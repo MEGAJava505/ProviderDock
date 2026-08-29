@@ -20,6 +20,8 @@ export * from "./bridge/responses/codex-model-catalog.js";
 export * from "./bridge/responses/responses-stream-state.js";
 export * from "./bridge/responses/responses-stream-relay.js";
 export * from "./bridge/responses/responses-bridge-server.js";
+export * from "./protocols/canonical/canonical-protocol.js";
+export * from "./protocols/openai-chat/responses-to-chat-request.js";
 export * from "./providers/generic-openai/generic-openai-adapter.js";
 export * from "./providers/agentrouter/agentrouter-adapter.js";
 export * from "./providers/gorouter/gorouter-adapter.js";

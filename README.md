@@ -17,6 +17,7 @@ Development has started with Phase 1. The first core slice provides:
 - a management CLI for provider CRUD, model discovery, and health probes;
 - an isolated Codex runtime profile, launcher, and checksum-guarded crash recovery;
 - a loopback-only native Responses bridge with Codex model capabilities and event-aware SSE repair;
+- canonical Responses request normalization and safe Responses-to-Chat request translation;
 - unit tests using fully local HTTP mocks.
 
 There is no production UI yet. The Codex launcher automatically owns a native Responses
