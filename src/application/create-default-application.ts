@@ -19,6 +19,7 @@ import {
 } from "../clients/codex/codex-launcher.js";
 import { ResponsesCodexBridgeFactory } from "../clients/codex/codex-bridge-factory.js";
 import { CodexRuntimeSessionManager } from "../clients/codex/codex-runtime-session.js";
+import { ProviderDoctor } from "../diagnostics/provider-doctor.js";
 import { ProviderDockApplication } from "./provider-dock-application.js";
 
 export interface ProviderDockPaths {
@@ -105,5 +106,18 @@ export function createDefaultApplication(
     }),
   );
 
-  return new ProviderDockApplication(profiles, probes, secretVault, codexLauncher, adapters);
+  const doctor = new ProviderDoctor({
+    secretStore: secrets,
+    adapterRegistry: adapters,
+    ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+  });
+
+  return new ProviderDockApplication(
+    profiles,
+    probes,
+    secretVault,
+    codexLauncher,
+    adapters,
+    doctor,
+  );
 }

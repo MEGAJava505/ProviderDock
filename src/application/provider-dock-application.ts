@@ -11,6 +11,11 @@ import type {
   LaunchCodexInput,
 } from "../clients/codex/codex-launcher.js";
 import type { CodexRecoveryOutcome } from "../clients/codex/codex-runtime-session.js";
+import type {
+  DoctorReport,
+  ProviderDoctor,
+  RunDoctorOptions,
+} from "../diagnostics/provider-doctor.js";
 
 export class ProviderNotFoundError extends Error {
   constructor(readonly providerId: string) {
@@ -33,6 +38,7 @@ export class ProviderDockApplication {
     private readonly secretVault?: SecretVault,
     private readonly codexLauncher?: CodexLauncher,
     private readonly adapters?: ProviderAdapterRegistry,
+    private readonly doctor?: ProviderDoctor,
   ) {}
 
   async listProviders(): Promise<readonly ProviderProfile[]> {
@@ -55,6 +61,11 @@ export class ProviderDockApplication {
 
   async probeProvider(id: string): Promise<ProviderProbeResult> {
     return this.probes.probe(await this.getProvider(id));
+  }
+
+  async diagnoseProvider(id: string, options: RunDoctorOptions = {}): Promise<DoctorReport> {
+    if (!this.doctor) throw new Error("The provider doctor is not configured.");
+    return this.doctor.run(await this.getProvider(id), options);
   }
 
   async setSecret(reference: string, value: string): Promise<void> {

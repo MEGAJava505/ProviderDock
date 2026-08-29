@@ -193,7 +193,7 @@ describe("ResponsesBridgeServer", () => {
         response: { status: "completed" },
       });
 
-      const failed = await postStream(address.baseUrl);
+      const failed = await postStream(address.baseUrl, "Work on the pending case");
       expect(failed.find((event) => event.type === "response.failed")).toMatchObject({
         response: {
           status: "failed",
@@ -445,8 +445,11 @@ function decodeEvents(source: string) {
   return [...decoder.push(encoder.encode(source)), ...decoder.finish()];
 }
 
-async function postStream(baseUrl: string): Promise<Array<Record<string, unknown>>> {
-  const response = await postJson(baseUrl, { model: "gpt-x", input: "Work", stream: true });
+async function postStream(
+  baseUrl: string,
+  input = "Work",
+): Promise<Array<Record<string, unknown>>> {
+  const response = await postJson(baseUrl, { model: "gpt-x", input, stream: true });
   return decodeEvents(await response.text())
     .filter((event) => event.data !== undefined && event.data !== "[DONE]")
     .map((event) => JSON.parse(event.data ?? "null") as Record<string, unknown>);
