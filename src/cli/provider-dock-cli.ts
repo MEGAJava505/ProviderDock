@@ -15,6 +15,7 @@ import {
   type ProviderProfile,
 } from "../core/providers/provider-profile.js";
 import type { ProviderProbeResult } from "../core/health/provider-probe-service.js";
+import type { DoctorLevel, DoctorReport } from "../diagnostics/provider-doctor.js";
 
 export interface CliIo {
   readonly stdout: (message: string) => void;
@@ -78,6 +79,7 @@ async function execute(
 
   if (command === "providers") return executeProviders(rest, application, io);
   if (command === "probe") return executeProbe(rest, application, io);
+  if (command === "doctor") return executeDoctor(rest, application, io);
   if (command === "secrets") return executeSecrets(rest, application, io, environment);
   if (command === "launch") return executeLaunch(rest, application, io, environment);
   if (command === "recover") return executeRecovery(rest, application, io);
@@ -360,6 +362,60 @@ async function executeProbe(
   return result.health.status === "ONLINE" ? 0 : 2;
 }
 
+async function executeDoctor(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: [...argv],
+    options: {
+      model: { type: "string" },
+      level: { type: "string" },
+      json: { type: "boolean", default: false },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+  const id = requireSinglePositional(
+    positionals,
+    "doctor <provider-id> [--model MODEL] [--level 0|1|2|3] [--json]",
+  );
+  const level = parseDoctorLevel(values.level ?? "1");
+  const report = await application.diagnoseProvider(id, {
+    level,
+    ...(typeof values.model === "string" ? { modelId: values.model } : {}),
+  });
+  io.stdout(values.json ? JSON.stringify(report, null, 2) : renderDoctorReport(report));
+  return report.verdict === "FAIL" ? 2 : 0;
+}
+
+function parseDoctorLevel(value: string | boolean | string[]): DoctorLevel {
+  if (typeof value !== "string" || !/^[0-3]$/.test(value)) {
+    throw new CliUsageError("--level must be 0, 1, 2, or 3.");
+  }
+  return Number(value) as DoctorLevel;
+}
+
+function renderDoctorReport(report: DoctorReport): string {
+  const header = [
+    `Provider: ${report.providerId}`,
+    ...(report.modelId === undefined ? [] : [`Model: ${report.modelId}`]),
+    ...(report.protocol === undefined ? [] : [`Protocol: ${report.protocol}`]),
+    `Level: ${report.level}`,
+  ];
+  const table = renderTable(
+    ["CHECK", "STATUS", "LATENCY", "DETAILS"],
+    report.checks.map((check) => [
+      check.name,
+      check.status,
+      check.latencyMs === undefined ? "-" : `${check.latencyMs} ms`,
+      check.details ?? "",
+    ]),
+  );
+  return `${header.join("\n")}\n\n${table}\n\nVerdict: ${report.verdict}`;
+}
+
 function parseAuth(values: Record<string, string | boolean | string[] | undefined>): ProviderAuth {
   const kind = parseEnum(
     typeof values["auth-kind"] === "string" ? values["auth-kind"] : "none",
@@ -519,11 +575,18 @@ Usage:
   providerdock providers set --id ID --name NAME --base-url URL [options]
   providerdock providers remove <provider-id>
   providerdock probe <provider-id> [--json]
+  providerdock doctor <provider-id> [--model MODEL] [--level 0|1|2|3] [--json]
   providerdock secrets list
   providerdock secrets set <reference> --from-env VARIABLE
   providerdock secrets remove <reference>
   providerdock launch codex --provider ID --model MODEL --project DIRECTORY [--bridge-url URL]
   providerdock recover codex [--json]
+
+Doctor levels (run manually; deeper levels send real inference requests):
+  0  metadata and model discovery only
+  1  plus one minimal inference request (default)
+  2  plus a streaming check
+  3  plus a synthetic side-effect-free tool round-trip
 
 Codex launch routing:
   Without --bridge-url, ProviderDock selects direct or managed compatibility bridge mode.

@@ -18,6 +18,10 @@ Development has started with Phase 1. The first core slice provides:
 - an isolated Codex runtime profile, launcher, and checksum-guarded crash recovery;
 - a loopback-only native Responses bridge with Codex model capabilities and event-aware SSE repair;
 - canonical Responses request normalization and safe Responses-to-Chat request translation;
+- an anti-replay/anti-recursion turn ledger that blocks duplicate turns, unsafe retries
+  after partial streams, and recursive tool loops before upstream contact;
+- a manual tiered Provider/Model Doctor (metadata, minimal inference, streaming,
+  synthetic tool round-trip);
 - unit tests using fully local HTTP mocks.
 
 There is no production UI yet. The Codex launcher automatically owns a compatibility
@@ -50,6 +54,7 @@ node dist/cli.js providers set \
 
 node dist/cli.js providers list
 node dist/cli.js probe agentrouter
+node dist/cli.js doctor agentrouter --level 2
 node dist/cli.js providers remove agentrouter
 ```
 
@@ -106,6 +111,8 @@ Chat Completions providers are translated automatically through the canonical pr
 Anthropic translation is not implemented yet. An already-running external compatibility
 bridge can be selected explicitly through `--bridge-url`.
 Bridge behavior is documented in [`docs/responses-bridge.md`](./docs/responses-bridge.md).
+Replay protection and tool-call integrity rules are documented in
+[`docs/anti-replay.md`](./docs/anti-replay.md).
 Runtime details and recovery guarantees are documented in
 [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 
