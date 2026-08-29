@@ -1,7 +1,11 @@
 import { parseArgs } from "node:util";
 import { z } from "zod";
 import type { ProviderDockApplication } from "../application/provider-dock-application.js";
-import { ProviderNotFoundError } from "../application/provider-dock-application.js";
+import {
+  ProviderNotFoundError,
+  SecretVaultUnavailableError,
+} from "../application/provider-dock-application.js";
+import { SecretProtectionError } from "../core/security/dpapi-secret-vault.js";
 import {
   preferredClients,
   providerApiTypes,
@@ -18,6 +22,7 @@ export interface CliIo {
 export interface RunProviderDockCliOptions {
   readonly application: ProviderDockApplication;
   readonly io?: CliIo;
+  readonly environment?: NodeJS.ProcessEnv;
 }
 
 const consoleIo: CliIo = {
@@ -32,9 +37,14 @@ export async function runProviderDockCli(
   const io = options.io ?? consoleIo;
 
   try {
-    return await execute(argv, options.application, io);
+    return await execute(argv, options.application, io, options.environment ?? process.env);
   } catch (error) {
-    if (error instanceof CliUsageError || error instanceof ProviderNotFoundError) {
+    if (
+      error instanceof CliUsageError ||
+      error instanceof ProviderNotFoundError ||
+      error instanceof SecretVaultUnavailableError ||
+      error instanceof SecretProtectionError
+    ) {
       io.stderr(`Error: ${error.message}`);
       return 1;
     }
@@ -54,6 +64,7 @@ async function execute(
   argv: readonly string[],
   application: ProviderDockApplication,
   io: CliIo,
+  environment: NodeJS.ProcessEnv,
 ): Promise<number> {
   const [command, ...rest] = argv;
 
@@ -64,8 +75,66 @@ async function execute(
 
   if (command === "providers") return executeProviders(rest, application, io);
   if (command === "probe") return executeProbe(rest, application, io);
+  if (command === "secrets") return executeSecrets(rest, application, io, environment);
 
   throw new CliUsageError(`Unknown command '${command}'. Run 'providerdock help'.`);
+}
+
+async function executeSecrets(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+  environment: NodeJS.ProcessEnv,
+): Promise<number> {
+  const [command, ...rest] = argv;
+
+  switch (command) {
+    case "list": {
+      const { positionals } = parseArgs({
+        args: [...rest],
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const references = await application.listSecretReferences();
+      io.stdout(references.length > 0 ? references.join("\n") : "No secrets stored.");
+      return 0;
+    }
+    case "set": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: { "from-env": { type: "string" } },
+        allowPositionals: true,
+        strict: true,
+      });
+      const reference = requireSinglePositional(
+        positionals,
+        "secrets set <reference> --from-env VARIABLE",
+      );
+      const environmentName = requireString(values["from-env"], "--from-env");
+      const value = environment[environmentName];
+      if (!value) {
+        throw new CliUsageError(`Environment variable '${environmentName}' is not set or empty.`);
+      }
+      await application.setSecret(reference, value);
+      io.stdout(`Stored secret '${reference}' in the OS-protected vault.`);
+      return 0;
+    }
+    case "remove": {
+      const { positionals } = parseArgs({
+        args: [...rest],
+        allowPositionals: true,
+        strict: true,
+      });
+      const reference = requireSinglePositional(positionals, "secrets remove <reference>");
+      const removed = await application.removeSecret(reference);
+      if (!removed) throw new CliUsageError(`Secret '${reference}' is not stored.`);
+      io.stdout(`Removed secret '${reference}'.`);
+      return 0;
+    }
+    default:
+      throw new CliUsageError("Expected secrets subcommand: list, set, or remove.");
+  }
 }
 
 async function executeProviders(
@@ -360,6 +429,9 @@ Usage:
   providerdock providers set --id ID --name NAME --base-url URL [options]
   providerdock providers remove <provider-id>
   providerdock probe <provider-id> [--json]
+  providerdock secrets list
+  providerdock secrets set <reference> --from-env VARIABLE
+  providerdock secrets remove <reference>
 
 Authentication options for providers set:
   --auth-kind none|bearer|header|query

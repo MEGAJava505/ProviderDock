@@ -15,7 +15,12 @@ export type ProviderApiType = z.infer<typeof providerApiTypeSchema>;
 export const preferredClients = ["auto", "codex", "claude-code"] as const;
 export const preferredClientSchema = z.enum(preferredClients);
 
-const secretReferenceSchema = z.string().trim().min(1).max(256);
+export const secretReferenceSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(256)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/, "Use letters, digits, '.', ':', '-' or '_'.");
 
 export const providerAuthSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("none") }).strict(),

@@ -5,6 +5,7 @@ import {
   ProviderDockApplication,
   ProviderNotFoundError,
   ProviderProbeService,
+  SecretVaultUnavailableError,
 } from "../src/index.js";
 
 describe("ProviderDockApplication", () => {
@@ -28,6 +29,13 @@ describe("ProviderDockApplication", () => {
     await expect(application.getProvider("missing")).rejects.toBeInstanceOf(ProviderNotFoundError);
     await expect(application.removeProvider("missing")).rejects.toBeInstanceOf(
       ProviderNotFoundError,
+    );
+  });
+
+  it("reports when a writable OS vault is unavailable", async () => {
+    const application = createApplication();
+    await expect(application.setSecret("ROUTER_KEY", "secret")).rejects.toBeInstanceOf(
+      SecretVaultUnavailableError,
     );
   });
 });

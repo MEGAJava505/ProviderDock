@@ -54,6 +54,20 @@ stored under `~/.provider-switcher/providers/providers.json`. Set `PROVIDER_DOCK
 to use an isolated data directory. Credential headers and query parameters are rejected
 as static values and must use `--secret-header` or the corresponding auth mode.
 
+On Windows, secrets can be imported into the per-user DPAPI vault without putting their
+value in process arguments:
+
+```powershell
+$env:IMPORT_PROVIDER_KEY = "your-token"
+node dist/cli.js secrets set AGENTROUTER_API_KEY --from-env IMPORT_PROVIDER_KEY
+Remove-Item Env:IMPORT_PROVIDER_KEY
+
+node dist/cli.js secrets list
+```
+
+Provider resolution checks the DPAPI vault first and then the child process environment.
+The CLI intentionally provides no command that prints a stored secret value.
+
 ## Architecture direction
 
 ```text
