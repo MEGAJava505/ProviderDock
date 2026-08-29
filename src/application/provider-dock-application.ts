@@ -2,6 +2,7 @@ import type { ProviderProbeResult, ProviderProbeService } from "../core/health/p
 import type { ProviderProfile } from "../core/providers/provider-profile.js";
 import { parseProviderProfile } from "../core/providers/provider-profile.js";
 import type { ProviderProfileRepository } from "../core/providers/provider-profile-repository.js";
+import type { ProviderAdapterRegistry } from "../core/providers/provider-adapter-registry.js";
 import type { SecretVault } from "../core/security/secret-store.js";
 import { secretReferenceSchema } from "../core/providers/provider-profile.js";
 import type {
@@ -31,20 +32,21 @@ export class ProviderDockApplication {
     private readonly probes: ProviderProbeService,
     private readonly secretVault?: SecretVault,
     private readonly codexLauncher?: CodexLauncher,
+    private readonly adapters?: ProviderAdapterRegistry,
   ) {}
 
-  listProviders(): Promise<readonly ProviderProfile[]> {
-    return this.profiles.list();
+  async listProviders(): Promise<readonly ProviderProfile[]> {
+    return (await this.profiles.list()).map((profile) => this.prepareProfile(profile));
   }
 
   async getProvider(id: string): Promise<ProviderProfile> {
     const profile = await this.profiles.get(id);
     if (!profile) throw new ProviderNotFoundError(id);
-    return profile;
+    return this.prepareProfile(profile);
   }
 
   async setProvider(input: unknown): Promise<ProviderProfile> {
-    return this.profiles.upsert(parseProviderProfile(input));
+    return this.profiles.upsert(this.prepareProfile(parseProviderProfile(input)));
   }
 
   async removeProvider(id: string): Promise<void> {
@@ -91,5 +93,9 @@ export class ProviderDockApplication {
       throw new Error("The Codex runtime launcher is not configured.");
     }
     return this.codexLauncher;
+  }
+
+  private prepareProfile(profile: ProviderProfile): ProviderProfile {
+    return this.adapters?.prepareProfile(profile) ?? profile;
   }
 }

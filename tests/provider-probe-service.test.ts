@@ -31,6 +31,7 @@ describe("ProviderProbeService", () => {
       checkedAt: "2026-08-29T00:00:00.000Z",
       latencyMs: 15,
       discoveredModelCount: 1,
+      appliedFixes: [],
     });
     expect(result.models.map(({ modelId, source, healthStatus }) => ({
       modelId,
@@ -103,4 +104,3 @@ function sequenceClock(...values: number[]): () => number {
   let index = 0;
   return () => values[Math.min(index++, values.length - 1)] ?? 0;
 }
-

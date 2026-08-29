@@ -16,6 +16,7 @@ export interface ProviderHealthSnapshot {
   readonly checkedAt: string;
   readonly latencyMs: number;
   readonly discoveredModelCount: number;
+  readonly appliedFixes: readonly string[];
   readonly errorType?: NormalizedErrorType;
   readonly errorMessage?: string;
   readonly httpStatus?: number;
@@ -45,21 +46,30 @@ export class ProviderProbeService {
 
   async probe(profile: ProviderProfile): Promise<ProviderProbeResult> {
     const startedAt = this.monotonicNow();
+    let appliedFixes: readonly string[] = [];
 
     if (!profile.enabled || !profile.healthCheck.enabled) {
       return {
-        health: this.snapshot(profile.id, "DISABLED", startedAt, 0),
+        health: this.snapshot(profile.id, "DISABLED", startedAt, 0, appliedFixes),
         models: mergeModelCatalog(profile, []),
       };
     }
 
     try {
       const adapter = this.registry.resolve(profile);
-      const discoveredModels = await adapter.discoverModels(profile);
+      const preparedProfile = adapter.prepareProfile?.(profile) ?? profile;
+      appliedFixes = adapter.compatibilityFixes?.(preparedProfile) ?? [];
+      const discoveredModels = await adapter.discoverModels(preparedProfile);
       const status: ModelHealthStatus = discoveredModels.length > 0 ? "ONLINE" : "DEGRADED";
 
       return {
-        health: this.snapshot(profile.id, status, startedAt, discoveredModels.length),
+        health: this.snapshot(
+          profile.id,
+          status,
+          startedAt,
+          discoveredModels.length,
+          appliedFixes,
+        ),
         models: mergeModelCatalog(profile, discoveredModels),
       };
     } catch (error) {
@@ -72,7 +82,13 @@ export class ProviderProbeService {
 
       return {
         health: {
-          ...this.snapshot(profile.id, healthStatusForError(normalized.type), startedAt, 0),
+          ...this.snapshot(
+            profile.id,
+            healthStatusForError(normalized.type),
+            startedAt,
+            0,
+            appliedFixes,
+          ),
           errorType: normalized.type,
           errorMessage: normalized.message,
           ...(normalized.httpStatus === undefined ? {} : { httpStatus: normalized.httpStatus }),
@@ -87,6 +103,7 @@ export class ProviderProbeService {
     status: ModelHealthStatus,
     startedAt: number,
     discoveredModelCount: number,
+    appliedFixes: readonly string[],
   ): ProviderHealthSnapshot {
     return {
       providerId,
@@ -94,6 +111,7 @@ export class ProviderProbeService {
       checkedAt: this.now().toISOString(),
       latencyMs: Math.max(0, Math.round(this.monotonicNow() - startedAt)),
       discoveredModelCount,
+      appliedFixes,
     };
   }
 }
@@ -121,4 +139,3 @@ function healthStatusForError(type: NormalizedErrorType): ModelHealthStatus {
       return "OFFLINE";
   }
 }
-

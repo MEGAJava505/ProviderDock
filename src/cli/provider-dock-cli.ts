@@ -9,6 +9,7 @@ import { SecretProtectionError } from "../core/security/dpapi-secret-vault.js";
 import { CodexRuntimeConfigurationError } from "../clients/codex/codex-runtime-config.js";
 import {
   preferredClients,
+  providerAdapterIds,
   providerApiTypes,
   type ProviderAuth,
   type ProviderProfile,
@@ -282,6 +283,7 @@ async function setProvider(
       name: { type: "string" },
       "base-url": { type: "string" },
       "api-type": { type: "string" },
+      adapter: { type: "string" },
       "models-endpoint": { type: "string" },
       "manual-model": { type: "string", multiple: true },
       "preferred-client": { type: "string" },
@@ -305,6 +307,7 @@ async function setProvider(
     displayName: requireString(values.name, "--name"),
     baseUrl: requireString(values["base-url"], "--base-url"),
     apiType: parseEnum(values["api-type"] ?? "auto", providerApiTypes, "--api-type"),
+    adapterId: parseEnum(values.adapter ?? "auto", providerAdapterIds, "--adapter"),
     auth: parseAuth(values),
     enabled: !values.disabled,
     staticHeaders: parseAssignments(values.header, "--header"),
@@ -437,10 +440,11 @@ function requireSinglePositional(positionals: readonly string[], usage: string):
 
 function renderProviderTable(profiles: readonly ProviderProfile[]): string {
   return renderTable(
-    ["ID", "NAME", "API", "ENABLED", "BASE URL"],
+    ["ID", "NAME", "ADAPTER", "API", "ENABLED", "BASE URL"],
     profiles.map((profile) => [
       profile.id,
       profile.displayName,
+      profile.adapterId,
       profile.apiType,
       profile.enabled ? "yes" : "no",
       profile.baseUrl,
@@ -457,6 +461,9 @@ function renderProbe(result: ProviderProbeResult): string {
   ];
   if (result.health.errorType) summary.push(`Error: ${result.health.errorType}`);
   if (result.health.errorMessage) summary.push(`Details: ${result.health.errorMessage}`);
+  if (result.health.appliedFixes.length > 0) {
+    summary.push(`Fixes: ${result.health.appliedFixes.join(", ")}`);
+  }
 
   if (result.models.length === 0) return `${summary.join("\n")}\nModels: none`;
   return `${summary.join("\n")}\n\n${renderTable(
@@ -518,6 +525,7 @@ Authentication options for providers set:
   --auth-kind none|bearer|header|query
   --secret-ref ENVIRONMENT_VARIABLE
   --auth-name HEADER_OR_QUERY_NAME
+  --adapter auto|generic-openai|agentrouter|gorouter|custom
 
 Additional repeatable options:
   --manual-model MODEL_ID

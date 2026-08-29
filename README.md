@@ -50,6 +50,22 @@ node dist/cli.js probe agentrouter
 node dist/cli.js providers remove agentrouter
 ```
 
+For AgentRouter, select its scoped adapter so the established client-identity headers and
+model filtering are applied automatically:
+
+```powershell
+node dist/cli.js providers set `
+  --id agentrouter `
+  --name AgentRouter `
+  --base-url https://agentrouter.org/v1 `
+  --adapter agentrouter `
+  --auth-kind bearer `
+  --secret-ref AGENTROUTER_API_KEY
+```
+
+GoRouter uses `--adapter gorouter`; no provider-specific behavior is assumed until a
+probe demonstrates it. See [`docs/provider-adapters.md`](./docs/provider-adapters.md).
+
 Provider profiles store only secret references. Put the actual token in the referenced
 environment variable; do not pass API keys on the command line. By default profiles are
 stored under `~/.provider-switcher/providers/providers.json`. Set `PROVIDER_DOCK_HOME`

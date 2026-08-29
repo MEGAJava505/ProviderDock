@@ -36,7 +36,10 @@ export class GenericOpenAiAdapter implements ProviderAdapter {
   }
 
   supports(profile: ProviderProfile): boolean {
-    return ["auto", "openai-responses", "openai-chat-completions"].includes(profile.apiType);
+    return (
+      ["auto", "generic-openai"].includes(profile.adapterId) &&
+      ["auto", "openai-responses", "openai-chat-completions"].includes(profile.apiType)
+    );
   }
 
   async discoverModels(profile: ProviderProfile): Promise<readonly DiscoveredProviderModel[]> {

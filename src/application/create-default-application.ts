@@ -11,6 +11,8 @@ import {
   type SecretVault,
 } from "../core/security/secret-store.js";
 import { GenericOpenAiAdapter } from "../providers/generic-openai/generic-openai-adapter.js";
+import { AgentRouterAdapter } from "../providers/agentrouter/agentrouter-adapter.js";
+import { GoRouterAdapter } from "../providers/gorouter/gorouter-adapter.js";
 import { CodexLauncher } from "../clients/codex/codex-launcher.js";
 import { CodexRuntimeSessionManager } from "../clients/codex/codex-runtime-session.js";
 import { ProviderDockApplication } from "./provider-dock-application.js";
@@ -76,11 +78,14 @@ export function createDefaultApplication(
     );
     secrets = new ChainedSecretStore([secretVault, environmentSecrets]);
   }
-  const openAiAdapter = new GenericOpenAiAdapter({
+  const adapterOptions = {
     secretStore: secrets,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
-  });
-  const adapters = new ProviderAdapterRegistry().register(openAiAdapter);
+  };
+  const adapters = new ProviderAdapterRegistry()
+    .register(new AgentRouterAdapter(adapterOptions))
+    .register(new GoRouterAdapter(adapterOptions))
+    .register(new GenericOpenAiAdapter(adapterOptions));
   const probes = new ProviderProbeService(adapters);
   const codexLauncher = new CodexLauncher(
     new CodexRuntimeSessionManager({
@@ -90,5 +95,5 @@ export function createDefaultApplication(
     }),
   );
 
-  return new ProviderDockApplication(profiles, probes, secretVault, codexLauncher);
+  return new ProviderDockApplication(profiles, probes, secretVault, codexLauncher, adapters);
 }

@@ -14,3 +14,6 @@ export * from "./core/providers/provider-profile-repository.js";
 export * from "./core/security/secret-store.js";
 export * from "./core/security/dpapi-secret-vault.js";
 export * from "./providers/generic-openai/generic-openai-adapter.js";
+export * from "./providers/agentrouter/agentrouter-adapter.js";
+export * from "./providers/gorouter/gorouter-adapter.js";
+export * from "./providers/builtin-provider-profiles.js";

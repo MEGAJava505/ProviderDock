@@ -15,6 +15,15 @@ export type ProviderApiType = z.infer<typeof providerApiTypeSchema>;
 export const preferredClients = ["auto", "codex", "claude-code"] as const;
 export const preferredClientSchema = z.enum(preferredClients);
 
+export const providerAdapterIds = [
+  "auto",
+  "generic-openai",
+  "agentrouter",
+  "gorouter",
+  "custom",
+] as const;
+export const providerAdapterIdSchema = z.enum(providerAdapterIds);
+
 export const secretReferenceSchema = z
   .string()
   .trim()
@@ -125,6 +134,7 @@ export const providerProfileSchema = z
       })
       .transform((value) => value.replace(/\/+$/, "")),
     apiType: providerApiTypeSchema.default("auto"),
+    adapterId: providerAdapterIdSchema.default("auto"),
     auth: providerAuthSchema.default({ kind: "none" }),
     staticHeaders: staticHeaderRecordSchema.default({}),
     secretHeaders: secretHeaderRecordSchema.default({}),

@@ -18,5 +18,9 @@ export class ProviderAdapterRegistry {
     if (!adapter) throw new UnsupportedProviderError(profile.id, profile.apiType);
     return adapter;
   }
-}
 
+  prepareProfile(profile: ProviderProfile): ProviderProfile {
+    const adapter = this.adapters.find((candidate) => candidate.supports(profile));
+    return adapter?.prepareProfile?.(profile) ?? profile;
+  }
+}
