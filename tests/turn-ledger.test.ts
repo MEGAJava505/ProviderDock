@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   TurnLedger,
+  extractResponsesDeliveredToolCalls,
   extractResponsesTurnSignature,
   type TurnSignature,
 } from "../src/index.js";
@@ -72,6 +73,36 @@ describe("TurnLedger", () => {
     expect(loop).toMatchObject({ decision: "blocked", code: "TOOL_LOOP_DETECTED" });
   });
 
+  it("records upstream-delivered calls before execution and blocks their replay", () => {
+    const ledger = new TurnLedger();
+    const delivered = {
+      callId: "call-upstream",
+      name: "write_file",
+      argumentsHash: "args-hash",
+    };
+    const first = ledger.admit(signature({ fingerprint: "fp-upstream" }));
+    if (first.decision !== "accepted") throw new Error("expected acceptance");
+    ledger.recordDeliveredToolCalls(first.token, [delivered]);
+    ledger.complete(first.token);
+
+    const continuation = ledger.admit(
+      signature({
+        fingerprint: "fp-continuation",
+        toolCalls: [delivered],
+        toolResults: [{ callId: delivered.callId, outputHash: "result-hash" }],
+      }),
+    );
+    expect(continuation.decision).toBe("accepted");
+    if (continuation.decision !== "accepted") return;
+    ledger.complete(continuation.token);
+
+    const next = ledger.admit(signature({ fingerprint: "fp-next" }));
+    if (next.decision !== "accepted") throw new Error("expected acceptance");
+    expect(() => ledger.recordDeliveredToolCalls(next.token, [delivered])).toThrow(
+      /already-resolved tool call/i,
+    );
+  });
+
   it("rejects tool results without a matching call and conflicting duplicates", () => {
     const ledger = new TurnLedger();
     expect(
@@ -133,5 +164,20 @@ describe("extractResponsesTurnSignature", () => {
 
     const c = extractResponsesTurnSignature({ ...body, model: "other" });
     expect(c.fingerprint).not.toBe(a.fingerprint);
+    const d = extractResponsesTurnSignature({ ...body, max_output_tokens: 512 });
+    expect(d.fingerprint).not.toBe(a.fingerprint);
+
+    expect(
+      extractResponsesDeliveredToolCalls({
+        output: [
+          {
+            type: "function_call",
+            call_id: "c1",
+            name: "echo",
+            arguments: '{"a":1}',
+          },
+        ],
+      }),
+    ).toEqual([expect.objectContaining({ callId: "c1", name: "echo" })]);
   });
 });

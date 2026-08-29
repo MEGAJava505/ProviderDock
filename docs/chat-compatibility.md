@@ -72,7 +72,8 @@ ID and no hidden third request.
 
 ## Current boundary
 
-Chat request, JSON response and SSE translation are connected. Server-side web search,
-stateful `previous_response_id` storage, persistent cross-request tool-call replay ledger,
-and Anthropic Messages translation remain later safety/compatibility blocks. Automatic
-retry remains disabled while those stateful barriers are incomplete.
+Chat request, JSON response and SSE translation are connected. The session-scoped
+TurnLedger records delivered tool calls and blocks cross-request replay; durable ledger
+storage and stateful `previous_response_id` storage remain later persistence blocks.
+Anthropic Messages↔Chat translation is connected through the separate Claude bridge.
+Server-side web search remains unsupported, and automatic retry remains disabled.

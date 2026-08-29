@@ -95,4 +95,84 @@ describe("bridge anti-replay guard", () => {
       await bridge.stop();
     }
   });
+
+  it("blocks an upstream replay of an already-resolved tool call before delivery", async () => {
+    const toolCall = {
+      id: "fc-1",
+      type: "function_call",
+      call_id: "call-side-effect",
+      name: "write_file",
+      arguments: '{"path":"a.txt"}',
+      status: "completed",
+    };
+    let requestNumber = 0;
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => {
+      requestNumber += 1;
+      const output = requestNumber === 2
+        ? [
+            {
+              id: "msg-final",
+              type: "message",
+              role: "assistant",
+              status: "completed",
+              content: [{ type: "output_text", text: "done" }],
+            },
+          ]
+        : [toolCall];
+      return new Response(
+        JSON.stringify({
+          id: `resp-${requestNumber}`,
+          object: "response",
+          status: "completed",
+          output,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    const bridge = bridgeWith(fetchMock);
+    const address = await bridge.start();
+    try {
+      const first = await postResponses(address.baseUrl, {
+        model: "gpt-x",
+        input: "write once",
+        stream: false,
+      });
+      expect(first.status).toBe(200);
+
+      const continuation = await postResponses(address.baseUrl, {
+        model: "gpt-x",
+        input: [
+          toolCall,
+          {
+            type: "function_call_output",
+            call_id: "call-side-effect",
+            output: "written",
+          },
+        ],
+        stream: false,
+      });
+      expect(continuation.status).toBe(200);
+
+      const replayedCall = await postResponses(address.baseUrl, {
+        model: "gpt-x",
+        input: "different new turn",
+        stream: false,
+      });
+      expect(replayedCall.status).toBe(409);
+      expect(replayedCall.headers.get("x-providerdock-turn-block")).toBe(
+        "TOOL_LOOP_DETECTED",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      await bridge.stop();
+    }
+  });
 });
+
+function postResponses(baseUrl: string, body: Record<string, unknown>): Promise<Response> {
+  return fetch(`${baseUrl}/responses`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}

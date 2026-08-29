@@ -61,6 +61,19 @@ export interface TurnToken {
   readonly attempt: number;
 }
 
+export class TurnLedgerViolationError extends Error {
+  constructor(
+    readonly code: Extract<
+      TurnBlockCode,
+      "TOOL_CALL_CONFLICT" | "TOOL_LOOP_DETECTED"
+    >,
+    message: string,
+  ) {
+    super(message);
+    this.name = "TurnLedgerViolationError";
+  }
+}
+
 interface TurnRecord {
   state: TurnState;
   streamStarted: boolean;
@@ -156,6 +169,64 @@ export class TurnLedger {
     record.updatedAtMs = this.now();
   }
 
+  /**
+   * Records tool calls from a validated upstream response before their
+   * completion event is delivered to the client. A reused/conflicting call id
+   * is rejected here, at the last safe side-effect barrier.
+   */
+  recordDeliveredToolCalls(token: TurnToken, calls: readonly TurnToolCall[]): void {
+    const record = this.currentRecord(token);
+    if (record === undefined) return;
+
+    const batch = new Map<string, TurnToolCall>();
+    for (const call of calls) {
+      const duplicate = batch.get(call.callId);
+      if (
+        duplicate !== undefined &&
+        (duplicate.name !== call.name || duplicate.argumentsHash !== call.argumentsHash)
+      ) {
+        throw new TurnLedgerViolationError(
+          "TOOL_CALL_CONFLICT",
+          `Upstream delivered tool call '${call.callId}' more than once with conflicting data.`,
+        );
+      }
+      batch.set(call.callId, call);
+
+      const known = this.toolCalls.get(call.callId);
+      if (
+        known !== undefined &&
+        (known.name !== call.name || known.argumentsHash !== call.argumentsHash)
+      ) {
+        throw new TurnLedgerViolationError(
+          "TOOL_CALL_CONFLICT",
+          `Upstream reused tool call '${call.callId}' with different name or arguments. ` +
+            "Delivery was blocked before the client could execute it.",
+        );
+      }
+      if (known?.resolved === true) {
+        throw new TurnLedgerViolationError(
+          "TOOL_LOOP_DETECTED",
+          `Upstream replayed already-resolved tool call '${call.callId}'. ` +
+            "Delivery was blocked before duplicate execution.",
+        );
+      }
+    }
+
+    for (const call of batch.values()) {
+      if (!this.toolCalls.has(call.callId)) {
+        this.toolCalls.set(call.callId, {
+          name: call.name,
+          argumentsHash: call.argumentsHash,
+          resolved: false,
+        });
+      }
+    }
+    if (batch.size > 0) {
+      record.toolActivity = true;
+      record.updatedAtMs = this.now();
+    }
+  }
+
   complete(token: TurnToken): void {
     this.transition(token, "COMPLETED");
   }
@@ -196,7 +267,10 @@ export class TurnLedger {
     const inRequestCalls = new Map<string, TurnToolCall>();
     for (const call of signature.toolCalls) {
       const duplicate = inRequestCalls.get(call.callId);
-      if (duplicate !== undefined && duplicate.argumentsHash !== call.argumentsHash) {
+      if (
+        duplicate !== undefined &&
+        (duplicate.name !== call.name || duplicate.argumentsHash !== call.argumentsHash)
+      ) {
         return blocked(
           "TOOL_CALL_CONFLICT",
           `Tool call '${call.callId}' appears twice in the request with different arguments.`,
@@ -205,7 +279,10 @@ export class TurnLedger {
       inRequestCalls.set(call.callId, call);
 
       const known = this.toolCalls.get(call.callId);
-      if (known !== undefined && known.argumentsHash !== call.argumentsHash) {
+      if (
+        known !== undefined &&
+        (known.name !== call.name || known.argumentsHash !== call.argumentsHash)
+      ) {
         return blocked(
           "TOOL_CALL_CONFLICT",
           `Tool call '${call.callId}' was previously delivered with different arguments. ` +
@@ -214,9 +291,16 @@ export class TurnLedger {
       }
     }
 
-    const inRequestResults = new Set<string>();
+    const inRequestResults = new Map<string, TurnToolResult>();
     for (const result of signature.toolResults) {
-      inRequestResults.add(result.callId);
+      const duplicate = inRequestResults.get(result.callId);
+      if (duplicate !== undefined && duplicate.outputHash !== result.outputHash) {
+        return blocked(
+          "TOOL_RESULT_CONFLICT",
+          `Tool result '${result.callId}' appears twice with different output.`,
+        );
+      }
+      inRequestResults.set(result.callId, result);
       if (!inRequestCalls.has(result.callId) && !this.toolCalls.has(result.callId)) {
         return blocked(
           "TOOL_RESULT_UNMATCHED",
@@ -321,17 +405,98 @@ export function extractResponsesTurnSignature(body: Readonly<Record<string, unkn
     }
   }
 
-  const fingerprint = sha256(
-    stableStringify({
-      model: body.model,
-      instructions: body.instructions,
-      input: body.input,
-      tools: body.tools,
-      tool_choice: body.tool_choice,
-    }),
-  );
+  const fingerprint = sha256(stableStringify(withoutStreamTransport(body)));
 
   return { fingerprint, toolCalls, toolResults };
+}
+
+/** Extracts completed tool calls from a Responses response or output item. */
+export function extractResponsesDeliveredToolCalls(
+  payload: Readonly<Record<string, unknown>>,
+): readonly TurnToolCall[] {
+  const output = Array.isArray(payload.output)
+    ? payload.output
+    : payload.type === "function_call" || payload.type === "custom_tool_call"
+      ? [payload]
+      : [];
+  const calls: TurnToolCall[] = [];
+  for (const rawItem of output) {
+    if (typeof rawItem !== "object" || rawItem === null || Array.isArray(rawItem)) continue;
+    const item = rawItem as Record<string, unknown>;
+    if (item.type !== "function_call" && item.type !== "custom_tool_call") continue;
+    if (typeof item.call_id !== "string" || item.call_id === "") continue;
+    calls.push({
+      callId: item.call_id,
+      name: typeof item.name === "string" ? item.name : "",
+      argumentsHash: sha256(stableStringify(item.arguments ?? item.input ?? "")),
+    });
+  }
+  return calls;
+}
+
+/**
+ * Extracts a stable turn signature from a raw Anthropic Messages request.
+ * tool_use blocks in assistant messages are delivered tool calls; tool_result
+ * blocks in user messages resolve them.
+ */
+export function extractAnthropicTurnSignature(
+  body: Readonly<Record<string, unknown>>,
+): TurnSignature {
+  const toolCalls: TurnToolCall[] = [];
+  const toolResults: TurnToolResult[] = [];
+
+  if (Array.isArray(body.messages)) {
+    for (const rawMessage of body.messages) {
+      if (typeof rawMessage !== "object" || rawMessage === null || Array.isArray(rawMessage)) {
+        continue;
+      }
+      const message = rawMessage as Record<string, unknown>;
+      if (!Array.isArray(message.content)) continue;
+      for (const rawBlock of message.content) {
+        if (typeof rawBlock !== "object" || rawBlock === null || Array.isArray(rawBlock)) continue;
+        const block = rawBlock as Record<string, unknown>;
+        if (block.type === "tool_use" && typeof block.id === "string" && block.id !== "") {
+          toolCalls.push({
+            callId: block.id,
+            name: typeof block.name === "string" ? block.name : "",
+            argumentsHash: sha256(stableStringify(block.input ?? {})),
+          });
+        } else if (
+          block.type === "tool_result" &&
+          typeof block.tool_use_id === "string" &&
+          block.tool_use_id !== ""
+        ) {
+          toolResults.push({
+            callId: block.tool_use_id,
+            outputHash: sha256(stableStringify(block.content ?? "")),
+          });
+        }
+      }
+    }
+  }
+
+  const fingerprint = sha256(stableStringify(withoutStreamTransport(body)));
+
+  return { fingerprint, toolCalls, toolResults };
+}
+
+/** Extracts tool_use blocks from a complete Anthropic message. */
+export function extractAnthropicDeliveredToolCalls(
+  payload: Readonly<Record<string, unknown>>,
+): readonly TurnToolCall[] {
+  const calls: TurnToolCall[] = [];
+  if (!Array.isArray(payload.content)) return calls;
+  for (const rawBlock of payload.content) {
+    if (typeof rawBlock !== "object" || rawBlock === null || Array.isArray(rawBlock)) continue;
+    const block = rawBlock as Record<string, unknown>;
+    if (block.type !== "tool_use" || typeof block.id !== "string" || block.id === "") continue;
+    calls.push({
+      callId: block.id,
+      name: typeof block.name === "string" ? block.name : "",
+      argumentsHash: sha256(stableStringify(block.input ?? {})),
+    });
+  }
+  return calls;
 }
 
 /** Deterministic JSON encoding with sorted object keys. */
@@ -350,6 +515,14 @@ function sortValue(value: unknown): unknown {
     return sorted;
   }
   return value;
+}
+
+function withoutStreamTransport(
+  value: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const result = { ...value };
+  delete result.stream;
+  return result;
 }
 
 function sha256(value: string): string {

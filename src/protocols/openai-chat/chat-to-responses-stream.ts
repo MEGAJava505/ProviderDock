@@ -55,6 +55,11 @@ export class ChatToResponsesStreamTranslator {
   private sequenceNumber = 0;
   private started = false;
   private terminal = false;
+  private terminalType:
+    | "response.completed"
+    | "response.failed"
+    | "response.incomplete"
+    | undefined;
   private upstreamId: string | undefined;
   private responseId: string | undefined;
   private model: string;
@@ -74,6 +79,14 @@ export class ChatToResponsesStreamTranslator {
 
   get terminalEventSeen(): boolean {
     return this.terminal;
+  }
+
+  get terminalEventType():
+    | "response.completed"
+    | "response.failed"
+    | "response.incomplete"
+    | undefined {
+    return this.terminalType;
   }
 
   feed(payload: unknown): readonly ResponsesStreamEventRecord[] {
@@ -190,6 +203,7 @@ export class ChatToResponsesStreamTranslator {
       const orderedOutput = this.finalizeOutputItems(events, translatedOutput);
       const response = { ...translated.response, output: orderedOutput };
       events.push(this.event(translated.terminalEventType, { response }));
+      this.terminalType = translated.terminalEventType;
       this.terminal = true;
       return events;
     } catch (error) {
@@ -211,6 +225,7 @@ export class ChatToResponsesStreamTranslator {
       message,
     });
     events.push(this.event("response.failed", { response }));
+    this.terminalType = "response.failed";
     this.terminal = true;
     return events;
   }

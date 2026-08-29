@@ -33,6 +33,7 @@ export class ResponsesStreamState {
   private highestSequenceNumber = -1;
   private fallbackOutputIndex = 0;
   private terminal = false;
+  private terminalType: "response.completed" | "response.failed" | "response.incomplete" | undefined;
   private readonly now: () => number;
   private readonly responseIdFactory: () => string;
 
@@ -45,6 +46,10 @@ export class ResponsesStreamState {
 
   get terminalEventSeen(): boolean {
     return this.terminal;
+  }
+
+  get terminalEventType(): "response.completed" | "response.failed" | "response.incomplete" | undefined {
+    return this.terminalType;
   }
 
   observe(event: JsonRecord, eventId?: string): StreamEventObservation {
@@ -123,6 +128,10 @@ export class ResponsesStreamState {
 
     if (terminalType) {
       this.terminal = true;
+      this.terminalType = event.type as
+        | "response.completed"
+        | "response.failed"
+        | "response.incomplete";
     }
 
     return { kind: "forward", event: forwarded };
@@ -155,6 +164,7 @@ export class ResponsesStreamState {
     };
 
     this.terminal = true;
+    this.terminalType = type;
     this.highestSequenceNumber += 1;
     return {
       type,

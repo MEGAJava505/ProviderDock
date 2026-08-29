@@ -14,12 +14,18 @@ export interface RelayResponsesStreamOptions {
   readonly heartbeatIntervalMs?: number;
   readonly idleTimeoutMs?: number;
   readonly maxEventCharacters?: number;
+  readonly beforeForwardEvent?: (event: JsonRecord) => void | Promise<void>;
 }
 
 export interface ResponsesStreamRelayResult {
   readonly repairedTerminal: boolean;
   readonly sawDoneMarker: boolean;
   readonly protocolFailure: boolean;
+  readonly terminalEventType:
+    | "response.completed"
+    | "response.failed"
+    | "response.incomplete"
+    | undefined;
 }
 
 export async function relayResponsesStream(
@@ -52,7 +58,7 @@ export async function relayResponsesStream(
       const chunk = await reader.read();
       if (chunk.done) {
         for (const event of decoder.finish()) {
-          if (await processEvent(event, state, options.response)) {
+          if (await processEvent(event, state, options.response, options.beforeForwardEvent)) {
             sawDoneMarker = true;
             finished = true;
             break;
@@ -63,7 +69,7 @@ export async function relayResponsesStream(
 
       resetIdleTimer();
       for (const event of decoder.push(chunk.value)) {
-        if (await processEvent(event, state, options.response)) {
+        if (await processEvent(event, state, options.response, options.beforeForwardEvent)) {
           sawDoneMarker = true;
           finished = true;
           await reader.cancel().catch(() => undefined);
@@ -85,7 +91,12 @@ export async function relayResponsesStream(
   }
 
   if (clientClosed || options.response.destroyed || options.response.writableEnded) {
-    return { repairedTerminal: false, sawDoneMarker, protocolFailure };
+    return {
+      repairedTerminal: false,
+      sawDoneMarker,
+      protocolFailure,
+      terminalEventType: state.terminalEventType,
+    };
   }
 
   const repair = state.buildTerminalRepair({
@@ -108,6 +119,7 @@ export async function relayResponsesStream(
     repairedTerminal: repair !== undefined,
     sawDoneMarker,
     protocolFailure,
+    terminalEventType: state.terminalEventType,
   };
 }
 
@@ -115,6 +127,7 @@ async function processEvent(
   event: SseEvent,
   state: ResponsesStreamState,
   response: ServerResponse,
+  beforeForwardEvent?: (event: JsonRecord) => void | Promise<void>,
 ): Promise<boolean> {
   if (event.data === "[DONE]") return true;
 
@@ -139,6 +152,8 @@ async function processEvent(
 
   const observation = state.observe(parsed, event.id);
   if (observation.kind !== "forward") return false;
+
+  await beforeForwardEvent?.(observation.event);
 
   await writeResponseChunk(
     response,

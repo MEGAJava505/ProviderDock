@@ -15,11 +15,19 @@ export interface RelayChatCompletionsStreamOptions {
   readonly heartbeatIntervalMs?: number;
   readonly idleTimeoutMs?: number;
   readonly maxEventCharacters?: number;
+  readonly beforeForwardEvent?: (
+    event: ResponsesStreamEventRecord,
+  ) => void | Promise<void>;
 }
 
 export interface ChatCompletionsStreamRelayResult {
   readonly sawDoneMarker: boolean;
   readonly protocolFailure: boolean;
+  readonly terminalEventType:
+    | "response.completed"
+    | "response.failed"
+    | "response.incomplete"
+    | undefined;
 }
 
 export async function relayChatCompletionsStream(
@@ -58,6 +66,7 @@ export async function relayChatCompletionsStream(
             translator,
             options.response,
             seenEventIds,
+            options.beforeForwardEvent,
           );
           if (outcome === "done") {
             sawDoneMarker = true;
@@ -74,6 +83,7 @@ export async function relayChatCompletionsStream(
           translator,
           options.response,
           seenEventIds,
+          options.beforeForwardEvent,
         );
         if (outcome === "done") {
           sawDoneMarker = true;
@@ -95,26 +105,42 @@ export async function relayChatCompletionsStream(
   }
 
   if (clientClosed || options.response.destroyed || options.response.writableEnded) {
-    return { sawDoneMarker, protocolFailure };
+    return {
+      sawDoneMarker,
+      protocolFailure,
+      terminalEventType: translator.terminalEventType,
+    };
   }
   const terminalEvents = protocolFailure
     ? translator.fail("Upstream sent a malformed or conflicting Chat stream event.")
     : translator.finish();
-  await writeTranslatedEvents(options.response, terminalEvents);
+  await writeTranslatedEvents(
+    options.response,
+    terminalEvents,
+    options.beforeForwardEvent,
+  );
   if (sawDoneMarker) {
     await writeResponseChunk(
       options.response,
       encodeSseEvent({ data: "[DONE]", comments: [] }),
     );
   }
-  return { sawDoneMarker, protocolFailure };
+  return {
+    sawDoneMarker,
+    protocolFailure,
+    terminalEventType: translator.terminalEventType,
+  };
 }
 
 export async function writeTranslatedEvents(
   response: ServerResponse,
   events: readonly ResponsesStreamEventRecord[],
+  beforeForwardEvent?: (
+    event: ResponsesStreamEventRecord,
+  ) => void | Promise<void>,
 ): Promise<void> {
   for (const event of events) {
+    await beforeForwardEvent?.(event);
     await writeResponseChunk(
       response,
       encodeSseEvent({
@@ -131,6 +157,9 @@ async function processChatEvent(
   translator: ChatToResponsesStreamTranslator,
   response: ServerResponse,
   seenEventIds: Map<string, string>,
+  beforeForwardEvent?: (
+    event: ResponsesStreamEventRecord,
+  ) => void | Promise<void>,
 ): Promise<"continue" | "done"> {
   if (event.data === "[DONE]") return "done";
   if (event.data === undefined) {
@@ -161,7 +190,7 @@ async function processChatEvent(
       { cause: error },
     );
   }
-  await writeTranslatedEvents(response, translator.feed(payload));
+  await writeTranslatedEvents(response, translator.feed(payload), beforeForwardEvent);
   return "continue";
 }
 

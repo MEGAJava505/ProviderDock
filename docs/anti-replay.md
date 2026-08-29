@@ -1,15 +1,17 @@
 # Anti-replay and tool integrity
 
-The bridge admits every `/v1/responses` turn through a `TurnLedger`
+The Responses and Anthropic bridges admit every `/v1/responses` or
+`/v1/messages` turn through a session-scoped `TurnLedger`
 (`src/core/state-machine/turn-ledger.ts`) before it is sent upstream. The
 ledger implements the safety rules from spec sections 19–21.
 
 ## Turn admission
 
-Each turn is fingerprinted from the semantically relevant request fields
-(`model`, `instructions`, `input`, `tools`, `tool_choice`) using a stable,
-key-sorted JSON hash. The `stream` flag is excluded so a streamed and a
-non-streamed attempt of the same turn share one identity.
+Each turn is fingerprinted from the complete request body using a stable,
+key-sorted JSON hash. Only the `stream` transport flag is excluded, so a
+streamed and a non-streamed attempt of the same semantic turn share one
+identity while changes to model parameters, tools, reasoning, metadata, or
+output limits create a different identity.
 
 Admission decisions:
 
@@ -43,8 +45,12 @@ for automatic retry by the client.
 
 ## Tool call integrity
 
-The ledger records every delivered tool call (`callId`, arguments hash) and
-its resolution hash. Violations block the turn before upstream contact:
+The ledger records every upstream tool call (`callId`, name, arguments hash)
+at the last safe barrier, before `output_item.done` or Anthropic
+`content_block_stop` is delivered to the coding client. It records the later
+result hash when the continuation request arrives. Violations found in input
+history block the turn before upstream contact; an unsafe call emitted by the
+provider is stopped before the client can execute it:
 
 - `TOOL_RESULT_UNMATCHED` — a result references an unknown call;
 - `TOOL_RESULT_CONFLICT` — an already-resolved call is re-resolved with a
@@ -52,6 +58,10 @@ its resolution hash. Violations block the turn before upstream contact:
 - `TOOL_CALL_CONFLICT` — the same `callId` reappears with different arguments;
 - `TOOL_LOOP_DETECTED` — a resolved call is presented as pending again
   (the recursive tool loop observed with AgentRouter).
+
+The ledger persists across HTTP requests for the lifetime of one private
+bridge/runtime session. Durable crash persistence remains a later storage
+block; the managed bridge is still stopped together with its coding client.
 
 ## Provider / Model Doctor
 

@@ -22,11 +22,17 @@ Development has started with Phase 1. The first core slice provides:
   after partial streams, and recursive tool loops before upstream contact;
 - a manual tiered Provider/Model Doctor (metadata, minimal inference, streaming,
   synthetic tool round-trip);
+- Claude Code support: a loopback Anthropic Messages bridge with native relay for
+  Anthropic providers and safety-validated OpenAI-Chat translation (requests,
+  responses, SSE);
+- a Claude Code launcher that configures `ANTHROPIC_*` only inside the child process
+  environment and never leaks provider credentials to the client;
+- a `generic-anthropic` provider adapter for Anthropic-native model discovery;
 - unit tests using fully local HTTP mocks.
 
 There is no production UI yet. The Codex launcher automatically owns a compatibility
 bridge for AgentRouter, query-authenticated Responses profiles, and Chat Completions
-providers. Anthropic Messages translation remains the next client-protocol block.
+providers. Claude Code always runs through a managed Anthropic Messages bridge.
 
 ## Development
 
@@ -105,12 +111,24 @@ node dist/cli.js launch codex `
 node dist/cli.js recover codex
 ```
 
+Launch Claude Code against a configured Anthropic Messages or OpenAI Chat
+provider through the managed Anthropic Messages bridge:
+
+```powershell
+node dist/cli.js launch claude `
+  --provider anthropic `
+  --model claude-x `
+  --project C:\Projects\example
+```
+
 Direct Codex routes currently require a Responses-compatible provider. Query-authenticated
 Responses providers and AgentRouter are relayed automatically by a per-session bridge.
-Chat Completions providers are translated automatically through the canonical protocol;
-Anthropic translation is not implemented yet. An already-running external compatibility
-bridge can be selected explicitly through `--bridge-url`.
+Chat Completions providers are translated automatically through the canonical protocol.
+An already-running external compatibility bridge can be selected explicitly through
+`--bridge-url`.
 Bridge behavior is documented in [`docs/responses-bridge.md`](./docs/responses-bridge.md).
+Claude Code runtime and Anthropic bridge behavior are documented in
+[`docs/claude-code.md`](./docs/claude-code.md).
 Replay protection and tool-call integrity rules are documented in
 [`docs/anti-replay.md`](./docs/anti-replay.md).
 Runtime details and recovery guarantees are documented in

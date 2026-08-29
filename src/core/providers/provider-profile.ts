@@ -18,6 +18,7 @@ export const preferredClientSchema = z.enum(preferredClients);
 export const providerAdapterIds = [
   "auto",
   "generic-openai",
+  "generic-anthropic",
   "agentrouter",
   "gorouter",
   "custom",

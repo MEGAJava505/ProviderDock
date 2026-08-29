@@ -94,7 +94,10 @@ async function executeLaunch(
   environment: NodeJS.ProcessEnv,
 ): Promise<number> {
   const [client, ...rest] = argv;
-  if (client !== "codex") throw new CliUsageError("Usage: providerdock launch codex [options]");
+  if (client === "claude") return executeLaunchClaude(rest, application, io, environment);
+  if (client !== "codex") {
+    throw new CliUsageError("Usage: providerdock launch <codex|claude> [options]");
+  }
   const { values, positionals } = parseArgs({
     args: [...rest],
     options: {
@@ -119,6 +122,37 @@ async function executeLaunch(
   });
   const status = exit.exitCode === null ? `signal ${exit.signal ?? "unknown"}` : `exit code ${exit.exitCode}`;
   io.stdout(`Codex session finished with ${status}.`);
+  return exit.exitCode ?? 1;
+}
+
+async function executeLaunchClaude(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+  environment: NodeJS.ProcessEnv,
+): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: [...argv],
+    options: {
+      provider: { type: "string" },
+      model: { type: "string" },
+      project: { type: "string" },
+      executable: { type: "string" },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+  assertNoPositionals(positionals);
+  const exit = await application.launchClaude({
+    providerId: requireString(values.provider, "--provider"),
+    modelId: requireString(values.model, "--model"),
+    projectDirectory: requireString(values.project, "--project"),
+    ...(values.executable ? { executable: values.executable } : {}),
+    parentEnvironment: environment,
+  });
+  const status =
+    exit.exitCode === null ? `signal ${exit.signal ?? "unknown"}` : `exit code ${exit.exitCode}`;
+  io.stdout(`Claude Code session finished with ${status}.`);
   return exit.exitCode ?? 1;
 }
 
@@ -580,6 +614,7 @@ Usage:
   providerdock secrets set <reference> --from-env VARIABLE
   providerdock secrets remove <reference>
   providerdock launch codex --provider ID --model MODEL --project DIRECTORY [--bridge-url URL]
+  providerdock launch claude --provider ID --model MODEL --project DIRECTORY
   providerdock recover codex [--json]
 
 Doctor levels (run manually; deeper levels send real inference requests):
@@ -592,11 +627,15 @@ Codex launch routing:
   Without --bridge-url, ProviderDock selects direct or managed compatibility bridge mode.
   --bridge-url selects an externally managed compatibility bridge and never stops it.
 
+Claude launch routing:
+  Claude Code always runs against a managed loopback Anthropic Messages bridge.
+  ANTHROPIC_* variables are set only inside the child process environment.
+
 Authentication options for providers set:
   --auth-kind none|bearer|header|query
   --secret-ref ENVIRONMENT_VARIABLE
   --auth-name HEADER_OR_QUERY_NAME
-  --adapter auto|generic-openai|agentrouter|gorouter|custom
+  --adapter auto|generic-openai|generic-anthropic|agentrouter|gorouter|custom
 
 Additional repeatable options:
   --manual-model MODEL_ID

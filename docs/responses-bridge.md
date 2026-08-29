@@ -72,7 +72,9 @@ the specification's internal error codes.
 ## Current boundary
 
 This component provides native Responses passthrough plus canonical Chat Completions
-request/JSON/SSE translation. Persistent cross-request anti-replay state and Claude Code
-routing remain separate roadmap blocks and must not be represented as already supported.
-The Codex launcher starts and stops the bridge automatically for AgentRouter,
-query-authenticated Responses profiles, and Chat Completions providers.
+request/JSON/SSE translation. A session-scoped cross-request TurnLedger now blocks unsafe
+replay and records completed upstream tool calls before client delivery; durable ledger
+storage across process crashes remains a later storage block. Claude Code uses its own
+managed Anthropic Messages bridge documented in `docs/claude-code.md`. The Codex launcher
+starts and stops this bridge automatically for AgentRouter, query-authenticated Responses
+profiles, and Chat Completions providers.

@@ -11,6 +11,7 @@ import {
   type SecretVault,
 } from "../core/security/secret-store.js";
 import { GenericOpenAiAdapter } from "../providers/generic-openai/generic-openai-adapter.js";
+import { GenericAnthropicAdapter } from "../providers/generic-anthropic/generic-anthropic-adapter.js";
 import { AgentRouterAdapter } from "../providers/agentrouter/agentrouter-adapter.js";
 import { GoRouterAdapter } from "../providers/gorouter/gorouter-adapter.js";
 import {
@@ -18,6 +19,11 @@ import {
   NodeCodexProcessRunner,
 } from "../clients/codex/codex-launcher.js";
 import { ResponsesCodexBridgeFactory } from "../clients/codex/codex-bridge-factory.js";
+import {
+  ClaudeLauncher,
+  NodeClaudeProcessRunner,
+} from "../clients/claude/claude-launcher.js";
+import { AnthropicClaudeBridgeFactory } from "../clients/claude/claude-bridge-factory.js";
 import { CodexRuntimeSessionManager } from "../clients/codex/codex-runtime-session.js";
 import { ProviderDoctor } from "../diagnostics/provider-doctor.js";
 import { ProviderDockApplication } from "./provider-dock-application.js";
@@ -90,7 +96,8 @@ export function createDefaultApplication(
   const adapters = new ProviderAdapterRegistry()
     .register(new AgentRouterAdapter(adapterOptions))
     .register(new GoRouterAdapter(adapterOptions))
-    .register(new GenericOpenAiAdapter(adapterOptions));
+    .register(new GenericOpenAiAdapter(adapterOptions))
+    .register(new GenericAnthropicAdapter(adapterOptions));
   const probes = new ProviderProbeService(adapters);
   const codexLauncher = new CodexLauncher(
     new CodexRuntimeSessionManager({
@@ -106,6 +113,15 @@ export function createDefaultApplication(
     }),
   );
 
+  const claudeLauncher = new ClaudeLauncher(
+    new AnthropicClaudeBridgeFactory({
+      secretStore: secrets,
+      adapterRegistry: adapters,
+      ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+    }),
+    new NodeClaudeProcessRunner(),
+  );
+
   const doctor = new ProviderDoctor({
     secretStore: secrets,
     adapterRegistry: adapters,
@@ -119,5 +135,6 @@ export function createDefaultApplication(
     codexLauncher,
     adapters,
     doctor,
+    claudeLauncher,
   );
 }

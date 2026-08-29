@@ -20,7 +20,10 @@ import {
   type BridgeModelDefinition,
 } from "./codex-model-catalog.js";
 import { relayResponsesStream } from "./responses-stream-relay.js";
-import { isJsonRecord } from "./responses-stream-state.js";
+import {
+  ResponsesStreamProtocolError,
+  isJsonRecord,
+} from "./responses-stream-state.js";
 import {
   ResponsesToChatTranslationError,
   translateResponsesRequestToChat,
@@ -37,6 +40,8 @@ import {
 } from "./chat-completions-stream-relay.js";
 import {
   TurnLedger,
+  TurnLedgerViolationError,
+  extractResponsesDeliveredToolCalls,
   extractResponsesTurnSignature,
   type TurnToken,
 } from "../../core/state-machine/turn-ledger.js";
@@ -388,9 +393,22 @@ export class ResponsesBridgeServer {
           heartbeatIntervalMs: this.heartbeatIntervalMs,
           idleTimeoutMs: this.streamIdleTimeoutMs,
           maxEventCharacters: this.maxSseEventCharacters,
+          beforeForwardEvent: (event) => {
+            try {
+              this.recordDeliveredResponsesCalls(admission.token, event);
+            } catch (error) {
+              throw new ResponsesStreamProtocolError(
+                error instanceof Error ? error.message : "Tool-call replay was blocked.",
+                { cause: error },
+              );
+            }
+          },
         });
         if (!response.destroyed && !response.writableEnded) response.end();
-        turnOutcome = relay.protocolFailure ? "incomplete" : "complete";
+        turnOutcome =
+          !relay.protocolFailure && relay.terminalEventType === "response.completed"
+            ? "complete"
+            : "incomplete";
         return;
       }
 
@@ -411,12 +429,16 @@ export class ResponsesBridgeServer {
           "Provider returned an invalid non-streaming Responses payload.",
         );
       }
+      this.recordDeliveredResponsesCalls(turnToken, payload);
       if (wantsStream) {
         this.sendJsonAsEventStream(response, upstream, payload);
       } else {
         sendJson(response, 200, payload, safeUpstreamHeaders(upstream, false));
       }
-      turnOutcome = "complete";
+      turnOutcome =
+        payload.status === "failed" || payload.status === "incomplete"
+          ? "incomplete"
+          : "complete";
     } catch (error) {
       if (response.destroyed) return;
       if (response.headersSent) {
@@ -506,9 +528,22 @@ export class ResponsesBridgeServer {
         heartbeatIntervalMs: this.heartbeatIntervalMs,
         idleTimeoutMs: this.streamIdleTimeoutMs,
         maxEventCharacters: this.maxSseEventCharacters,
+        beforeForwardEvent: (event) => {
+          try {
+            this.recordDeliveredResponsesCalls(turnToken, event);
+          } catch (error) {
+            throw new ChatToResponsesTranslationError(
+              "PROTOCOL_ERROR",
+              error instanceof Error ? error.message : "Tool-call replay was blocked.",
+              { cause: error },
+            );
+          }
+        },
       });
       if (!response.destroyed && !response.writableEnded) response.end();
-      return relay.protocolFailure ? "incomplete" : "complete";
+      return !relay.protocolFailure && relay.terminalEventType === "response.completed"
+        ? "complete"
+        : "incomplete";
     }
     if (!wantsStream && isEventStream) {
       await upstream.body?.cancel().catch(() => undefined);
@@ -523,23 +558,45 @@ export class ResponsesBridgeServer {
     if (wantsStream) {
       const translator = new ChatToResponsesStreamTranslator({ request: canonicalRequest });
       const events = [...translator.feed(payload), ...translator.finish()];
+      for (const event of events) this.recordDeliveredResponsesCalls(turnToken, event);
       const headers = safeUpstreamHeaders(upstream, true, "chat-completions");
       headers.set("x-providerdock-normalization", "chat-json-to-responses-sse");
       response.writeHead(200, headersToNode(headers));
       response.flushHeaders();
       await writeTranslatedEvents(response, events);
       response.end(encodeSseEvent({ data: "[DONE]", comments: [] }));
-      return "complete";
+      return translator.terminalEventType === "response.completed"
+        ? "complete"
+        : "incomplete";
     }
 
     const translated = translateChatResponseToResponses(payload, { request: canonicalRequest });
+    this.recordDeliveredResponsesCalls(turnToken, translated.response);
     sendJson(
       response,
       200,
       translated.response,
       safeUpstreamHeaders(upstream, false, "chat-completions"),
     );
-    return "complete";
+    return translated.terminalEventType === "response.completed"
+      ? "complete"
+      : "incomplete";
+  }
+
+  private recordDeliveredResponsesCalls(
+    turnToken: TurnToken,
+    payload: Readonly<Record<string, unknown>>,
+  ): void {
+    const item = isJsonRecord(payload.item) ? payload.item : undefined;
+    const responsePayload = isJsonRecord(payload.response) ? payload.response : undefined;
+    const source =
+      payload.type === "response.output_item.done" && item !== undefined
+        ? item
+        : responsePayload ?? payload;
+    this.turnLedger.recordDeliveredToolCalls(
+      turnToken,
+      extractResponsesDeliveredToolCalls(source),
+    );
   }
 
   private methodNotAllowed(response: ServerResponse, allow: string): void {
@@ -563,6 +620,16 @@ export class ResponsesBridgeServer {
     }
     if (error instanceof ChatToResponsesTranslationError) {
       sendBridgeError(response, 502, error.type, error.message);
+      return;
+    }
+    if (error instanceof TurnLedgerViolationError) {
+      sendBridgeError(
+        response,
+        409,
+        "PROTOCOL_ERROR",
+        error.message,
+        new Headers({ "x-providerdock-turn-block": error.code }),
+      );
       return;
     }
     if (error instanceof ProviderRequestError) {

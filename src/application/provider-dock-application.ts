@@ -12,6 +12,11 @@ import type {
 } from "../clients/codex/codex-launcher.js";
 import type { CodexRecoveryOutcome } from "../clients/codex/codex-runtime-session.js";
 import type {
+  ClaudeLauncher,
+  ClaudeProcessExit,
+  LaunchClaudeInput,
+} from "../clients/claude/claude-launcher.js";
+import type {
   DoctorReport,
   ProviderDoctor,
   RunDoctorOptions,
@@ -39,6 +44,7 @@ export class ProviderDockApplication {
     private readonly codexLauncher?: CodexLauncher,
     private readonly adapters?: ProviderAdapterRegistry,
     private readonly doctor?: ProviderDoctor,
+    private readonly claudeLauncher?: ClaudeLauncher,
   ) {}
 
   async listProviders(): Promise<readonly ProviderProfile[]> {
@@ -94,6 +100,16 @@ export class ProviderDockApplication {
     return this.requireCodexLauncher().recover();
   }
 
+  async launchClaude(
+    input: Omit<LaunchClaudeInput, "profile"> & { readonly providerId: string },
+  ): Promise<ClaudeProcessExit> {
+    const { providerId, ...launchInput } = input;
+    return this.requireClaudeLauncher().launch({
+      ...launchInput,
+      profile: await this.getProvider(providerId),
+    });
+  }
+
   private requireSecretVault(): SecretVault {
     if (!this.secretVault) throw new SecretVaultUnavailableError();
     return this.secretVault;
@@ -104,6 +120,13 @@ export class ProviderDockApplication {
       throw new Error("The Codex runtime launcher is not configured.");
     }
     return this.codexLauncher;
+  }
+
+  private requireClaudeLauncher(): ClaudeLauncher {
+    if (!this.claudeLauncher) {
+      throw new Error("The Claude Code runtime launcher is not configured.");
+    }
+    return this.claudeLauncher;
   }
 
   private prepareProfile(profile: ProviderProfile): ProviderProfile {
