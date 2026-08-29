@@ -24,6 +24,14 @@ import { isJsonRecord } from "./responses-stream-state.js";
 
 const loopbackHost = "127.0.0.1";
 const defaultBodyLimitBytes = 64 * 1024 * 1024;
+const fetchForbiddenPorts = new Set([
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79,
+  87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137,
+  139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+  540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723,
+  2049, 3659, 4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697,
+  10080,
+]);
 
 export interface ResponsesBridgeServerOptions {
   readonly profile: ProviderProfile;
@@ -139,21 +147,19 @@ export class ResponsesBridgeServer {
     this.server = server;
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        const onError = (error: Error): void => {
-          server.off("listening", onListening);
-          reject(error);
-        };
-        const onListening = (): void => {
-          server.off("error", onError);
-          resolve();
-        };
-        server.once("error", onError);
-        server.once("listening", onListening);
-        server.listen({ host: loopbackHost, port: 0, exclusive: true });
-      });
-      this.startedAt = Date.now();
-      return this.address();
+      for (let attempt = 0; attempt < 32; attempt += 1) {
+        await listenOnRandomPort(server);
+        const address = server.address();
+        if (!address || typeof address === "string") {
+          throw new Error("Responses bridge did not receive a TCP address.");
+        }
+        if (isBridgePortAllowed(address.port)) {
+          this.startedAt = Date.now();
+          return bridgeAddress(address);
+        }
+        await closeListeningServer(server);
+      }
+      throw new Error("Unable to allocate a Fetch-compatible loopback bridge port.");
     } catch (error) {
       this.server = undefined;
       server.closeAllConnections?.();
@@ -628,4 +634,31 @@ function bridgeAddress(address: AddressInfo): ResponsesBridgeAddress {
     url,
     baseUrl: `${url}/v1`,
   };
+}
+
+export function isBridgePortAllowed(port: number): boolean {
+  return Number.isInteger(port) && port >= 1 && port <= 65_535 && !fetchForbiddenPorts.has(port);
+}
+
+function listenOnRandomPort(server: Server): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const onError = (error: Error): void => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = (): void => {
+      server.off("error", onError);
+      resolve();
+    };
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen({ host: loopbackHost, port: 0, exclusive: true });
+  });
+}
+
+function closeListeningServer(server: Server): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+    server.closeAllConnections?.();
+  });
 }

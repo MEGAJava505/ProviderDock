@@ -73,5 +73,6 @@ the specification's internal error codes.
 
 This component currently provides native Responses passthrough and safe transport
 normalization. Responses↔Chat translation, canonical tool history, anti-replay state,
-automatic Codex launcher startup/shutdown and Claude Code routing remain separate roadmap
-blocks and must not be represented as already supported.
+Claude Code routing remain separate roadmap blocks and must not be represented as already
+supported. The Codex launcher now starts and stops this native bridge automatically for
+AgentRouter and Responses profiles that require query authentication.

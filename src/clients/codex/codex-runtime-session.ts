@@ -20,9 +20,7 @@ import {
 } from "./codex-runtime-config.js";
 
 const sessionIdSchema = z.string().regex(/^[a-f0-9]{32}$/);
-const manifestSchema = z
-  .object({
-    version: z.literal(1),
+const manifestCoreShape = {
     sessionId: sessionIdSchema,
     profileName: z.string().regex(/^providerdock-[a-f0-9]{32}$/),
     profileSha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -32,16 +30,60 @@ const manifestSchema = z
     state: z.enum(["PREPARING", "READY", "ACTIVE"]),
     createdAt: z.string().datetime(),
     pid: z.number().int().positive().optional(),
-  })
+} as const;
+const manifestV1Schema = z.object({ version: z.literal(1), ...manifestCoreShape }).strict();
+const bridgeBaseUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => value.startsWith("http://") || value.startsWith("https://"));
+const runtimeRouteSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("direct") }).strict(),
+  z
+    .object({
+      kind: z.literal("bridge"),
+      baseUrl: bridgeBaseUrlSchema,
+      ownership: z.enum(["managed", "external"]),
+      state: z.enum(["LISTENING", "CONFIGURED", "ACTIVE"]),
+    })
+    .strict(),
+]).superRefine((route, context) => {
+  if (route.kind !== "bridge" || route.ownership !== "managed") return;
+  let url: URL;
+  try {
+    url = new URL(route.baseUrl);
+  } catch {
+    return;
+  }
+  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Managed Codex bridges must use the IPv4 loopback address.",
+      path: ["baseUrl"],
+    });
+  }
+});
+const manifestV2Schema = z
+  .object({ version: z.literal(2), ...manifestCoreShape, route: runtimeRouteSchema })
   .strict();
+const manifestSchema = z.discriminatedUnion("version", [manifestV1Schema, manifestV2Schema]);
 
 type CodexRuntimeManifest = z.infer<typeof manifestSchema>;
+type CodexRuntimeManifestV2 = z.infer<typeof manifestV2Schema>;
+
+export type CodexBridgeOwnership = "managed" | "external";
+
+export interface CodexRuntimeBridgeDiagnostics {
+  readonly baseUrl: string;
+  readonly ownership: CodexBridgeOwnership;
+  readonly state: "LISTENING" | "CONFIGURED" | "ACTIVE";
+}
 
 export interface PrepareCodexRuntimeInput {
   readonly profile: ProviderProfile;
   readonly modelId: string;
   readonly projectDirectory: string;
   readonly route: CodexProviderRoute;
+  readonly bridgeOwnership?: CodexBridgeOwnership;
 }
 
 export interface PreparedCodexRuntime {
@@ -52,11 +94,17 @@ export interface PreparedCodexRuntime {
   readonly manifestPath: string;
   readonly projectDirectory: string;
   readonly environment: Readonly<Record<string, string>>;
+  readonly bridge: CodexRuntimeBridgeDiagnostics | undefined;
 }
 
 export type CodexRecoveryOutcome =
   | { readonly sessionId: string; readonly status: "RECOVERED" }
-  | { readonly sessionId: string; readonly status: "ACTIVE"; readonly pid: number }
+  | {
+      readonly sessionId: string;
+      readonly status: "ACTIVE";
+      readonly pid: number;
+      readonly bridge?: CodexRuntimeBridgeDiagnostics;
+    }
   | { readonly sessionId: string; readonly status: "CONFLICT"; readonly message: string }
   | { readonly sessionId: string; readonly status: "INVALID"; readonly message: string };
 
@@ -67,6 +115,7 @@ export interface CodexRuntimeSessionManagerOptions {
   readonly now?: () => Date;
   readonly randomId?: () => string;
   readonly isProcessAlive?: (pid: number) => boolean;
+  readonly isBridgeAlive?: (baseUrl: string, providerId: string) => Promise<boolean>;
 }
 
 export class CodexRuntimeSessionManager {
@@ -76,6 +125,7 @@ export class CodexRuntimeSessionManager {
   private readonly now: () => Date;
   private readonly randomId: () => string;
   private readonly isProcessAlive: (pid: number) => boolean;
+  private readonly isBridgeAlive: (baseUrl: string, providerId: string) => Promise<boolean>;
 
   constructor(options: CodexRuntimeSessionManagerOptions) {
     this.codexHome = options.codexHome;
@@ -84,6 +134,7 @@ export class CodexRuntimeSessionManager {
     this.now = options.now ?? (() => new Date());
     this.randomId = options.randomId ?? (() => randomUUID().replaceAll("-", ""));
     this.isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
+    this.isBridgeAlive = options.isBridgeAlive ?? defaultIsBridgeAlive;
   }
 
   async prepare(input: PrepareCodexRuntimeInput): Promise<PreparedCodexRuntime> {
@@ -93,6 +144,7 @@ export class CodexRuntimeSessionManager {
         `Project directory '${input.projectDirectory}' does not exist or is not a directory.`,
       );
     }
+    validateBridgeOwnership(input);
 
     const sessionId = sessionIdSchema.parse(this.randomId());
     const built = await this.configFactory.build({
@@ -105,8 +157,17 @@ export class CodexRuntimeSessionManager {
     const sessionDirectory = join(this.runtimeRoot, sessionId);
     const manifestPath = join(sessionDirectory, "manifest.json");
     const profilePath = join(this.codexHome, `${built.profileName}.config.toml`);
-    const manifest: CodexRuntimeManifest = {
-      version: 1,
+    const route: CodexRuntimeManifestV2["route"] =
+      input.route.kind === "direct"
+        ? { kind: "direct" }
+        : {
+            kind: "bridge",
+            baseUrl: input.route.baseUrl,
+            ownership: input.bridgeOwnership ?? "external",
+            state: input.bridgeOwnership === "managed" ? "LISTENING" : "CONFIGURED",
+          };
+    const manifest: CodexRuntimeManifestV2 = {
+      version: 2,
       sessionId,
       profileName: built.profileName,
       profileSha256,
@@ -115,6 +176,7 @@ export class CodexRuntimeSessionManager {
       modelId: input.modelId,
       state: "PREPARING",
       createdAt: this.now().toISOString(),
+      route,
     };
 
     await mkdir(this.runtimeRoot, { recursive: true });
@@ -132,6 +194,7 @@ export class CodexRuntimeSessionManager {
       manifestPath,
       projectDirectory: input.projectDirectory,
       environment: built.environment,
+      bridge: route.kind === "bridge" ? bridgeDiagnostics(route) : undefined,
     };
   }
 
@@ -142,7 +205,15 @@ export class CodexRuntimeSessionManager {
         `Codex runtime '${runtime.sessionId}' is not ready to become active.`,
       );
     }
-    await this.writeManifest(runtime.manifestPath, { ...manifest, state: "ACTIVE", pid });
+    await this.writeManifest(runtime.manifestPath, {
+      ...manifest,
+      state: "ACTIVE",
+      pid,
+      route:
+        manifest.route.kind === "bridge"
+          ? { ...manifest.route, state: "ACTIVE" }
+          : manifest.route,
+    });
   }
 
   async cleanup(runtime: PreparedCodexRuntime): Promise<void> {
@@ -178,7 +249,26 @@ export class CodexRuntimeSessionManager {
       }
 
       if (manifest.state === "ACTIVE" && manifest.pid && this.isProcessAlive(manifest.pid)) {
-        outcomes.push({ sessionId, status: "ACTIVE", pid: manifest.pid });
+        const bridge = manifestBridgeDiagnostics(manifest);
+        if (
+          bridge?.ownership === "managed" &&
+          !(await this.isBridgeAlive(bridge.baseUrl, manifest.providerId))
+        ) {
+          outcomes.push({
+            sessionId,
+            status: "CONFLICT",
+            message:
+              `Codex process ${manifest.pid} is still active, but its managed bridge ` +
+              "is no longer reachable; session files were preserved.",
+          });
+          continue;
+        }
+        outcomes.push({
+          sessionId,
+          status: "ACTIVE",
+          pid: manifest.pid,
+          ...(bridge === undefined ? {} : { bridge }),
+        });
         continue;
       }
 
@@ -197,10 +287,17 @@ export class CodexRuntimeSessionManager {
     return outcomes;
   }
 
-  private async readPreparedManifest(runtime: PreparedCodexRuntime): Promise<CodexRuntimeManifest> {
+  private async readPreparedManifest(
+    runtime: PreparedCodexRuntime,
+  ): Promise<CodexRuntimeManifestV2> {
     const manifest = manifestSchema.parse(
       JSON.parse(await readFile(runtime.manifestPath, "utf8")),
     );
+    if (manifest.version !== 2) {
+      throw new CodexRuntimeConfigurationError(
+        "Prepared Codex runtime uses an unsupported legacy manifest version.",
+      );
+    }
     if (
       manifest.sessionId !== runtime.sessionId ||
       manifest.profileName !== runtime.profileName ||
@@ -249,6 +346,48 @@ function serializeManifest(manifest: CodexRuntimeManifest): string {
   return `${JSON.stringify(manifestSchema.parse(manifest), null, 2)}\n`;
 }
 
+function validateBridgeOwnership(input: PrepareCodexRuntimeInput): void {
+  if (input.route.kind === "direct") {
+    if (input.bridgeOwnership !== undefined) {
+      throw new CodexRuntimeConfigurationError(
+        "Bridge ownership metadata cannot be attached to a direct Codex route.",
+      );
+    }
+    return;
+  }
+  if (input.bridgeOwnership !== "managed") return;
+
+  let url: URL;
+  try {
+    url = new URL(input.route.baseUrl);
+  } catch {
+    throw new CodexRuntimeConfigurationError("Managed Codex bridge URL is invalid.");
+  }
+  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1") {
+    throw new CodexRuntimeConfigurationError(
+      "Managed Codex bridges must use an HTTP IPv4 loopback URL.",
+    );
+  }
+}
+
+function bridgeDiagnostics(
+  route: Extract<CodexRuntimeManifestV2["route"], { readonly kind: "bridge" }>,
+): CodexRuntimeBridgeDiagnostics {
+  return {
+    baseUrl: route.baseUrl,
+    ownership: route.ownership,
+    state: route.state,
+  };
+}
+
+function manifestBridgeDiagnostics(
+  manifest: CodexRuntimeManifest,
+): CodexRuntimeBridgeDiagnostics | undefined {
+  return manifest.version === 2 && manifest.route.kind === "bridge"
+    ? bridgeDiagnostics(manifest.route)
+    : undefined;
+}
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -259,6 +398,28 @@ function defaultIsProcessAlive(pid: number): boolean {
     return true;
   } catch (error) {
     if (isNodeError(error) && error.code === "EPERM") return true;
+    return false;
+  }
+}
+
+async function defaultIsBridgeAlive(baseUrl: string, providerId: string): Promise<boolean> {
+  try {
+    const healthUrl = new URL(baseUrl);
+    healthUrl.pathname = "/health";
+    healthUrl.search = "";
+    healthUrl.hash = "";
+    const response = await fetch(healthUrl, { signal: AbortSignal.timeout(1_000) });
+    if (!response.ok) return false;
+    const body = (await response.json()) as unknown;
+    return (
+      typeof body === "object" &&
+      body !== null &&
+      "status" in body &&
+      body.status === "ok" &&
+      "provider_id" in body &&
+      body.provider_id === providerId
+    );
+  } catch {
     return false;
   }
 }

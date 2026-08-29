@@ -13,7 +13,11 @@ import {
 import { GenericOpenAiAdapter } from "../providers/generic-openai/generic-openai-adapter.js";
 import { AgentRouterAdapter } from "../providers/agentrouter/agentrouter-adapter.js";
 import { GoRouterAdapter } from "../providers/gorouter/gorouter-adapter.js";
-import { CodexLauncher } from "../clients/codex/codex-launcher.js";
+import {
+  CodexLauncher,
+  NodeCodexProcessRunner,
+} from "../clients/codex/codex-launcher.js";
+import { ResponsesCodexBridgeFactory } from "../clients/codex/codex-bridge-factory.js";
 import { CodexRuntimeSessionManager } from "../clients/codex/codex-runtime-session.js";
 import { ProviderDockApplication } from "./provider-dock-application.js";
 
@@ -92,6 +96,12 @@ export function createDefaultApplication(
       codexHome: paths.codexHome,
       runtimeRoot: join(paths.runtimeDirectory, "codex"),
       secrets,
+    }),
+    new NodeCodexProcessRunner(),
+    new ResponsesCodexBridgeFactory({
+      secretStore: secrets,
+      adapterRegistry: adapters,
+      ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
     }),
   );
 

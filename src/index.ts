@@ -3,6 +3,7 @@ export * from "./application/provider-dock-application.js";
 export * from "./cli/provider-dock-cli.js";
 export * from "./clients/codex/codex-launcher.js";
 export * from "./clients/codex/codex-runtime-config.js";
+export * from "./clients/codex/codex-bridge-factory.js";
 export * from "./clients/codex/codex-runtime-session.js";
 export * from "./core/errors/provider-error.js";
 export * from "./core/health/provider-probe-service.js";

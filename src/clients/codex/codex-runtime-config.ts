@@ -9,6 +9,8 @@ export type CodexProviderRoute =
   | { readonly kind: "direct" }
   | { readonly kind: "bridge"; readonly baseUrl: string };
 
+export type CodexLaunchRoute = CodexProviderRoute | { readonly kind: "auto" };
+
 export interface BuildCodexRuntimeConfigInput {
   readonly profile: ProviderProfile;
   readonly modelId: string;

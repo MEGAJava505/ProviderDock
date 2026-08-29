@@ -19,9 +19,9 @@ Development has started with Phase 1. The first core slice provides:
 - a loopback-only native Responses bridge with Codex model capabilities and event-aware SSE repair;
 - unit tests using fully local HTTP mocks.
 
-There is no production UI yet. The native Responses bridge is available as a core
-component; automatic bridge lifecycle integration in the Codex launcher and protocol
-translation for Chat Completions/Anthropic providers are the next compatibility work.
+There is no production UI yet. The Codex launcher automatically owns a native Responses
+bridge when a profile needs query authentication or uses the AgentRouter adapter.
+Translation for Chat Completions/Anthropic providers remains the next compatibility work.
 
 ## Development
 
@@ -100,9 +100,9 @@ node dist/cli.js recover codex
 ```
 
 Direct Codex routes currently require a Responses-compatible provider. Query-authenticated
-Responses providers can already be relayed by the bridge core. Chat Completions and
-Anthropic translation are not implemented yet. Until automatic lifecycle integration is
-complete, the launcher accepts an already-started bridge URL through `--bridge-url`.
+Responses providers and AgentRouter are relayed automatically by a per-session bridge.
+Chat Completions and Anthropic translation are not implemented yet. An already-running
+external compatibility bridge can be selected explicitly through `--bridge-url`.
 Bridge behavior is documented in [`docs/responses-bridge.md`](./docs/responses-bridge.md).
 Runtime details and recovery guarantees are documented in
 [`docs/codex-runtime.md`](./docs/codex-runtime.md).

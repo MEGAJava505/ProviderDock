@@ -111,7 +111,7 @@ async function executeLaunch(
     providerId: requireString(values.provider, "--provider"),
     modelId: requireString(values.model, "--model"),
     projectDirectory: requireString(values.project, "--project"),
-    route: bridgeUrl ? { kind: "bridge", baseUrl: bridgeUrl } : { kind: "direct" },
+    route: bridgeUrl ? { kind: "bridge", baseUrl: bridgeUrl } : { kind: "auto" },
     ...(values.executable ? { executable: values.executable } : {}),
     parentEnvironment: environment,
   });
@@ -145,7 +145,11 @@ async function executeRecovery(
           outcome.sessionId,
           outcome.status,
           outcome.status === "ACTIVE"
-            ? `PID ${outcome.pid}`
+            ? `PID ${outcome.pid}${
+                outcome.bridge === undefined
+                  ? ""
+                  : `; bridge ${outcome.bridge.ownership}/${outcome.bridge.state} ${outcome.bridge.baseUrl}`
+              }`
             : outcome.status === "CONFLICT" || outcome.status === "INVALID"
               ? outcome.message
               : "temporary profile removed",
@@ -518,8 +522,12 @@ Usage:
   providerdock secrets list
   providerdock secrets set <reference> --from-env VARIABLE
   providerdock secrets remove <reference>
-  providerdock launch codex --provider ID --model MODEL --project DIRECTORY
+  providerdock launch codex --provider ID --model MODEL --project DIRECTORY [--bridge-url URL]
   providerdock recover codex [--json]
+
+Codex launch routing:
+  Without --bridge-url, ProviderDock selects direct or managed native Responses bridge mode.
+  --bridge-url selects an externally managed compatibility bridge and never stops it.
 
 Authentication options for providers set:
   --auth-kind none|bearer|header|query

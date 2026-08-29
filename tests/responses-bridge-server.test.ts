@@ -7,6 +7,7 @@ import {
   SseDecoder,
   agentRouterIdentityDefaults,
   encodeSseEvent,
+  isBridgePortAllowed,
   parseProviderProfile,
   type ProviderProfile,
 } from "../src/index.js";
@@ -14,6 +15,13 @@ import {
 const encoder = new TextEncoder();
 
 describe("ResponsesBridgeServer", () => {
+  it("rejects ports forbidden by Fetch clients", () => {
+    expect(isBridgePortAllowed(6000)).toBe(false);
+    expect(isBridgePortAllowed(6667)).toBe(false);
+    expect(isBridgePortAllowed(10080)).toBe(false);
+    expect(isBridgePortAllowed(45678)).toBe(true);
+  });
+
   it("binds to loopback and serves health plus OpenAI/Codex model catalogs", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({ id: "resp-1", object: "response", status: "completed", output: [] }),
