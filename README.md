@@ -16,10 +16,12 @@ Development has started with Phase 1. The first core slice provides:
 - normalized provider health states and errors;
 - a management CLI for provider CRUD, model discovery, and health probes;
 - an isolated Codex runtime profile, launcher, and checksum-guarded crash recovery;
+- a loopback-only native Responses bridge with Codex model capabilities and event-aware SSE repair;
 - unit tests using fully local HTTP mocks.
 
-There is no production UI or compatibility bridge yet. The Codex launcher is an early
-Phase 1 implementation and currently supports direct Responses-compatible routes.
+There is no production UI yet. The native Responses bridge is available as a core
+component; automatic bridge lifecycle integration in the Codex launcher and protocol
+translation for Chat Completions/Anthropic providers are the next compatibility work.
 
 ## Development
 
@@ -97,11 +99,16 @@ node dist/cli.js launch codex `
 node dist/cli.js recover codex
 ```
 
-Direct Codex routes currently require a Responses-compatible provider. Chat Completions,
-Anthropic, secret query authentication, and providers needing translation must use the
-local compatibility bridge; pass its session URL with `--bridge-url` once that bridge is
-available. Runtime details and recovery guarantees are documented in
+Direct Codex routes currently require a Responses-compatible provider. Query-authenticated
+Responses providers can already be relayed by the bridge core. Chat Completions and
+Anthropic translation are not implemented yet. Until automatic lifecycle integration is
+complete, the launcher accepts an already-started bridge URL through `--bridge-url`.
+Bridge behavior is documented in [`docs/responses-bridge.md`](./docs/responses-bridge.md).
+Runtime details and recovery guarantees are documented in
 [`docs/codex-runtime.md`](./docs/codex-runtime.md).
+
+Third-party attributions are recorded in
+[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).
 
 ## Architecture direction
 

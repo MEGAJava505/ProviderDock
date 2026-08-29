@@ -7,6 +7,7 @@ import type { DiscoveredProviderModel } from "../../core/providers/model-catalog
 import type { ProviderAdapter } from "../../core/providers/provider-adapter.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
+import { ProviderHttpRequestBuilder } from "../../core/providers/provider-http-request.js";
 
 const modelSchema = z
   .object({
@@ -27,11 +28,11 @@ export interface GenericOpenAiAdapterOptions {
 
 export class GenericOpenAiAdapter implements ProviderAdapter {
   readonly id = "generic-openai";
-  private readonly secretStore: SecretStore;
+  private readonly requests: ProviderHttpRequestBuilder;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: GenericOpenAiAdapterOptions) {
-    this.secretStore = options.secretStore;
+    this.requests = new ProviderHttpRequestBuilder(options.secretStore);
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
@@ -43,8 +44,7 @@ export class GenericOpenAiAdapter implements ProviderAdapter {
   }
 
   async discoverModels(profile: ProviderProfile): Promise<readonly DiscoveredProviderModel[]> {
-    const url = await this.createModelsUrl(profile);
-    const headers = await this.createHeaders(profile);
+    const { url, headers } = await this.requests.build(profile, profile.modelsEndpoint);
     let response: Response;
 
     try {
@@ -104,50 +104,6 @@ export class GenericOpenAiAdapter implements ProviderAdapter {
     return [...uniqueModels.values()];
   }
 
-  private async createHeaders(profile: ProviderProfile): Promise<Headers> {
-    const headers = new Headers({ Accept: "application/json", ...profile.staticHeaders });
-
-    if (profile.auth.kind === "bearer") {
-      headers.set("Authorization", `Bearer ${await this.requireSecret(profile.auth.secretRef)}`);
-    } else if (profile.auth.kind === "header") {
-      headers.set(profile.auth.headerName, await this.requireSecret(profile.auth.secretRef));
-    }
-
-    for (const [headerName, secretRef] of Object.entries(profile.secretHeaders)) {
-      headers.set(headerName, await this.requireSecret(secretRef));
-    }
-
-    return headers;
-  }
-
-  private async createModelsUrl(profile: ProviderProfile): Promise<URL> {
-    const base = profile.baseUrl.endsWith("/") ? profile.baseUrl : `${profile.baseUrl}/`;
-    const url = new URL(profile.modelsEndpoint, base);
-
-    for (const [name, value] of Object.entries(profile.queryParameters)) {
-      url.searchParams.set(name, value);
-    }
-
-    if (profile.auth.kind === "query") {
-      url.searchParams.set(
-        profile.auth.parameterName,
-        await this.requireSecret(profile.auth.secretRef),
-      );
-    }
-
-    return url;
-  }
-
-  private async requireSecret(reference: string): Promise<string> {
-    const secret = await this.secretStore.get(reference);
-    if (!secret) {
-      throw new ProviderRequestError(
-        "AUTH_ERROR",
-        `Required secret reference '${reference}' is not available.`,
-      );
-    }
-    return secret;
-  }
 }
 
 function isAbortOrTimeoutError(error: unknown): boolean {
