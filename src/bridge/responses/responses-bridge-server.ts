@@ -35,6 +35,11 @@ import {
   relayChatCompletionsStream,
   writeTranslatedEvents,
 } from "./chat-completions-stream-relay.js";
+import {
+  TurnLedger,
+  extractResponsesTurnSignature,
+  type TurnToken,
+} from "../../core/state-machine/turn-ledger.js";
 
 const loopbackHost = "127.0.0.1";
 const defaultBodyLimitBytes = 64 * 1024 * 1024;
@@ -82,6 +87,7 @@ export class ResponsesBridgeServer {
   private readonly streamIdleTimeoutMs: number;
   private readonly maxSseEventCharacters: number;
   private readonly activeUpstreamRequests = new Set<AbortController>();
+  private readonly turnLedger = new TurnLedger();
   private server: Server | undefined;
   private startTask: Promise<ResponsesBridgeAddress> | undefined;
   private stopTask: Promise<void> | undefined;
@@ -272,8 +278,17 @@ export class ResponsesBridgeServer {
     request.once("aborted", onRequestAborted);
     response.once("close", onResponseClosed);
 
+    let turnToken: TurnToken | undefined;
+    let turnOutcome: "complete" | "fail" | "cancel" | "incomplete" = "fail";
     try {
       const body = await readJsonObject(request, this.requestBodyLimitBytes);
+      const admission = this.turnLedger.admit(extractResponsesTurnSignature(body));
+      if (admission.decision === "blocked") {
+        const headers = new Headers({ "x-providerdock-turn-block": admission.code });
+        sendBridgeError(response, 409, "INVALID_REQUEST", admission.message, headers);
+        return;
+      }
+      turnToken = admission.token;
       const wantsStream = body.stream === true;
       if (
         !["auto", "openai-responses", "openai-chat-completions"].includes(
@@ -314,7 +329,10 @@ export class ResponsesBridgeServer {
           signal: controller.signal,
         });
       } catch (error) {
-        if (response.destroyed || controller.signal.aborted && !headerTimedOut) return;
+        if (response.destroyed || (controller.signal.aborted && !headerTimedOut)) {
+          turnOutcome = "cancel";
+          return;
+        }
         if (headerTimedOut) {
           throw new BridgeRequestError(504, "TIMEOUT", "Provider response headers timed out.");
         }
@@ -341,13 +359,14 @@ export class ResponsesBridgeServer {
       const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
       const isEventStream = contentType.includes("text/event-stream");
       if (chatTranslation !== undefined) {
-        await this.handleChatUpstream(
+        turnOutcome = await this.handleChatUpstream(
           response,
           upstream,
           wantsStream,
           isEventStream,
           chatTranslation.canonical,
           controller,
+          turnToken,
         );
         return;
       }
@@ -361,7 +380,8 @@ export class ResponsesBridgeServer {
         }
         response.writeHead(200, headersToNode(safeUpstreamHeaders(upstream, true)));
         response.flushHeaders();
-        await relayResponsesStream({
+        this.turnLedger.markStreamStarted(turnToken);
+        const relay = await relayResponsesStream({
           response,
           body: upstream.body,
           abortUpstream: (reason) => controller.abort(reason),
@@ -370,6 +390,7 @@ export class ResponsesBridgeServer {
           maxEventCharacters: this.maxSseEventCharacters,
         });
         if (!response.destroyed && !response.writableEnded) response.end();
+        turnOutcome = relay.protocolFailure ? "incomplete" : "complete";
         return;
       }
 
@@ -395,14 +416,22 @@ export class ResponsesBridgeServer {
       } else {
         sendJson(response, 200, payload, safeUpstreamHeaders(upstream, false));
       }
+      turnOutcome = "complete";
     } catch (error) {
       if (response.destroyed) return;
       if (response.headersSent) {
+        turnOutcome = "incomplete";
         response.destroy();
         return;
       }
       this.handleUnexpectedError(response, error);
     } finally {
+      if (turnToken !== undefined) {
+        if (turnOutcome === "complete") this.turnLedger.complete(turnToken);
+        else if (turnOutcome === "cancel") this.turnLedger.cancel(turnToken);
+        else if (turnOutcome === "incomplete") this.turnLedger.incomplete(turnToken);
+        else this.turnLedger.fail(turnToken);
+      }
       request.off("aborted", onRequestAborted);
       response.off("close", onResponseClosed);
       this.activeUpstreamRequests.delete(controller);
@@ -453,7 +482,8 @@ export class ResponsesBridgeServer {
     isEventStream: boolean,
     canonicalRequest: CanonicalRequest,
     controller: AbortController,
-  ): Promise<void> {
+    turnToken: TurnToken,
+  ): Promise<"complete" | "incomplete"> {
     if (wantsStream && isEventStream) {
       if (upstream.body === null) {
         throw new BridgeRequestError(
@@ -467,7 +497,8 @@ export class ResponsesBridgeServer {
         headersToNode(safeUpstreamHeaders(upstream, true, "chat-completions")),
       );
       response.flushHeaders();
-      await relayChatCompletionsStream({
+      this.turnLedger.markStreamStarted(turnToken);
+      const relay = await relayChatCompletionsStream({
         response,
         body: upstream.body,
         request: canonicalRequest,
@@ -477,7 +508,7 @@ export class ResponsesBridgeServer {
         maxEventCharacters: this.maxSseEventCharacters,
       });
       if (!response.destroyed && !response.writableEnded) response.end();
-      return;
+      return relay.protocolFailure ? "incomplete" : "complete";
     }
     if (!wantsStream && isEventStream) {
       await upstream.body?.cancel().catch(() => undefined);
@@ -498,7 +529,7 @@ export class ResponsesBridgeServer {
       response.flushHeaders();
       await writeTranslatedEvents(response, events);
       response.end(encodeSseEvent({ data: "[DONE]", comments: [] }));
-      return;
+      return "complete";
     }
 
     const translated = translateChatResponseToResponses(payload, { request: canonicalRequest });
@@ -508,6 +539,7 @@ export class ResponsesBridgeServer {
       translated.response,
       safeUpstreamHeaders(upstream, false, "chat-completions"),
     );
+    return "complete";
   }
 
   private methodNotAllowed(response: ServerResponse, allow: string): void {
