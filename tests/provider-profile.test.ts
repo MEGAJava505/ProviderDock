@@ -34,6 +34,21 @@ describe("provider profiles", () => {
     ).toThrow();
   });
 
+  it.each([
+    ["staticHeaders", { Authorization: "Bearer actual-secret" }],
+    ["staticHeaders", { "x-api-key": "actual-secret" }],
+    ["queryParameters", { access_token: "actual-secret" }],
+  ])("rejects credential values in %s", (field, value) => {
+    expect(() =>
+      parseProviderProfile({
+        id: "unsafe",
+        displayName: "Unsafe",
+        baseUrl: "https://example.test/v1",
+        [field]: value,
+      }),
+    ).toThrow(/must use/);
+  });
+
   it("persists CRUD changes as validated JSON", async () => {
     const directory = await mkdtemp(join(tmpdir(), "provider-dock-profiles-"));
     const filePath = join(directory, "providers.json");
@@ -60,4 +75,3 @@ describe("provider profiles", () => {
     expect(JSON.parse(await readFile(filePath, "utf8"))).toHaveLength(1);
   });
 });
-

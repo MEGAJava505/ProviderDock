@@ -14,6 +14,7 @@ Development has started with Phase 1. The first core slice provides:
 - OpenAI-compatible model discovery;
 - manual/discovered model merging;
 - normalized provider health states and errors;
+- a management CLI for provider CRUD, model discovery, and health probes;
 - unit tests using fully local HTTP mocks.
 
 There is no production UI or client launcher yet.
@@ -28,6 +29,30 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## Management CLI
+
+Build the project, then manage local provider profiles with `node dist/cli.js` (or the
+`providerdock` binary when the package is linked):
+
+```bash
+node dist/cli.js providers set \
+  --id agentrouter \
+  --name AgentRouter \
+  --base-url https://example.invalid/v1 \
+  --auth-kind bearer \
+  --secret-ref AGENTROUTER_API_KEY
+
+node dist/cli.js providers list
+node dist/cli.js probe agentrouter
+node dist/cli.js providers remove agentrouter
+```
+
+Provider profiles store only secret references. Put the actual token in the referenced
+environment variable; do not pass API keys on the command line. By default profiles are
+stored under `~/.provider-switcher/providers/providers.json`. Set `PROVIDER_DOCK_HOME`
+to use an isolated data directory. Credential headers and query parameters are rejected
+as static values and must use `--secret-header` or the corresponding auth mode.
 
 ## Architecture direction
 
@@ -57,4 +82,3 @@ The authoritative roadmap and acceptance criteria live in [PROVIDER_SWITCHER_TEC
 4. Safe fallback with side-effect barriers.
 5. Project and prompt profiles.
 6. Additional providers and platforms.
-

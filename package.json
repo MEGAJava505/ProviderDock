@@ -4,11 +4,15 @@
   "private": true,
   "description": "Local multi-provider manager and compatibility gateway for coding agents.",
   "type": "module",
+  "bin": {
+    "providerdock": "dist/cli.js"
+  },
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

@@ -1,16 +1,19 @@
 import { z } from "zod";
 
-export const providerApiTypeSchema = z.enum([
+export const providerApiTypes = [
   "auto",
   "openai-responses",
   "openai-chat-completions",
   "anthropic-messages",
   "custom",
-]);
+] as const;
+
+export const providerApiTypeSchema = z.enum(providerApiTypes);
 
 export type ProviderApiType = z.infer<typeof providerApiTypeSchema>;
 
-export const preferredClientSchema = z.enum(["auto", "codex", "claude-code"]);
+export const preferredClients = ["auto", "codex", "claude-code"] as const;
+export const preferredClientSchema = z.enum(preferredClients);
 
 const secretReferenceSchema = z.string().trim().min(1).max(256);
 
@@ -45,6 +48,46 @@ const stringRecordSchema = z.record(
   z.string().max(8_192),
 );
 
+const sensitiveStaticHeaders = new Set([
+  "authorization",
+  "proxy-authorization",
+  "x-api-key",
+  "api-key",
+  "cookie",
+]);
+
+const sensitiveQueryParameters = new Set([
+  "access_token",
+  "api_key",
+  "apikey",
+  "key",
+  "token",
+]);
+
+const staticHeaderRecordSchema = stringRecordSchema.superRefine((headers, context) => {
+  for (const headerName of Object.keys(headers)) {
+    if (sensitiveStaticHeaders.has(headerName.toLowerCase())) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Header '${headerName}' must use auth or secretHeaders instead of a plaintext value.`,
+        path: [headerName],
+      });
+    }
+  }
+});
+
+const queryParameterRecordSchema = stringRecordSchema.superRefine((parameters, context) => {
+  for (const parameterName of Object.keys(parameters)) {
+    if (sensitiveQueryParameters.has(parameterName.toLowerCase())) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Query parameter '${parameterName}' must use query auth instead of a plaintext value.`,
+        path: [parameterName],
+      });
+    }
+  }
+});
+
 const secretHeaderRecordSchema = z.record(
   z.string().trim().min(1).max(256),
   secretReferenceSchema,
@@ -78,9 +121,9 @@ export const providerProfileSchema = z
       .transform((value) => value.replace(/\/+$/, "")),
     apiType: providerApiTypeSchema.default("auto"),
     auth: providerAuthSchema.default({ kind: "none" }),
-    staticHeaders: stringRecordSchema.default({}),
+    staticHeaders: staticHeaderRecordSchema.default({}),
     secretHeaders: secretHeaderRecordSchema.default({}),
-    queryParameters: stringRecordSchema.default({}),
+    queryParameters: queryParameterRecordSchema.default({}),
     modelsEndpoint: z.string().trim().min(1).max(2_048).default("models"),
     manualModelIds: z.array(z.string().trim().min(1).max(256)).max(1_000).default([]),
     preferredClient: preferredClientSchema.default("auto"),
@@ -95,4 +138,3 @@ export type ProviderProfileInput = z.input<typeof providerProfileSchema>;
 export function parseProviderProfile(input: unknown): ProviderProfile {
   return providerProfileSchema.parse(input);
 }
-
