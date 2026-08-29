@@ -23,8 +23,9 @@ The CLI uses `auto` routing unless `--bridge-url` names an external bridge. Auto
 - uses direct mode for ordinary Responses-compatible profiles;
 - starts one managed loopback bridge for AgentRouter, query authentication, or configured
   provider query parameters;
-- rejects Chat Completions, Anthropic Messages, and custom protocol translation with an
-  explicit error until those translators are implemented.
+- starts a managed bridge with canonical request/response translation for Chat Completions;
+- rejects Anthropic Messages and custom protocol translation with an explicit error until
+  those translators are implemented.
 
 Managed bridges receive provider credentials internally. Their Codex runtime profile
 contains only the loopback URL and no upstream API key. External bridge URLs are recorded

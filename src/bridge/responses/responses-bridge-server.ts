@@ -21,6 +21,20 @@ import {
 } from "./codex-model-catalog.js";
 import { relayResponsesStream } from "./responses-stream-relay.js";
 import { isJsonRecord } from "./responses-stream-state.js";
+import {
+  ResponsesToChatTranslationError,
+  translateResponsesRequestToChat,
+} from "../../protocols/openai-chat/responses-to-chat-request.js";
+import {
+  ChatToResponsesTranslationError,
+  translateChatResponseToResponses,
+} from "../../protocols/openai-chat/chat-to-responses-response.js";
+import { ChatToResponsesStreamTranslator } from "../../protocols/openai-chat/chat-to-responses-stream.js";
+import type { CanonicalRequest } from "../../protocols/canonical/canonical-protocol.js";
+import {
+  relayChatCompletionsStream,
+  writeTranslatedEvents,
+} from "./chat-completions-stream-relay.js";
 
 const loopbackHost = "127.0.0.1";
 const defaultBodyLimitBytes = 64 * 1024 * 1024;
@@ -39,6 +53,7 @@ export interface ResponsesBridgeServerOptions {
   readonly adapterRegistry?: ProviderAdapterRegistry;
   readonly models?: readonly BridgeModelDefinition[];
   readonly responsesEndpoint?: string;
+  readonly chatCompletionsEndpoint?: string;
   readonly fetchImpl?: typeof fetch;
   readonly requestBodyLimitBytes?: number;
   readonly responseBodyLimitBytes?: number;
@@ -59,6 +74,7 @@ export class ResponsesBridgeServer {
   private readonly requests: ProviderHttpRequestBuilder;
   private readonly models: readonly BridgeModelDefinition[];
   private readonly responsesEndpoint: string;
+  private readonly chatCompletionsEndpoint: string;
   private readonly fetchImpl: typeof fetch;
   private readonly requestBodyLimitBytes: number;
   private readonly responseBodyLimitBytes: number;
@@ -78,6 +94,7 @@ export class ResponsesBridgeServer {
       options.models ?? this.profile.manualModelIds.map((modelId) => ({ modelId })),
     );
     this.responsesEndpoint = options.responsesEndpoint ?? "responses";
+    this.chatCompletionsEndpoint = options.chatCompletionsEndpoint ?? "chat/completions";
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.requestBodyLimitBytes = positiveLimit(
       options.requestBodyLimitBytes,
@@ -258,7 +275,25 @@ export class ResponsesBridgeServer {
     try {
       const body = await readJsonObject(request, this.requestBodyLimitBytes);
       const wantsStream = body.stream === true;
-      const built = await this.requests.build(this.profile, this.responsesEndpoint, {
+      if (
+        !["auto", "openai-responses", "openai-chat-completions"].includes(
+          this.profile.apiType,
+        )
+      ) {
+        throw new BridgeRequestError(
+          400,
+          "UNSUPPORTED_FEATURE",
+          `Bridge cannot translate provider API type '${this.profile.apiType}' yet.`,
+        );
+      }
+      const chatTranslation =
+        this.profile.apiType === "openai-chat-completions"
+          ? translateResponsesRequestToChat(body)
+          : undefined;
+      const upstreamPayload = chatTranslation?.chatRequest ?? body;
+      const endpoint =
+        chatTranslation === undefined ? this.responsesEndpoint : this.chatCompletionsEndpoint;
+      const built = await this.requests.build(this.profile, endpoint, {
         accept: wantsStream ? "text/event-stream, application/json" : "application/json",
         contentType: "application/json",
       });
@@ -275,7 +310,7 @@ export class ResponsesBridgeServer {
         upstream = await this.fetchImpl(built.url, {
           method: "POST",
           headers: built.headers,
-          body: JSON.stringify(body),
+          body: JSON.stringify(upstreamPayload),
           signal: controller.signal,
         });
       } catch (error) {
@@ -305,6 +340,17 @@ export class ResponsesBridgeServer {
 
       const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
       const isEventStream = contentType.includes("text/event-stream");
+      if (chatTranslation !== undefined) {
+        await this.handleChatUpstream(
+          response,
+          upstream,
+          wantsStream,
+          isEventStream,
+          chatTranslation.canonical,
+          controller,
+        );
+        return;
+      }
       if (wantsStream && isEventStream) {
         if (upstream.body === null) {
           throw new BridgeRequestError(
@@ -400,6 +446,70 @@ export class ResponsesBridgeServer {
     response.end(encodeSseEvent({ data: "[DONE]", comments: [] }));
   }
 
+  private async handleChatUpstream(
+    response: ServerResponse,
+    upstream: Response,
+    wantsStream: boolean,
+    isEventStream: boolean,
+    canonicalRequest: CanonicalRequest,
+    controller: AbortController,
+  ): Promise<void> {
+    if (wantsStream && isEventStream) {
+      if (upstream.body === null) {
+        throw new BridgeRequestError(
+          502,
+          "STREAM_ERROR",
+          "Chat provider returned an empty streaming response body.",
+        );
+      }
+      response.writeHead(
+        200,
+        headersToNode(safeUpstreamHeaders(upstream, true, "chat-completions")),
+      );
+      response.flushHeaders();
+      await relayChatCompletionsStream({
+        response,
+        body: upstream.body,
+        request: canonicalRequest,
+        abortUpstream: (reason) => controller.abort(reason),
+        heartbeatIntervalMs: this.heartbeatIntervalMs,
+        idleTimeoutMs: this.streamIdleTimeoutMs,
+        maxEventCharacters: this.maxSseEventCharacters,
+      });
+      if (!response.destroyed && !response.writableEnded) response.end();
+      return;
+    }
+    if (!wantsStream && isEventStream) {
+      await upstream.body?.cancel().catch(() => undefined);
+      throw new BridgeRequestError(
+        502,
+        "PROTOCOL_ERROR",
+        "Chat provider returned SSE for a non-streaming request.",
+      );
+    }
+
+    const payload = await readUpstreamJson(upstream, this.responseBodyLimitBytes);
+    if (wantsStream) {
+      const translator = new ChatToResponsesStreamTranslator({ request: canonicalRequest });
+      const events = [...translator.feed(payload), ...translator.finish()];
+      const headers = safeUpstreamHeaders(upstream, true, "chat-completions");
+      headers.set("x-providerdock-normalization", "chat-json-to-responses-sse");
+      response.writeHead(200, headersToNode(headers));
+      response.flushHeaders();
+      await writeTranslatedEvents(response, events);
+      response.end(encodeSseEvent({ data: "[DONE]", comments: [] }));
+      return;
+    }
+
+    const translated = translateChatResponseToResponses(payload, { request: canonicalRequest });
+    sendJson(
+      response,
+      200,
+      translated.response,
+      safeUpstreamHeaders(upstream, false, "chat-completions"),
+    );
+  }
+
   private methodNotAllowed(response: ServerResponse, allow: string): void {
     const headers = new Headers({ Allow: allow });
     sendBridgeError(response, 405, "INVALID_REQUEST", "HTTP method is not allowed.", headers);
@@ -413,6 +523,14 @@ export class ResponsesBridgeServer {
     }
     if (error instanceof BridgeRequestError) {
       sendBridgeError(response, error.status, error.type, error.message);
+      return;
+    }
+    if (error instanceof ResponsesToChatTranslationError) {
+      sendBridgeError(response, 400, error.type, error.message);
+      return;
+    }
+    if (error instanceof ChatToResponsesTranslationError) {
+      sendBridgeError(response, 502, error.type, error.message);
       return;
     }
     if (error instanceof ProviderRequestError) {
@@ -527,10 +645,14 @@ async function readUpstreamJson(response: Response, limitBytes: number): Promise
   }
 }
 
-function safeUpstreamHeaders(upstream: Response, streaming: boolean): Headers {
+function safeUpstreamHeaders(
+  upstream: Response,
+  streaming: boolean,
+  bridgeMode = "native-responses",
+): Headers {
   const headers = new Headers({
     "cache-control": streaming ? "no-cache, no-transform" : "no-store",
-    "x-providerdock-bridge": "native-responses",
+    "x-providerdock-bridge": bridgeMode,
   });
   if (streaming) {
     headers.set("content-type", "text/event-stream; charset=utf-8");

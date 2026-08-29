@@ -526,7 +526,7 @@ Usage:
   providerdock recover codex [--json]
 
 Codex launch routing:
-  Without --bridge-url, ProviderDock selects direct or managed native Responses bridge mode.
+  Without --bridge-url, ProviderDock selects direct or managed compatibility bridge mode.
   --bridge-url selects an externally managed compatibility bridge and never stops it.
 
 Authentication options for providers set:

@@ -292,7 +292,7 @@ describe("CodexLauncher", () => {
     await expect(access(join(fixture.runtimeRoot, sessionId))).rejects.toThrow();
   });
 
-  it("rejects unsupported automatic protocol translation before creating a bridge", async () => {
+  it("rejects unsupported Anthropic translation before creating a bridge", async () => {
     const fixture = await createFixture();
     const bridges = new FakeBridgeFactory([]);
     const launcher = new CodexLauncher(fixture.manager, new FakeProcessRunner(), bridges);
@@ -300,16 +300,16 @@ describe("CodexLauncher", () => {
     await expect(
       launcher.launch({
         profile: parseProviderProfile({
-          id: "chat-router",
-          displayName: "Chat Router",
+          id: "anthropic-router",
+          displayName: "Anthropic Router",
           baseUrl: "https://example.test/v1",
-          apiType: "openai-chat-completions",
+          apiType: "anthropic-messages",
         }),
         modelId: "model-x",
         projectDirectory: fixture.projectDirectory,
         route: { kind: "auto" },
       }),
-    ).rejects.toThrow(/cannot translate.*openai-chat-completions/i);
+    ).rejects.toThrow(/cannot translate.*anthropic-messages/i);
     expect(bridges.input).toBeUndefined();
   });
 

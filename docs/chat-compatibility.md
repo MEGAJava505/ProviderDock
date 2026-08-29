@@ -51,9 +51,28 @@ tool name, arguments hash, status, timestamps and result hash. Before any upstre
 This prevents an old unfinished tool call from being sent back to the model and triggering
 a recursive execution. There is still no automatic retry or replay.
 
+## Response and streaming translation
+
+Chat JSON responses are converted to complete Responses envelopes with deterministic
+response/output IDs, normalized usage, reasoning summaries, text/refusal content and
+function/custom tool calls. Missing legacy call IDs are synthesized deterministically.
+Malformed function arguments, duplicated call IDs and multiple choices are protocol
+errors rather than partial success.
+
+Chat SSE is decoded independently of transport chunks and emitted as Responses events as
+soon as semantic deltas arrive. The translator produces output item/content/tool events,
+monotonic sequence numbers and one validated terminal event. It maps length/content-filter
+finishes to `response.incomplete`, and emits `response.failed` if `[DONE]` or the transport
+ends without a supported finish reason. `[DONE]` is held until this validation completes.
+
+The loopback bridge now selects `/chat/completions` for Chat profiles, and the Codex
+launcher starts/stops that bridge automatically. A regression scenario verifies
+`tool_call → tool_result → final answer` across two HTTP requests with the original call
+ID and no hidden third request.
+
 ## Current boundary
 
-This checkpoint implements canonical input and Chat request generation only. Chat JSON and
-SSE responses are not yet translated back to Responses, so the Codex launcher continues to
-reject automatic Chat routing until the reverse translator and its terminal-state tests
-are connected.
+Chat request, JSON response and SSE translation are connected. Server-side web search,
+stateful `previous_response_id` storage, persistent cross-request tool-call replay ledger,
+and Anthropic Messages translation remain later safety/compatibility blocks. Automatic
+retry remains disabled while those stateful barriers are incomplete.

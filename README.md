@@ -20,9 +20,9 @@ Development has started with Phase 1. The first core slice provides:
 - canonical Responses request normalization and safe Responses-to-Chat request translation;
 - unit tests using fully local HTTP mocks.
 
-There is no production UI yet. The Codex launcher automatically owns a native Responses
-bridge when a profile needs query authentication or uses the AgentRouter adapter.
-Translation for Chat Completions/Anthropic providers remains the next compatibility work.
+There is no production UI yet. The Codex launcher automatically owns a compatibility
+bridge for AgentRouter, query-authenticated Responses profiles, and Chat Completions
+providers. Anthropic Messages translation remains the next client-protocol block.
 
 ## Development
 
@@ -102,8 +102,9 @@ node dist/cli.js recover codex
 
 Direct Codex routes currently require a Responses-compatible provider. Query-authenticated
 Responses providers and AgentRouter are relayed automatically by a per-session bridge.
-Chat Completions and Anthropic translation are not implemented yet. An already-running
-external compatibility bridge can be selected explicitly through `--bridge-url`.
+Chat Completions providers are translated automatically through the canonical protocol;
+Anthropic translation is not implemented yet. An already-running external compatibility
+bridge can be selected explicitly through `--bridge-url`.
 Bridge behavior is documented in [`docs/responses-bridge.md`](./docs/responses-bridge.md).
 Runtime details and recovery guarantees are documented in
 [`docs/codex-runtime.md`](./docs/codex-runtime.md).

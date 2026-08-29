@@ -2,8 +2,8 @@
 
 ## AgentRouter Codex Bridge
 
-ProviderDock's native Responses bridge and Codex model catalog adapt implementation ideas
-and portions of the model capability structure from
+ProviderDock's native Responses bridge, Codex model catalog, and Chat compatibility
+translation adapt implementation ideas and portions of the model capability structure from
 [`MEGAJava505/agentrouter_for_codex`](https://github.com/MEGAJava505/agentrouter_for_codex),
 as directed by the Provider Switcher technical specification.
 

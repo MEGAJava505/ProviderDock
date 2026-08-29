@@ -146,7 +146,11 @@ export class CodexLauncher {
       return { kind: "external", route: input.route };
     }
 
-    if (!["auto", "openai-responses"].includes(input.profile.apiType)) {
+    if (
+      !["auto", "openai-responses", "openai-chat-completions"].includes(
+        input.profile.apiType,
+      )
+    ) {
       throw new CodexRuntimeConfigurationError(
         `Automatic Codex routing cannot translate provider API type '${input.profile.apiType}' yet. ` +
           "Configure a compatible external bridge explicitly.",
@@ -154,6 +158,7 @@ export class CodexLauncher {
     }
 
     const requiresBridge =
+      input.profile.apiType === "openai-chat-completions" ||
       input.profile.adapterId === "agentrouter" ||
       input.profile.auth.kind === "query" ||
       Object.keys(input.profile.queryParameters).length > 0;
