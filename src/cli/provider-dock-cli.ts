@@ -6,6 +6,7 @@ import {
   SecretVaultUnavailableError,
 } from "../application/provider-dock-application.js";
 import { SecretProtectionError } from "../core/security/dpapi-secret-vault.js";
+import { CodexRuntimeConfigurationError } from "../clients/codex/codex-runtime-config.js";
 import {
   preferredClients,
   providerApiTypes,
@@ -43,7 +44,8 @@ export async function runProviderDockCli(
       error instanceof CliUsageError ||
       error instanceof ProviderNotFoundError ||
       error instanceof SecretVaultUnavailableError ||
-      error instanceof SecretProtectionError
+      error instanceof SecretProtectionError ||
+      error instanceof CodexRuntimeConfigurationError
     ) {
       io.stderr(`Error: ${error.message}`);
       return 1;
@@ -76,8 +78,85 @@ async function execute(
   if (command === "providers") return executeProviders(rest, application, io);
   if (command === "probe") return executeProbe(rest, application, io);
   if (command === "secrets") return executeSecrets(rest, application, io, environment);
+  if (command === "launch") return executeLaunch(rest, application, io, environment);
+  if (command === "recover") return executeRecovery(rest, application, io);
 
   throw new CliUsageError(`Unknown command '${command}'. Run 'providerdock help'.`);
+}
+
+async function executeLaunch(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+  environment: NodeJS.ProcessEnv,
+): Promise<number> {
+  const [client, ...rest] = argv;
+  if (client !== "codex") throw new CliUsageError("Usage: providerdock launch codex [options]");
+  const { values, positionals } = parseArgs({
+    args: [...rest],
+    options: {
+      provider: { type: "string" },
+      model: { type: "string" },
+      project: { type: "string" },
+      "bridge-url": { type: "string" },
+      executable: { type: "string" },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+  assertNoPositionals(positionals);
+  const bridgeUrl = values["bridge-url"];
+  const exit = await application.launchCodex({
+    providerId: requireString(values.provider, "--provider"),
+    modelId: requireString(values.model, "--model"),
+    projectDirectory: requireString(values.project, "--project"),
+    route: bridgeUrl ? { kind: "bridge", baseUrl: bridgeUrl } : { kind: "direct" },
+    ...(values.executable ? { executable: values.executable } : {}),
+    parentEnvironment: environment,
+  });
+  const status = exit.exitCode === null ? `signal ${exit.signal ?? "unknown"}` : `exit code ${exit.exitCode}`;
+  io.stdout(`Codex session finished with ${status}.`);
+  return exit.exitCode ?? 1;
+}
+
+async function executeRecovery(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+): Promise<number> {
+  const [client, ...rest] = argv;
+  if (client !== "codex") throw new CliUsageError("Usage: providerdock recover codex [--json]");
+  const { values, positionals } = parseArgs({
+    args: [...rest],
+    options: { json: { type: "boolean", default: false } },
+    allowPositionals: true,
+    strict: true,
+  });
+  assertNoPositionals(positionals);
+  const outcomes = await application.recoverCodexSessions();
+  if (values.json) io.stdout(JSON.stringify(outcomes, null, 2));
+  else if (outcomes.length === 0) io.stdout("No stale Codex sessions found.");
+  else {
+    io.stdout(
+      renderTable(
+        ["SESSION", "STATUS", "DETAILS"],
+        outcomes.map((outcome) => [
+          outcome.sessionId,
+          outcome.status,
+          outcome.status === "ACTIVE"
+            ? `PID ${outcome.pid}`
+            : outcome.status === "CONFLICT" || outcome.status === "INVALID"
+              ? outcome.message
+              : "temporary profile removed",
+        ]),
+      ),
+    );
+  }
+  return outcomes.some(
+    (outcome) => outcome.status === "CONFLICT" || outcome.status === "INVALID",
+  )
+    ? 2
+    : 0;
 }
 
 async function executeSecrets(
@@ -432,6 +511,8 @@ Usage:
   providerdock secrets list
   providerdock secrets set <reference> --from-env VARIABLE
   providerdock secrets remove <reference>
+  providerdock launch codex --provider ID --model MODEL --project DIRECTORY
+  providerdock recover codex [--json]
 
 Authentication options for providers set:
   --auth-kind none|bearer|header|query

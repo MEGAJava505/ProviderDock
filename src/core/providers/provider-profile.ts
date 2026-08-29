@@ -135,7 +135,55 @@ export const providerProfileSchema = z
     timeoutMs: z.number().int().min(250).max(300_000).default(10_000),
     healthCheck: healthCheckPolicySchema.default({}),
   })
-  .strict();
+  .strict()
+  .superRefine((profile, context) => {
+    const staticHeaderNames = new Set(
+      Object.keys(profile.staticHeaders).map((name) => name.toLowerCase()),
+    );
+    const secretHeaderNames = new Set(
+      Object.keys(profile.secretHeaders).map((name) => name.toLowerCase()),
+    );
+
+    for (const duplicate of [...staticHeaderNames].filter((name) => secretHeaderNames.has(name))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Header '${duplicate}' cannot be both static and secret-backed.`,
+        path: ["secretHeaders", duplicate],
+      });
+    }
+
+    if (profile.auth.kind === "bearer" && secretHeaderNames.has("authorization")) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Bearer auth cannot be combined with a secret-backed Authorization header.",
+        path: ["secretHeaders", "authorization"],
+      });
+    }
+    if (profile.auth.kind === "header") {
+      const authHeader = profile.auth.headerName.toLowerCase();
+      if (staticHeaderNames.has(authHeader) || secretHeaderNames.has(authHeader)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Auth header '${profile.auth.headerName}' cannot also be configured as a custom header.`,
+          path: ["auth", "headerName"],
+        });
+      }
+    }
+    if (profile.auth.kind === "query") {
+      const parameterName = profile.auth.parameterName;
+      if (
+        Object.keys(profile.queryParameters).some(
+          (name) => name.toLowerCase() === parameterName.toLowerCase(),
+        )
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Auth query parameter '${parameterName}' cannot also be static.`,
+          path: ["auth", "parameterName"],
+        });
+      }
+    }
+  });
 
 export type ProviderProfile = z.infer<typeof providerProfileSchema>;
 export type ProviderProfileInput = z.input<typeof providerProfileSchema>;

@@ -49,6 +49,18 @@ describe("provider profiles", () => {
     ).toThrow(/must use/);
   });
 
+  it("rejects ambiguous duplicate authentication headers", () => {
+    expect(() =>
+      parseProviderProfile({
+        id: "ambiguous",
+        displayName: "Ambiguous",
+        baseUrl: "https://example.test/v1",
+        auth: { kind: "bearer", secretRef: "BEARER_KEY" },
+        secretHeaders: { Authorization: "OTHER_KEY" },
+      }),
+    ).toThrow(/cannot be combined/);
+  });
+
   it("persists CRUD changes as validated JSON", async () => {
     const directory = await mkdtemp(join(tmpdir(), "provider-dock-profiles-"));
     const filePath = join(directory, "providers.json");

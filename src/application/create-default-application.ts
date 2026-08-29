@@ -11,12 +11,16 @@ import {
   type SecretVault,
 } from "../core/security/secret-store.js";
 import { GenericOpenAiAdapter } from "../providers/generic-openai/generic-openai-adapter.js";
+import { CodexLauncher } from "../clients/codex/codex-launcher.js";
+import { CodexRuntimeSessionManager } from "../clients/codex/codex-runtime-session.js";
 import { ProviderDockApplication } from "./provider-dock-application.js";
 
 export interface ProviderDockPaths {
   readonly dataDirectory: string;
   readonly providersFile: string;
   readonly secretsDirectory: string;
+  readonly runtimeDirectory: string;
+  readonly codexHome: string;
 }
 
 export interface ResolveProviderDockPathsOptions {
@@ -30,6 +34,7 @@ export function resolveProviderDockPaths(
   const environment = options.environment ?? process.env;
   const userHome = options.userHome ?? homedir();
   const configuredDirectory = environment.PROVIDER_DOCK_HOME?.trim();
+  const configuredCodexHome = environment.CODEX_HOME?.trim();
   const dataDirectory = configuredDirectory
     ? isAbsolute(configuredDirectory)
       ? configuredDirectory
@@ -40,6 +45,12 @@ export function resolveProviderDockPaths(
     dataDirectory,
     providersFile: join(dataDirectory, "providers", "providers.json"),
     secretsDirectory: join(dataDirectory, "secrets"),
+    runtimeDirectory: join(dataDirectory, "runtime"),
+    codexHome: configuredCodexHome
+      ? isAbsolute(configuredCodexHome)
+        ? configuredCodexHome
+        : resolve(configuredCodexHome)
+      : join(userHome, ".codex"),
   };
 }
 
@@ -71,6 +82,13 @@ export function createDefaultApplication(
   });
   const adapters = new ProviderAdapterRegistry().register(openAiAdapter);
   const probes = new ProviderProbeService(adapters);
+  const codexLauncher = new CodexLauncher(
+    new CodexRuntimeSessionManager({
+      codexHome: paths.codexHome,
+      runtimeRoot: join(paths.runtimeDirectory, "codex"),
+      secrets,
+    }),
+  );
 
-  return new ProviderDockApplication(profiles, probes, secretVault);
+  return new ProviderDockApplication(profiles, probes, secretVault, codexLauncher);
 }

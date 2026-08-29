@@ -3,6 +3,13 @@ import type { ProviderProfile } from "../core/providers/provider-profile.js";
 import { parseProviderProfile } from "../core/providers/provider-profile.js";
 import type { ProviderProfileRepository } from "../core/providers/provider-profile-repository.js";
 import type { SecretVault } from "../core/security/secret-store.js";
+import { secretReferenceSchema } from "../core/providers/provider-profile.js";
+import type {
+  CodexLauncher,
+  CodexProcessExit,
+  LaunchCodexInput,
+} from "../clients/codex/codex-launcher.js";
+import type { CodexRecoveryOutcome } from "../clients/codex/codex-runtime-session.js";
 
 export class ProviderNotFoundError extends Error {
   constructor(readonly providerId: string) {
@@ -23,6 +30,7 @@ export class ProviderDockApplication {
     private readonly profiles: ProviderProfileRepository,
     private readonly probes: ProviderProbeService,
     private readonly secretVault?: SecretVault,
+    private readonly codexLauncher?: CodexLauncher,
   ) {}
 
   listProviders(): Promise<readonly ProviderProfile[]> {
@@ -48,7 +56,7 @@ export class ProviderDockApplication {
   }
 
   async setSecret(reference: string, value: string): Promise<void> {
-    await this.requireSecretVault().set(reference, value);
+    await this.requireSecretVault().set(secretReferenceSchema.parse(reference), value);
   }
 
   listSecretReferences(): Promise<readonly string[]> {
@@ -56,11 +64,32 @@ export class ProviderDockApplication {
   }
 
   async removeSecret(reference: string): Promise<boolean> {
-    return this.requireSecretVault().delete(reference);
+    return this.requireSecretVault().delete(secretReferenceSchema.parse(reference));
+  }
+
+  async launchCodex(
+    input: Omit<LaunchCodexInput, "profile"> & { readonly providerId: string },
+  ): Promise<CodexProcessExit> {
+    const { providerId, ...launchInput } = input;
+    return this.requireCodexLauncher().launch({
+      ...launchInput,
+      profile: await this.getProvider(providerId),
+    });
+  }
+
+  recoverCodexSessions(): Promise<readonly CodexRecoveryOutcome[]> {
+    return this.requireCodexLauncher().recover();
   }
 
   private requireSecretVault(): SecretVault {
     if (!this.secretVault) throw new SecretVaultUnavailableError();
     return this.secretVault;
+  }
+
+  private requireCodexLauncher(): CodexLauncher {
+    if (!this.codexLauncher) {
+      throw new Error("The Codex runtime launcher is not configured.");
+    }
+    return this.codexLauncher;
   }
 }

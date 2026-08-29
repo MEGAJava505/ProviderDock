@@ -12,6 +12,10 @@ describe("ProviderDock paths", () => {
     expect(paths.secretsDirectory).toBe(
       join("C:\\Users\\test", ".provider-switcher", "secrets"),
     );
+    expect(paths.runtimeDirectory).toBe(
+      join("C:\\Users\\test", ".provider-switcher", "runtime"),
+    );
+    expect(paths.codexHome).toBe(join("C:\\Users\\test", ".codex"));
   });
 
   it("supports an isolated directory override", () => {
