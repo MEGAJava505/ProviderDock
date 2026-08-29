@@ -1,0 +1,98 @@
+import { z } from "zod";
+
+export const providerApiTypeSchema = z.enum([
+  "auto",
+  "openai-responses",
+  "openai-chat-completions",
+  "anthropic-messages",
+  "custom",
+]);
+
+export type ProviderApiType = z.infer<typeof providerApiTypeSchema>;
+
+export const preferredClientSchema = z.enum(["auto", "codex", "claude-code"]);
+
+const secretReferenceSchema = z.string().trim().min(1).max(256);
+
+export const providerAuthSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }).strict(),
+  z
+    .object({
+      kind: z.literal("bearer"),
+      secretRef: secretReferenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("header"),
+      headerName: z.string().trim().min(1).max(256),
+      secretRef: secretReferenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("query"),
+      parameterName: z.string().trim().min(1).max(256),
+      secretRef: secretReferenceSchema,
+    })
+    .strict(),
+]);
+
+export type ProviderAuth = z.infer<typeof providerAuthSchema>;
+
+const stringRecordSchema = z.record(
+  z.string().trim().min(1).max(256),
+  z.string().max(8_192),
+);
+
+const secretHeaderRecordSchema = z.record(
+  z.string().trim().min(1).max(256),
+  secretReferenceSchema,
+);
+
+export const healthCheckPolicySchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    metadataTtlMs: z.number().int().min(1_000).max(86_400_000).default(60_000),
+    minimalInference: z.enum(["never", "on-demand", "after-metadata"]).default("on-demand"),
+  })
+  .strict();
+
+export const providerProfileSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9][a-z0-9_-]*$/, "Use lowercase letters, digits, '-' or '_'."),
+    displayName: z.string().trim().min(1).max(128),
+    enabled: z.boolean().default(true),
+    baseUrl: z
+      .string()
+      .trim()
+      .url()
+      .refine((value) => value.startsWith("https://") || value.startsWith("http://"), {
+        message: "Only HTTP(S) provider URLs are supported.",
+      })
+      .transform((value) => value.replace(/\/+$/, "")),
+    apiType: providerApiTypeSchema.default("auto"),
+    auth: providerAuthSchema.default({ kind: "none" }),
+    staticHeaders: stringRecordSchema.default({}),
+    secretHeaders: secretHeaderRecordSchema.default({}),
+    queryParameters: stringRecordSchema.default({}),
+    modelsEndpoint: z.string().trim().min(1).max(2_048).default("models"),
+    manualModelIds: z.array(z.string().trim().min(1).max(256)).max(1_000).default([]),
+    preferredClient: preferredClientSchema.default("auto"),
+    timeoutMs: z.number().int().min(250).max(300_000).default(10_000),
+    healthCheck: healthCheckPolicySchema.default({}),
+  })
+  .strict();
+
+export type ProviderProfile = z.infer<typeof providerProfileSchema>;
+export type ProviderProfileInput = z.input<typeof providerProfileSchema>;
+
+export function parseProviderProfile(input: unknown): ProviderProfile {
+  return providerProfileSchema.parse(input);
+}
+
