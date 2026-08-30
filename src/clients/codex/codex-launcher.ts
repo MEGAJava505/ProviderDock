@@ -93,8 +93,10 @@ export class CodexLauncher {
     let runtime: Awaited<ReturnType<CodexRuntimeSessionManager["prepare"]>> | undefined;
 
     try {
-      resolution = await this.resolveRoute(input);
+      const sessionId = this.sessions.createSessionId();
+      resolution = await this.resolveRoute(input, sessionId);
       runtime = await this.sessions.prepare({
+        sessionId,
         profile: input.profile,
         modelId: input.modelId,
         projectDirectory: input.projectDirectory,
@@ -138,7 +140,10 @@ export class CodexLauncher {
     return this.sessions.recoverStaleSessions();
   }
 
-  private async resolveRoute(input: LaunchCodexInput): Promise<ResolvedCodexRoute> {
+  private async resolveRoute(
+    input: LaunchCodexInput,
+    sessionId: string,
+  ): Promise<ResolvedCodexRoute> {
     if (input.route.kind === "direct") {
       return { kind: "direct", route: input.route };
     }
@@ -169,7 +174,11 @@ export class CodexLauncher {
       );
     }
 
-    const bridge = this.bridges.create({ profile: input.profile, modelId: input.modelId });
+    const bridge = this.bridges.create({
+      profile: input.profile,
+      modelId: input.modelId,
+      sessionId,
+    });
     try {
       const address = await bridge.start();
       return {

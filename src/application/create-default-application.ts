@@ -109,6 +109,7 @@ export function createDefaultApplication(
     new ResponsesCodexBridgeFactory({
       secretStore: secrets,
       adapterRegistry: adapters,
+      runtimeRoot: join(paths.runtimeDirectory, "codex"),
       ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
     }),
   );
@@ -117,6 +118,7 @@ export function createDefaultApplication(
     new AnthropicClaudeBridgeFactory({
       secretStore: secrets,
       adapterRegistry: adapters,
+      runtimeRoot: join(paths.runtimeDirectory, "claude"),
       ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
     }),
     new NodeClaudeProcessRunner(),

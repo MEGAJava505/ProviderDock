@@ -62,6 +62,10 @@ state (`LISTENING`, `CONFIGURED`, or `ACTIVE`) for diagnostics. They never recor
 credentials. Recovery remains compatible with version 1 manifests created by earlier
 ProviderDock builds.
 
+Managed sessions also keep `turn-ledger.json` beside the manifest. It is written before
+upstream/tool delivery, retained after a crash, and removed with the session directory
+only during checksum-guarded normal or stale-session cleanup.
+
 For an active managed route, recovery verifies the loopback `/health` response and
 provider ID. If the Codex PID is alive but its bridge disappeared after a launcher crash,
 the session is reported as `CONFLICT`; its profile and manifest are preserved rather than

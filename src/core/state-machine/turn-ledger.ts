@@ -51,6 +51,7 @@ export type TurnBlockCode =
   | "TURN_IN_FLIGHT"
   | "TURN_ALREADY_COMPLETED"
   | "UNSAFE_REPLAY"
+  | "LEDGER_CAPACITY_EXCEEDED"
   | "TOOL_CALL_CONFLICT"
   | "TOOL_RESULT_CONFLICT"
   | "TOOL_RESULT_UNMATCHED"
@@ -65,7 +66,7 @@ export class TurnLedgerViolationError extends Error {
   constructor(
     readonly code: Extract<
       TurnBlockCode,
-      "TOOL_CALL_CONFLICT" | "TOOL_LOOP_DETECTED"
+      "LEDGER_CAPACITY_EXCEEDED" | "TOOL_CALL_CONFLICT" | "TOOL_LOOP_DETECTED"
     >,
     message: string,
   ) {
@@ -74,23 +75,37 @@ export class TurnLedgerViolationError extends Error {
   }
 }
 
-interface TurnRecord {
+export interface TurnRecordSnapshot {
+  readonly fingerprint: string;
   state: TurnState;
   streamStarted: boolean;
   toolActivity: boolean;
+  replayUnsafe: boolean;
   attempt: number;
   updatedAtMs: number;
 }
 
-interface ToolCallRecord {
+export interface ToolCallRecordSnapshot {
+  readonly callId: string;
   readonly name: string;
   readonly argumentsHash: string;
   resolved: boolean;
   resultHash?: string;
 }
 
+export interface TurnLedgerSnapshot {
+  readonly version: 1;
+  readonly turns: readonly TurnRecordSnapshot[];
+  readonly toolCalls: readonly ToolCallRecordSnapshot[];
+}
+
+type TurnRecord = Omit<TurnRecordSnapshot, "fingerprint">;
+type ToolCallRecord = Omit<ToolCallRecordSnapshot, "callId">;
+
 export interface TurnLedgerOptions {
   readonly maxTurnRecords?: number;
+  readonly maxToolCallRecords?: number;
+  readonly initialSnapshot?: TurnLedgerSnapshot;
   readonly now?: () => number;
 }
 
@@ -98,17 +113,33 @@ export class TurnLedger {
   private readonly turns = new Map<string, TurnRecord>();
   private readonly toolCalls = new Map<string, ToolCallRecord>();
   private readonly maxTurnRecords: number;
+  private readonly maxToolCallRecords: number;
   private readonly now: () => number;
 
   constructor(options: TurnLedgerOptions = {}) {
     this.maxTurnRecords = options.maxTurnRecords ?? 512;
+    this.maxToolCallRecords = options.maxToolCallRecords ?? 4_096;
+    if (!Number.isSafeInteger(this.maxTurnRecords) || this.maxTurnRecords < 1) {
+      throw new RangeError("maxTurnRecords must be a positive safe integer.");
+    }
+    if (!Number.isSafeInteger(this.maxToolCallRecords) || this.maxToolCallRecords < 1) {
+      throw new RangeError("maxToolCallRecords must be a positive safe integer.");
+    }
     this.now = options.now ?? Date.now;
+    if (options.initialSnapshot !== undefined) this.restore(options.initialSnapshot);
   }
 
   /** Evaluates a turn before it is sent upstream. */
   admit(signature: TurnSignature): TurnAdmission {
     const toolCheck = this.checkToolIntegrity(signature);
     if (toolCheck !== undefined) return toolCheck;
+    const newToolCallCount = this.countNewToolCalls(signature.toolCalls);
+    if (this.toolCalls.size + newToolCallCount > this.maxToolCallRecords) {
+      return blocked(
+        "LEDGER_CAPACITY_EXCEEDED",
+        "The session tool-call ledger reached its safety limit. Start a new runtime session.",
+      );
+    }
 
     const existing = this.turns.get(signature.fingerprint);
     if (existing !== undefined) {
@@ -125,7 +156,7 @@ export class TurnLedger {
             "start a new turn instead of resending the identical request.",
         );
       }
-      if (existing.streamStarted || existing.toolActivity) {
+      if (existing.replayUnsafe || existing.streamStarted || existing.toolActivity) {
         return blocked(
           "UNSAFE_REPLAY",
           "The previous attempt of this turn already streamed output or involved tool " +
@@ -142,11 +173,19 @@ export class TurnLedger {
     }
 
     this.evictIfNeeded();
+    if (this.turns.size >= this.maxTurnRecords) {
+      return blocked(
+        "LEDGER_CAPACITY_EXCEEDED",
+        "The session turn ledger is full while all retained turns are still active. " +
+          "Wait for them to finish or start a new runtime session.",
+      );
+    }
     const toolActivity = signature.toolCalls.length > 0 || signature.toolResults.length > 0;
     this.turns.set(signature.fingerprint, {
       state: "ACCEPTED",
       streamStarted: false,
       toolActivity,
+      replayUnsafe: toolActivity,
       attempt: 1,
       updatedAtMs: this.now(),
     });
@@ -158,6 +197,7 @@ export class TurnLedger {
     const record = this.currentRecord(token);
     if (record === undefined) return;
     record.streamStarted = true;
+    record.replayUnsafe = true;
     record.state = "STREAMING";
     record.updatedAtMs = this.now();
   }
@@ -166,6 +206,7 @@ export class TurnLedger {
     const record = this.currentRecord(token);
     if (record === undefined) return;
     record.toolActivity = true;
+    record.replayUnsafe = true;
     record.updatedAtMs = this.now();
   }
 
@@ -212,6 +253,17 @@ export class TurnLedger {
       }
     }
 
+    const newToolCallCount = [...batch.keys()].filter(
+      (callId) => !this.toolCalls.has(callId),
+    ).length;
+    if (this.toolCalls.size + newToolCallCount > this.maxToolCallRecords) {
+      throw new TurnLedgerViolationError(
+        "LEDGER_CAPACITY_EXCEEDED",
+        "The session tool-call ledger reached its safety limit. " +
+          "Delivery was blocked before execution.",
+      );
+    }
+
     for (const call of batch.values()) {
       if (!this.toolCalls.has(call.callId)) {
         this.toolCalls.set(call.callId, {
@@ -223,6 +275,7 @@ export class TurnLedger {
     }
     if (batch.size > 0) {
       record.toolActivity = true;
+      record.replayUnsafe = true;
       record.updatedAtMs = this.now();
     }
   }
@@ -245,6 +298,35 @@ export class TurnLedger {
 
   stateOf(fingerprint: string): TurnState | undefined {
     return this.turns.get(fingerprint)?.state;
+  }
+
+  /** Returns a deterministic, detached representation safe to persist. */
+  snapshot(): TurnLedgerSnapshot {
+    return {
+      version: 1,
+      turns: [...this.turns.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([fingerprint, record]) => ({ fingerprint, ...record })),
+      toolCalls: [...this.toolCalls.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([callId, record]) => ({ callId, ...record })),
+    };
+  }
+
+  /**
+   * A process crash leaves no proof that an accepted/in-flight turn was safe
+   * to repeat. Convert it to INCOMPLETE so recovery always fails closed.
+   */
+  recoverInterruptedTurns(): boolean {
+    let changed = false;
+    for (const record of this.turns.values()) {
+      if (record.state !== "ACCEPTED" && record.state !== "STREAMING") continue;
+      record.state = "INCOMPLETE";
+      record.replayUnsafe = true;
+      record.updatedAtMs = this.now();
+      changed = true;
+    }
+    return changed;
   }
 
   private transition(token: TurnToken, state: TurnState): void {
@@ -354,12 +436,63 @@ export class TurnLedger {
     }
   }
 
+  private countNewToolCalls(calls: readonly TurnToolCall[]): number {
+    const newCallIds = new Set<string>();
+    for (const call of calls) {
+      if (!this.toolCalls.has(call.callId)) newCallIds.add(call.callId);
+    }
+    return newCallIds.size;
+  }
+
+  private restore(snapshot: TurnLedgerSnapshot): void {
+    if (snapshot.version !== 1) throw new TypeError("Unsupported turn ledger snapshot version.");
+    if (snapshot.turns.length > this.maxTurnRecords) {
+      throw new RangeError("Turn ledger snapshot exceeds maxTurnRecords.");
+    }
+    if (snapshot.toolCalls.length > this.maxToolCallRecords) {
+      throw new RangeError("Turn ledger snapshot exceeds maxToolCallRecords.");
+    }
+    for (const record of snapshot.turns) {
+      if (this.turns.has(record.fingerprint)) {
+        throw new TypeError(`Duplicate turn fingerprint '${record.fingerprint}' in snapshot.`);
+      }
+      this.turns.set(record.fingerprint, {
+        state: record.state,
+        streamStarted: record.streamStarted,
+        toolActivity: record.toolActivity,
+        replayUnsafe: record.replayUnsafe,
+        attempt: record.attempt,
+        updatedAtMs: record.updatedAtMs,
+      });
+    }
+    for (const record of snapshot.toolCalls) {
+      if (this.toolCalls.has(record.callId)) {
+        throw new TypeError(`Duplicate tool call '${record.callId}' in snapshot.`);
+      }
+      this.toolCalls.set(record.callId, {
+        name: record.name,
+        argumentsHash: record.argumentsHash,
+        resolved: record.resolved,
+        ...(record.resultHash === undefined ? {} : { resultHash: record.resultHash }),
+      });
+    }
+  }
+
   private evictIfNeeded(): void {
     if (this.turns.size < this.maxTurnRecords) return;
     let oldestKey: string | undefined;
     let oldestAt = Number.POSITIVE_INFINITY;
     for (const [key, record] of this.turns) {
-      if (record.state === "ACCEPTED" || record.state === "STREAMING") continue;
+      if (
+        record.state === "ACCEPTED" ||
+        record.state === "STREAMING" ||
+        record.state === "COMPLETED" ||
+        record.replayUnsafe ||
+        record.streamStarted ||
+        record.toolActivity
+      ) {
+        continue;
+      }
       if (record.updatedAtMs < oldestAt) {
         oldestAt = record.updatedAtMs;
         oldestKey = key;

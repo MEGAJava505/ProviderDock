@@ -54,6 +54,16 @@ describe("TurnLedger", () => {
     });
   });
 
+  it("allows an explicit incomplete retry only when no output or tool activity occurred", () => {
+    const ledger = new TurnLedger();
+    const first = ledger.admit(signature({ fingerprint: "fp-incomplete-no-output" }));
+    if (first.decision !== "accepted") throw new Error("expected acceptance");
+    ledger.incomplete(first.token);
+    expect(
+      ledger.admit(signature({ fingerprint: "fp-incomplete-no-output" })).decision,
+    ).toBe("accepted");
+  });
+
   it("detects the recursive tool loop: resolved call presented as pending again", () => {
     const ledger = new TurnLedger();
     const call = { callId: "call-1", name: "write_file", argumentsHash: "hash-a" };
@@ -141,6 +151,45 @@ describe("TurnLedger", () => {
         }),
       ),
     ).toMatchObject({ decision: "blocked", code: "TOOL_CALL_CONFLICT" });
+  });
+
+  it("fails closed when bounded turn or tool-call capacity is exhausted", () => {
+    const turns = new TurnLedger({ maxTurnRecords: 1 });
+    expect(turns.admit(signature({ fingerprint: "active" })).decision).toBe("accepted");
+    expect(turns.admit(signature({ fingerprint: "overflow" }))).toMatchObject({
+      decision: "blocked",
+      code: "LEDGER_CAPACITY_EXCEEDED",
+    });
+
+    const completed = new TurnLedger({ maxTurnRecords: 1 });
+    const completedTurn = completed.admit(signature({ fingerprint: "completed" }));
+    if (completedTurn.decision !== "accepted") throw new Error("expected acceptance");
+    completed.complete(completedTurn.token);
+    expect(completed.admit(signature({ fingerprint: "next" }))).toMatchObject({
+      decision: "blocked",
+      code: "LEDGER_CAPACITY_EXCEEDED",
+    });
+    expect(completed.admit(signature({ fingerprint: "completed" }))).toMatchObject({
+      decision: "blocked",
+      code: "TURN_ALREADY_COMPLETED",
+    });
+
+    const tools = new TurnLedger({ maxToolCallRecords: 1 });
+    const first = tools.admit(
+      signature({
+        fingerprint: "tool-1",
+        toolCalls: [{ callId: "call-1", name: "one", argumentsHash: "hash-1" }],
+      }),
+    );
+    expect(first.decision).toBe("accepted");
+    expect(
+      tools.admit(
+        signature({
+          fingerprint: "tool-2",
+          toolCalls: [{ callId: "call-2", name: "two", argumentsHash: "hash-2" }],
+        }),
+      ),
+    ).toMatchObject({ decision: "blocked", code: "LEDGER_CAPACITY_EXCEEDED" });
   });
 });
 

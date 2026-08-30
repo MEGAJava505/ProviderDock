@@ -19,7 +19,8 @@ Development has started with Phase 1. The first core slice provides:
 - a loopback-only native Responses bridge with Codex model capabilities and event-aware SSE repair;
 - canonical Responses request normalization and safe Responses-to-Chat request translation;
 - an anti-replay/anti-recursion turn ledger that blocks duplicate turns, unsafe retries
-  after partial streams, and recursive tool loops before upstream contact;
+  after partial streams, and recursive tool loops before upstream contact, with
+  atomic crash-safe session snapshots;
 - a manual tiered Provider/Model Doctor (metadata, minimal inference, streaming,
   synthetic tool round-trip);
 - Claude Code support: a loopback Anthropic Messages bridge with native relay for

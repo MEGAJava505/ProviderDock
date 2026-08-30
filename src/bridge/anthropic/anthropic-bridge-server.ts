@@ -16,12 +16,16 @@ import type { ProviderAdapterRegistry } from "../../core/providers/provider-adap
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
 import {
-  TurnLedger,
   TurnLedgerViolationError,
   extractAnthropicDeliveredToolCalls,
   extractAnthropicTurnSignature,
   type TurnToken,
 } from "../../core/state-machine/turn-ledger.js";
+import {
+  PersistentTurnLedger,
+  TurnLedgerPersistenceError,
+  type TurnLedgerStore,
+} from "../../core/state-machine/persistent-turn-ledger.js";
 import { SseDecodeError, SseDecoder, encodeSseEvent } from "../sse/sse-decoder.js";
 import { isBridgePortAllowed } from "../responses/responses-bridge-server.js";
 import {
@@ -50,6 +54,7 @@ export interface AnthropicBridgeServerOptions {
   readonly streamIdleTimeoutMs?: number;
   /** Optional bearer/x-api-key required from the loopback Claude client. */
   readonly clientToken?: string;
+  readonly turnLedgerStore?: TurnLedgerStore;
 }
 
 export interface AnthropicBridgeAddress {
@@ -80,7 +85,7 @@ export class AnthropicBridgeServer {
   private readonly responseBodyLimitBytes: number;
   private readonly streamIdleTimeoutMs: number;
   private readonly clientToken: string | undefined;
-  private readonly turnLedger = new TurnLedger();
+  private readonly turnLedger: PersistentTurnLedger;
   private readonly activeUpstreamRequests = new Set<AbortController>();
   private server: Server | undefined;
   private startTask: Promise<AnthropicBridgeAddress> | undefined;
@@ -97,6 +102,9 @@ export class AnthropicBridgeServer {
     this.responseBodyLimitBytes = options.responseBodyLimitBytes ?? defaultBodyLimitBytes;
     this.streamIdleTimeoutMs = options.streamIdleTimeoutMs ?? 1_800_000;
     this.clientToken = options.clientToken;
+    this.turnLedger = new PersistentTurnLedger({
+      ...(options.turnLedgerStore === undefined ? {} : { store: options.turnLedgerStore }),
+    });
   }
 
   start(): Promise<AnthropicBridgeAddress> {
@@ -126,6 +134,7 @@ export class AnthropicBridgeServer {
   }
 
   private async listen(): Promise<AnthropicBridgeAddress> {
+    await this.turnLedger.initialize();
     const server = createServer((request, response) => {
       void this.handleRequest(request, response).catch((error: unknown) => {
         this.handleUnexpectedError(response, error);
@@ -223,7 +232,7 @@ export class AnthropicBridgeServer {
     let turnOutcome: "complete" | "fail" | "cancel" | "incomplete" = "fail";
     try {
       const body = await readJsonObject(request, this.requestBodyLimitBytes);
-      const admission = this.turnLedger.admit(extractAnthropicTurnSignature(body));
+      const admission = await this.turnLedger.admit(extractAnthropicTurnSignature(body));
       if (admission.decision === "blocked") {
         const headers = new Headers({ "x-providerdock-turn-block": admission.code });
         sendAnthropicError(response, 409, "INVALID_REQUEST", admission.message, headers);
@@ -323,10 +332,10 @@ export class AnthropicBridgeServer {
       this.handleUnexpectedError(response, error);
     } finally {
       if (turnToken !== undefined) {
-        if (turnOutcome === "complete") this.turnLedger.complete(turnToken);
-        else if (turnOutcome === "cancel") this.turnLedger.cancel(turnToken);
-        else if (turnOutcome === "incomplete") this.turnLedger.incomplete(turnToken);
-        else this.turnLedger.fail(turnToken);
+        if (turnOutcome === "complete") await this.turnLedger.complete(turnToken);
+        else if (turnOutcome === "cancel") await this.turnLedger.cancel(turnToken);
+        else if (turnOutcome === "incomplete") await this.turnLedger.incomplete(turnToken);
+        else await this.turnLedger.fail(turnToken);
       }
       response.off("close", onResponseClosed);
       this.activeUpstreamRequests.delete(controller);
@@ -346,14 +355,14 @@ export class AnthropicBridgeServer {
       }
       response.writeHead(200, sseHeaders("native-anthropic"));
       response.flushHeaders();
-      this.turnLedger.markStreamStarted(turnToken);
+      await this.turnLedger.markStreamStarted(turnToken);
       const tracker = new NativeAnthropicStreamTracker();
       let terminalError = false;
-      const ok = await this.pipeSse(response, upstream.body, (event) => {
+      const ok = await this.pipeSse(response, upstream.body, async (event) => {
         if (event.data === undefined) return false;
         const observation = tracker.observe(event.data);
         if (observation.completedToolUse !== undefined) {
-          this.turnLedger.recordDeliveredToolCalls(
+          await this.turnLedger.recordDeliveredToolCalls(
             turnToken,
             extractAnthropicDeliveredToolCalls({
               content: [observation.completedToolUse],
@@ -361,6 +370,10 @@ export class AnthropicBridgeServer {
           );
         }
         if (observation.terminalError) terminalError = true;
+        if (observation.terminal) {
+          if (observation.terminalError) await this.turnLedger.incomplete(turnToken);
+          else await this.turnLedger.complete(turnToken);
+        }
         return observation.terminal;
       });
       if (!response.destroyed && !response.writableEnded) response.end();
@@ -375,10 +388,11 @@ export class AnthropicBridgeServer {
         "Provider returned an invalid Anthropic Messages payload.",
       );
     }
-    this.turnLedger.recordDeliveredToolCalls(
+    await this.turnLedger.recordDeliveredToolCalls(
       turnToken,
       extractAnthropicDeliveredToolCalls(payload),
     );
+    await this.turnLedger.complete(turnToken);
     if (wantsStream) {
       response.writeHead(200, sseHeaders("native-anthropic-json"));
       response.flushHeaders();
@@ -411,7 +425,7 @@ export class AnthropicBridgeServer {
       }
       response.writeHead(200, sseHeaders("openai-chat"));
       response.flushHeaders();
-      this.turnLedger.markStreamStarted(turnToken);
+      await this.turnLedger.markStreamStarted(turnToken);
       const translator = new ChatToAnthropicStreamTranslator({ model, allowedToolNames });
       let protocolFailure = false;
       const ok = await this.pipeSse(
@@ -446,7 +460,7 @@ export class AnthropicBridgeServer {
           : translator.finish();
         if (translator.terminalSucceeded) {
           try {
-            this.turnLedger.recordDeliveredToolCalls(
+            await this.turnLedger.recordDeliveredToolCalls(
               turnToken,
               extractAnthropicDeliveredToolCalls({
                 content: translator.completedToolUses.map((tool) => ({
@@ -472,6 +486,8 @@ export class AnthropicBridgeServer {
             throw error;
           }
         }
+        if (translator.terminalSucceeded) await this.turnLedger.complete(turnToken);
+        else await this.turnLedger.incomplete(turnToken);
         for (const event of terminalEvents) {
           response.write(encodeAnthropicEvent(event));
         }
@@ -489,10 +505,11 @@ export class AnthropicBridgeServer {
         model,
         allowedToolNames,
       });
-      this.turnLedger.recordDeliveredToolCalls(
+      await this.turnLedger.recordDeliveredToolCalls(
         turnToken,
         extractAnthropicDeliveredToolCalls(translated),
       );
+      await this.turnLedger.complete(turnToken);
       response.writeHead(200, sseHeaders("openai-chat"));
       response.flushHeaders();
       for (const event of synthesizeAnthropicStream(translated)) {
@@ -505,10 +522,11 @@ export class AnthropicBridgeServer {
       model,
       allowedToolNames,
     });
-    this.turnLedger.recordDeliveredToolCalls(
+    await this.turnLedger.recordDeliveredToolCalls(
       turnToken,
       extractAnthropicDeliveredToolCalls(translated),
     );
+    await this.turnLedger.complete(turnToken);
     sendJson(response, 200, translated, safeHeaders(upstream));
     return "complete";
   }
@@ -521,7 +539,7 @@ export class AnthropicBridgeServer {
   private async pipeSse(
     response: ServerResponse,
     body: ReadableStream<Uint8Array>,
-    isTerminal: (event: { readonly data?: string }) => boolean,
+    isTerminal: (event: { readonly data?: string }) => boolean | Promise<boolean>,
     translate?: (event: { readonly data?: string }) => readonly AnthropicStreamEvent[],
   ): Promise<boolean> {
     const decoder = new SseDecoder();
@@ -545,7 +563,7 @@ export class AnthropicBridgeServer {
         const events = chunk.done ? decoder.finish() : decoder.push(chunk.value);
         resetIdle();
         for (const event of events) {
-          const terminal = isTerminal(event);
+          const terminal = await isTerminal(event);
           if (translate === undefined) {
             if (event.data !== undefined || event.event !== undefined) {
               response.write(
@@ -599,6 +617,15 @@ export class AnthropicBridgeServer {
         "PROTOCOL_ERROR",
         error.message,
         new Headers({ "x-providerdock-turn-block": error.code }),
+      );
+      return;
+    }
+    if (error instanceof TurnLedgerPersistenceError) {
+      sendAnthropicError(
+        response,
+        503,
+        "UNKNOWN",
+        "Turn ledger storage is unavailable; the request was blocked for safety.",
       );
       return;
     }

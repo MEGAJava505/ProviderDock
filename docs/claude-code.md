@@ -68,6 +68,8 @@ mode the provider's own well-formed Anthropic error body is passed through.
 Every `/v1/messages` turn passes the TurnLedger (see `docs/anti-replay.md`)
 using the complete semantic request body; `tool_use`/`tool_result` blocks feed
 tool-integrity checks and upstream tool blocks are recorded before delivery.
+The managed launcher stores the non-secret ledger under a random Claude runtime
+session ID and removes it only after the bridge has stopped on a clean exit.
 Blocked turns get HTTP 409 with the block code in
 `x-providerdock-turn-block`, without any upstream contact.
 

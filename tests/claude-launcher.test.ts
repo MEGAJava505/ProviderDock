@@ -1,8 +1,13 @@
+import { mkdtemp, readFile, readdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  AnthropicClaudeBridgeFactory,
   ClaudeLauncher,
   ClaudeRuntimeConfigurationError,
   buildClaudeChildEnvironment,
+  MemorySecretStore,
   parseProviderProfile,
   type ClaudeBridgeFactory,
   type ClaudeProcessRunner,
@@ -48,6 +53,79 @@ describe("buildClaudeChildEnvironment", () => {
 });
 
 describe("ClaudeLauncher", () => {
+  it("persists the session ledger while Claude runs and removes it on clean exit", async () => {
+    const root = await mkdtemp(join(tmpdir(), "providerdock-claude-runtime-"));
+    const runtimeRoot = join(root, "runtime");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "msg-runtime",
+          type: "message",
+          role: "assistant",
+          model: "claude-x",
+          content: [{ type: "text", text: "OK" }],
+          stop_reason: "end_turn",
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+    let persistedLedger: Record<string, unknown> | undefined;
+    const processes: ClaudeProcessRunner = {
+      start: async (request) => ({
+        pid: 43,
+        wait: async () => {
+          const response = await fetch(`${request.environment.ANTHROPIC_BASE_URL}/v1/messages`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${request.environment.ANTHROPIC_AUTH_TOKEN}`,
+            },
+            body: JSON.stringify({
+              model: "claude-x",
+              max_tokens: 16,
+              messages: [{ role: "user", content: "Hi" }],
+            }),
+          });
+          expect(response.status).toBe(200);
+          await response.json();
+          const sessionDirectories = await readdir(runtimeRoot);
+          expect(sessionDirectories).toHaveLength(1);
+          persistedLedger = JSON.parse(
+            await readFile(
+              join(runtimeRoot, sessionDirectories[0] ?? "missing", "turn-ledger.json"),
+              "utf8",
+            ),
+          ) as Record<string, unknown>;
+          return { exitCode: 0, signal: null };
+        },
+      }),
+    };
+    const launcher = new ClaudeLauncher(
+      new AnthropicClaudeBridgeFactory({
+        secretStore: new MemorySecretStore(),
+        fetchImpl: fetchMock,
+        runtimeRoot,
+      }),
+      processes,
+    );
+
+    await launcher.launch({
+      profile: testProfile(),
+      modelId: "claude-x",
+      projectDirectory: root,
+      parentEnvironment: {},
+    });
+
+    expect(persistedLedger).toMatchObject({
+      version: 1,
+      turns: [expect.objectContaining({ state: "COMPLETED" })],
+    });
+    expect(await readdir(runtimeRoot)).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("starts the bridge, spawns claude with child-only env, then stops the bridge", async () => {
     const order: string[] = [];
     const bridge = {
@@ -91,6 +169,7 @@ describe("ClaudeLauncher", () => {
     expect(startRequest?.environment.ANTHROPIC_MODEL).toBe("claude-x");
     expect(startRequest?.environment.ANTHROPIC_API_KEY).toBeUndefined();
     expect(createInput?.clientToken).toMatch(/^providerdock-[0-9a-f]{32}$/);
+    expect(createInput?.sessionId).toMatch(/^[0-9a-f]{32}$/);
     expect(startRequest?.environment.ANTHROPIC_AUTH_TOKEN).toBe(createInput?.clientToken);
   });
 

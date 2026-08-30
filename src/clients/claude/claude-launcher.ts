@@ -109,10 +109,12 @@ export class ClaudeLauncher {
     let bridge: ManagedClaudeBridge | undefined;
     try {
       const sessionToken = `providerdock-${randomBytes(16).toString("hex")}`;
+      const sessionId = randomBytes(16).toString("hex");
       bridge = this.bridges.create({
         profile: input.profile,
         modelId: input.modelId,
         clientToken: sessionToken,
+        sessionId,
       });
       const address = await bridge.start();
       const environment = buildClaudeChildEnvironment({
@@ -130,15 +132,20 @@ export class ClaudeLauncher {
         environment,
       });
       const exit = await processHandle.wait();
-      await bridge.stop();
+      await disposeClaudeBridge(bridge);
       bridge = undefined;
       return exit;
     } finally {
       if (bridge !== undefined) {
-        await bridge.stop().catch(() => undefined);
+        await disposeClaudeBridge(bridge).catch(() => undefined);
       }
     }
   }
+}
+
+async function disposeClaudeBridge(bridge: ManagedClaudeBridge): Promise<void> {
+  if (bridge.dispose !== undefined) await bridge.dispose();
+  else await bridge.stop();
 }
 
 export interface BuildClaudeChildEnvironmentInput {

@@ -59,9 +59,24 @@ provider is stopped before the client can execute it:
 - `TOOL_LOOP_DETECTED` — a resolved call is presented as pending again
   (the recursive tool loop observed with AgentRouter).
 
-The ledger persists across HTTP requests for the lifetime of one private
-bridge/runtime session. Durable crash persistence remains a later storage
-block; the managed bridge is still stopped together with its coding client.
+## Crash-safe persistence
+
+Managed Codex and Claude sessions persist a versioned ledger snapshot under
+their private runtime directory. The snapshot contains fingerprints, hashes,
+tool-call IDs/names, states, attempts, and timestamps only—never provider
+credentials, raw prompts, tool arguments, or tool results.
+
+Every accepted turn is atomically written before upstream contact. Stream
+start, tool-call delivery, and terminal state are also written before the
+corresponding output can reach the coding client. Writes use a same-directory
+temporary file followed by rename and are serialized with ledger mutations.
+
+On bridge reconstruction, persisted `ACCEPTED` or `STREAMING` records become
+replay-unsafe `INCOMPLETE` records. A corrupt, oversized, or unwritable snapshot
+fails closed: the bridge refuses to start or returns HTTP 503 without contacting
+upstream. Normal client shutdown removes the session directory; a process crash
+leaves it available for recovery. Turn and tool-call counts are bounded, and a
+full ledger blocks new unsafe work instead of evicting active safety state.
 
 ## Provider / Model Doctor
 

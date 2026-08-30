@@ -39,12 +39,16 @@ import {
   writeTranslatedEvents,
 } from "./chat-completions-stream-relay.js";
 import {
-  TurnLedger,
   TurnLedgerViolationError,
   extractResponsesDeliveredToolCalls,
   extractResponsesTurnSignature,
   type TurnToken,
 } from "../../core/state-machine/turn-ledger.js";
+import {
+  PersistentTurnLedger,
+  TurnLedgerPersistenceError,
+  type TurnLedgerStore,
+} from "../../core/state-machine/persistent-turn-ledger.js";
 
 const loopbackHost = "127.0.0.1";
 const defaultBodyLimitBytes = 64 * 1024 * 1024;
@@ -70,6 +74,7 @@ export interface ResponsesBridgeServerOptions {
   readonly heartbeatIntervalMs?: number;
   readonly streamIdleTimeoutMs?: number;
   readonly maxSseEventCharacters?: number;
+  readonly turnLedgerStore?: TurnLedgerStore;
 }
 
 export interface ResponsesBridgeAddress {
@@ -92,7 +97,7 @@ export class ResponsesBridgeServer {
   private readonly streamIdleTimeoutMs: number;
   private readonly maxSseEventCharacters: number;
   private readonly activeUpstreamRequests = new Set<AbortController>();
-  private readonly turnLedger = new TurnLedger();
+  private readonly turnLedger: PersistentTurnLedger;
   private server: Server | undefined;
   private startTask: Promise<ResponsesBridgeAddress> | undefined;
   private stopTask: Promise<void> | undefined;
@@ -132,6 +137,9 @@ export class ResponsesBridgeServer {
       16 * 1024 * 1024,
       "maxSseEventCharacters",
     );
+    this.turnLedger = new PersistentTurnLedger({
+      ...(options.turnLedgerStore === undefined ? {} : { store: options.turnLedgerStore }),
+    });
   }
 
   start(): Promise<ResponsesBridgeAddress> {
@@ -164,6 +172,7 @@ export class ResponsesBridgeServer {
   }
 
   private async listen(): Promise<ResponsesBridgeAddress> {
+    await this.turnLedger.initialize();
     const server = createServer((request, response) => {
       void this.handleRequest(request, response).catch((error: unknown) => {
         this.handleUnexpectedError(response, error);
@@ -287,7 +296,7 @@ export class ResponsesBridgeServer {
     let turnOutcome: "complete" | "fail" | "cancel" | "incomplete" = "fail";
     try {
       const body = await readJsonObject(request, this.requestBodyLimitBytes);
-      const admission = this.turnLedger.admit(extractResponsesTurnSignature(body));
+      const admission = await this.turnLedger.admit(extractResponsesTurnSignature(body));
       if (admission.decision === "blocked") {
         const headers = new Headers({ "x-providerdock-turn-block": admission.code });
         sendBridgeError(response, 409, "INVALID_REQUEST", admission.message, headers);
@@ -385,7 +394,7 @@ export class ResponsesBridgeServer {
         }
         response.writeHead(200, headersToNode(safeUpstreamHeaders(upstream, true)));
         response.flushHeaders();
-        this.turnLedger.markStreamStarted(turnToken);
+        await this.turnLedger.markStreamStarted(turnToken);
         const relay = await relayResponsesStream({
           response,
           body: upstream.body,
@@ -393,9 +402,9 @@ export class ResponsesBridgeServer {
           heartbeatIntervalMs: this.heartbeatIntervalMs,
           idleTimeoutMs: this.streamIdleTimeoutMs,
           maxEventCharacters: this.maxSseEventCharacters,
-          beforeForwardEvent: (event) => {
+          beforeForwardEvent: async (event) => {
             try {
-              this.recordDeliveredResponsesCalls(admission.token, event);
+              await this.recordDeliveredResponsesCalls(admission.token, event);
             } catch (error) {
               throw new ResponsesStreamProtocolError(
                 error instanceof Error ? error.message : "Tool-call replay was blocked.",
@@ -429,7 +438,7 @@ export class ResponsesBridgeServer {
           "Provider returned an invalid non-streaming Responses payload.",
         );
       }
-      this.recordDeliveredResponsesCalls(turnToken, payload);
+      await this.recordDeliveredResponsesCalls(turnToken, payload);
       if (wantsStream) {
         this.sendJsonAsEventStream(response, upstream, payload);
       } else {
@@ -449,10 +458,10 @@ export class ResponsesBridgeServer {
       this.handleUnexpectedError(response, error);
     } finally {
       if (turnToken !== undefined) {
-        if (turnOutcome === "complete") this.turnLedger.complete(turnToken);
-        else if (turnOutcome === "cancel") this.turnLedger.cancel(turnToken);
-        else if (turnOutcome === "incomplete") this.turnLedger.incomplete(turnToken);
-        else this.turnLedger.fail(turnToken);
+        if (turnOutcome === "complete") await this.turnLedger.complete(turnToken);
+        else if (turnOutcome === "cancel") await this.turnLedger.cancel(turnToken);
+        else if (turnOutcome === "incomplete") await this.turnLedger.incomplete(turnToken);
+        else await this.turnLedger.fail(turnToken);
       }
       request.off("aborted", onRequestAborted);
       response.off("close", onResponseClosed);
@@ -519,7 +528,7 @@ export class ResponsesBridgeServer {
         headersToNode(safeUpstreamHeaders(upstream, true, "chat-completions")),
       );
       response.flushHeaders();
-      this.turnLedger.markStreamStarted(turnToken);
+      await this.turnLedger.markStreamStarted(turnToken);
       const relay = await relayChatCompletionsStream({
         response,
         body: upstream.body,
@@ -528,9 +537,9 @@ export class ResponsesBridgeServer {
         heartbeatIntervalMs: this.heartbeatIntervalMs,
         idleTimeoutMs: this.streamIdleTimeoutMs,
         maxEventCharacters: this.maxSseEventCharacters,
-        beforeForwardEvent: (event) => {
+        beforeForwardEvent: async (event) => {
           try {
-            this.recordDeliveredResponsesCalls(turnToken, event);
+            await this.recordDeliveredResponsesCalls(turnToken, event);
           } catch (error) {
             throw new ChatToResponsesTranslationError(
               "PROTOCOL_ERROR",
@@ -558,7 +567,7 @@ export class ResponsesBridgeServer {
     if (wantsStream) {
       const translator = new ChatToResponsesStreamTranslator({ request: canonicalRequest });
       const events = [...translator.feed(payload), ...translator.finish()];
-      for (const event of events) this.recordDeliveredResponsesCalls(turnToken, event);
+      for (const event of events) await this.recordDeliveredResponsesCalls(turnToken, event);
       const headers = safeUpstreamHeaders(upstream, true, "chat-completions");
       headers.set("x-providerdock-normalization", "chat-json-to-responses-sse");
       response.writeHead(200, headersToNode(headers));
@@ -571,7 +580,7 @@ export class ResponsesBridgeServer {
     }
 
     const translated = translateChatResponseToResponses(payload, { request: canonicalRequest });
-    this.recordDeliveredResponsesCalls(turnToken, translated.response);
+    await this.recordDeliveredResponsesCalls(turnToken, translated.response);
     sendJson(
       response,
       200,
@@ -583,20 +592,37 @@ export class ResponsesBridgeServer {
       : "incomplete";
   }
 
-  private recordDeliveredResponsesCalls(
+  private async recordDeliveredResponsesCalls(
     turnToken: TurnToken,
     payload: Readonly<Record<string, unknown>>,
-  ): void {
+  ): Promise<void> {
     const item = isJsonRecord(payload.item) ? payload.item : undefined;
     const responsePayload = isJsonRecord(payload.response) ? payload.response : undefined;
     const source =
       payload.type === "response.output_item.done" && item !== undefined
         ? item
         : responsePayload ?? payload;
-    this.turnLedger.recordDeliveredToolCalls(
+    await this.turnLedger.recordDeliveredToolCalls(
       turnToken,
       extractResponsesDeliveredToolCalls(source),
     );
+    const eventType = typeof payload.type === "string" ? payload.type : undefined;
+    const responseStatus =
+      typeof responsePayload?.status === "string"
+        ? responsePayload.status
+        : payload.object === "response" && typeof payload.status === "string"
+          ? payload.status
+          : undefined;
+    if (eventType === "response.completed" || responseStatus === "completed") {
+      await this.turnLedger.complete(turnToken);
+    } else if (
+      eventType === "response.failed" ||
+      eventType === "response.incomplete" ||
+      responseStatus === "failed" ||
+      responseStatus === "incomplete"
+    ) {
+      await this.turnLedger.incomplete(turnToken);
+    }
   }
 
   private methodNotAllowed(response: ServerResponse, allow: string): void {
@@ -629,6 +655,15 @@ export class ResponsesBridgeServer {
         "PROTOCOL_ERROR",
         error.message,
         new Headers({ "x-providerdock-turn-block": error.code }),
+      );
+      return;
+    }
+    if (error instanceof TurnLedgerPersistenceError) {
+      sendBridgeError(
+        response,
+        503,
+        "UNKNOWN",
+        "Turn ledger storage is unavailable; the request was blocked for safety.",
       );
       return;
     }

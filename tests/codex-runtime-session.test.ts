@@ -245,7 +245,11 @@ describe("CodexLauncher", () => {
     });
 
     expect(exit).toEqual({ exitCode: 0, signal: null });
-    expect(bridges.input).toEqual({ profile, modelId: "model-x" });
+    expect(bridges.input).toEqual({
+      profile,
+      modelId: "model-x",
+      sessionId,
+    });
     expect(lifecycle).toEqual(["bridge:start", "codex:start", "codex:wait", "bridge:stop"]);
     expect(runner.configContents).toContain('base_url = "http://127.0.0.1:45678/v1"');
     expect(runner.configContents).not.toContain("secret-value");

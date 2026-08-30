@@ -17,6 +17,7 @@ export * from "./core/providers/provider-http-request.js";
 export * from "./core/providers/provider-profile-repository.js";
 export * from "./core/security/secret-store.js";
 export * from "./core/state-machine/turn-ledger.js";
+export * from "./core/state-machine/persistent-turn-ledger.js";
 export * from "./diagnostics/provider-doctor.js";
 export * from "./core/security/dpapi-secret-vault.js";
 export * from "./bridge/sse/sse-decoder.js";

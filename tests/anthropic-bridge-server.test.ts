@@ -1,12 +1,92 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   AnthropicBridgeServer,
+  FileTurnLedgerStore,
   MemorySecretStore,
   parseProviderProfile,
   type ProviderProfile,
 } from "../src/index.js";
 
 describe("AnthropicBridgeServer", () => {
+  it("returns 503 and never contacts upstream when ledger persistence fails", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "unused-secret" }),
+      fetchImpl: fetchMock,
+      turnLedgerStore: {
+        load: async () => undefined,
+        save: async () => {
+          throw new Error("disk unavailable");
+        },
+      },
+    });
+    const address = await bridge.start();
+    try {
+      const response = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "do not send" }],
+      });
+      expect(response.status).toBe(503);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("blocks a completed Messages turn after the bridge is reconstructed", async () => {
+    const root = await mkdtemp(join(tmpdir(), "providerdock-anthropic-restart-"));
+    const ledgerPath = join(root, "turn-ledger.json");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: "msg-persisted",
+        type: "message",
+        role: "assistant",
+        model: "claude-x",
+        content: [{ type: "text", text: "OK" }],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+    const createBridge = (): AnthropicBridgeServer =>
+      new AnthropicBridgeServer({
+        profile: anthropicProfile(),
+        secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "restart-secret" }),
+        fetchImpl: fetchMock,
+        turnLedgerStore: new FileTurnLedgerStore({ filePath: ledgerPath }),
+      });
+    const body = {
+      model: "claude-x",
+      max_tokens: 16,
+      messages: [{ role: "user", content: "same turn" }],
+    };
+
+    const first = createBridge();
+    const firstAddress = await first.start();
+    const initial = await postJson(`${firstAddress.url}/v1/messages`, body);
+    expect(initial.status).toBe(200);
+    await initial.json();
+    await first.stop();
+
+    const recovered = createBridge();
+    const recoveredAddress = await recovered.start();
+    try {
+      const replay = await postJson(`${recoveredAddress.url}/v1/messages`, body);
+      expect(replay.status).toBe(409);
+      expect(replay.headers.get("x-providerdock-turn-block")).toBe(
+        "TURN_ALREADY_COMPLETED",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await recovered.stop();
+    }
+  });
+
   it("relays native Anthropic requests verbatim with injected auth and headers", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () =>
       jsonResponse({

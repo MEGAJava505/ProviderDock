@@ -38,7 +38,11 @@ describe("managed Codex bridge lifecycle", () => {
         isProcessAlive: () => false,
       }),
       runner,
-      new ResponsesCodexBridgeFactory({ secretStore: secrets, fetchImpl: upstreamFetch }),
+      new ResponsesCodexBridgeFactory({
+        secretStore: secrets,
+        fetchImpl: upstreamFetch,
+        runtimeRoot,
+      }),
     );
 
     const exit = await launcher.launch({
@@ -61,6 +65,10 @@ describe("managed Codex bridge lifecycle", () => {
     expect(runner.manifest).toMatchObject({
       state: "ACTIVE",
       route: { kind: "bridge", ownership: "managed", state: "ACTIVE" },
+    });
+    expect(runner.ledger).toMatchObject({
+      version: 1,
+      turns: [expect.objectContaining({ state: "COMPLETED" })],
     });
     expect(runner.configContents).not.toContain("upstream-secret");
     expect(Object.values(runner.request?.environment ?? {})).not.toContain("upstream-secret");
@@ -106,7 +114,11 @@ describe("managed Codex bridge lifecycle", () => {
         isProcessAlive: () => false,
       }),
       runner,
-      new ResponsesCodexBridgeFactory({ secretStore: secrets, fetchImpl: upstreamFetch }),
+      new ResponsesCodexBridgeFactory({
+        secretStore: secrets,
+        fetchImpl: upstreamFetch,
+        runtimeRoot,
+      }),
     );
 
     await launcher.launch({
@@ -152,6 +164,7 @@ class BridgeUsingCodexRunner implements CodexProcessRunner {
   health: Record<string, unknown> | undefined;
   providerResponse: Record<string, unknown> | undefined;
   manifest: Record<string, unknown> | undefined;
+  ledger: Record<string, unknown> | undefined;
 
   constructor(private readonly runtimeRoot: string) {}
 
@@ -183,6 +196,9 @@ class BridgeUsingCodexRunner implements CodexProcessRunner {
             body: JSON.stringify({ model: this.selectedModel, input: "Hello", stream: false }),
           })
         ).json()) as Record<string, unknown>;
+        this.ledger = JSON.parse(
+          await readFile(join(this.runtimeRoot, sessionId, "turn-ledger.json"), "utf8"),
+        ) as Record<string, unknown>;
         this.manifest = JSON.parse(
           await readFile(join(this.runtimeRoot, sessionId, "manifest.json"), "utf8"),
         ) as Record<string, unknown>;

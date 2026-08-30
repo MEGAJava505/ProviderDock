@@ -79,6 +79,7 @@ export interface CodexRuntimeBridgeDiagnostics {
 }
 
 export interface PrepareCodexRuntimeInput {
+  readonly sessionId?: string;
   readonly profile: ProviderProfile;
   readonly modelId: string;
   readonly projectDirectory: string;
@@ -137,6 +138,10 @@ export class CodexRuntimeSessionManager {
     this.isBridgeAlive = options.isBridgeAlive ?? defaultIsBridgeAlive;
   }
 
+  createSessionId(): string {
+    return sessionIdSchema.parse(this.randomId());
+  }
+
   async prepare(input: PrepareCodexRuntimeInput): Promise<PreparedCodexRuntime> {
     const projectStats = await stat(input.projectDirectory).catch(() => undefined);
     if (!projectStats?.isDirectory()) {
@@ -146,7 +151,10 @@ export class CodexRuntimeSessionManager {
     }
     validateBridgeOwnership(input);
 
-    const sessionId = sessionIdSchema.parse(this.randomId());
+    const sessionId =
+      input.sessionId === undefined
+        ? this.createSessionId()
+        : sessionIdSchema.parse(input.sessionId);
     const built = await this.configFactory.build({
       profile: input.profile,
       modelId: input.modelId,

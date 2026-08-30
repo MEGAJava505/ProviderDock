@@ -1,6 +1,10 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   AgentRouterAdapter,
+  FileTurnLedgerStore,
   MemorySecretStore,
   ProviderAdapterRegistry,
   ResponsesBridgeServer,
@@ -15,6 +19,84 @@ import {
 const encoder = new TextEncoder();
 
 describe("ResponsesBridgeServer", () => {
+  it("returns 503 and never contacts upstream when ledger persistence fails", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const bridge = new ResponsesBridgeServer({
+      profile: testProfile(),
+      secretStore: new MemorySecretStore(),
+      fetchImpl: fetchMock,
+      models: [{ modelId: "gpt-x" }],
+      turnLedgerStore: {
+        load: async () => undefined,
+        save: async () => {
+          throw new Error("disk unavailable");
+        },
+      },
+    });
+    const address = await bridge.start();
+    try {
+      const response = await fetch(`${address.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model: "gpt-x", input: "do not send" }),
+      });
+      expect(response.status).toBe(503);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("blocks a completed turn after the bridge is reconstructed", async () => {
+    const root = await mkdtemp(join(tmpdir(), "providerdock-responses-restart-"));
+    const ledgerPath = join(root, "turn-ledger.json");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: "resp-persisted",
+        object: "response",
+        status: "completed",
+        output: [],
+      }),
+    );
+    const createBridge = (): ResponsesBridgeServer =>
+      new ResponsesBridgeServer({
+        profile: testProfile(),
+        secretStore: new MemorySecretStore(),
+        fetchImpl: fetchMock,
+        models: [{ modelId: "gpt-x" }],
+        turnLedgerStore: new FileTurnLedgerStore({ filePath: ledgerPath }),
+      });
+    const requestBody = JSON.stringify({ model: "gpt-x", input: "same turn" });
+
+    const first = createBridge();
+    const firstAddress = await first.start();
+    const initial = await fetch(`${firstAddress.baseUrl}/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: requestBody,
+    });
+    expect(initial.status).toBe(200);
+    await initial.json();
+    await first.stop();
+
+    const recovered = createBridge();
+    const recoveredAddress = await recovered.start();
+    try {
+      const replay = await fetch(`${recoveredAddress.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: requestBody,
+      });
+      expect(replay.status).toBe(409);
+      expect(replay.headers.get("x-providerdock-turn-block")).toBe(
+        "TURN_ALREADY_COMPLETED",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await recovered.stop();
+    }
+  });
+
   it("rejects ports forbidden by Fetch clients", () => {
     expect(isBridgePortAllowed(6000)).toBe(false);
     expect(isBridgePortAllowed(6667)).toBe(false);
