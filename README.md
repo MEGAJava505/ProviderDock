@@ -29,6 +29,8 @@ Development has started with Phase 1. The first core slice provides:
 - a Claude Code launcher that configures `ANTHROPIC_*` only inside the child process
   environment and never leaks provider credentials to the client;
 - a `generic-anthropic` provider adapter for Anthropic-native model discovery;
+- a provider-independent safe-fallback policy core with logical-model priority,
+  sticky sessions, circuit breakers, continuation checks, and side-effect barriers;
 - unit tests using fully local HTTP mocks.
 
 There is no production UI yet. The Codex launcher automatically owns a compatibility
@@ -132,6 +134,8 @@ Claude Code runtime and Anthropic bridge behavior are documented in
 [`docs/claude-code.md`](./docs/claude-code.md).
 Replay protection and tool-call integrity rules are documented in
 [`docs/anti-replay.md`](./docs/anti-replay.md).
+Fallback policy and its current integration boundary are documented in
+[`docs/safe-fallback.md`](./docs/safe-fallback.md).
 Runtime details and recovery guarantees are documented in
 [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 
