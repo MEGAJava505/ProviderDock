@@ -25,6 +25,21 @@ ties are deterministic. A successful or selected fallback route becomes sticky
 for the runtime session until the user changes it or a later failure/circuit
 decision selects another route.
 
+Logical models are persisted in a bounded, versioned JSON document at
+`~/.provider-switcher/fallback/logical-models.json`. Mutations are serialized and
+published with an atomic temporary-file rename. Invalid, duplicate, oversized, or
+unknown-version data fails closed. CLI management is available through:
+
+```text
+providerdock logical-models list [--json]
+providerdock logical-models show <id>
+providerdock logical-models set --id <id> --route provider=model@priority [--route ...]
+providerdock logical-models remove <id>
+```
+
+Routes may only reference configured providers, and provider deletion is blocked
+while a logical-model route still uses that provider.
+
 ## Side-effect barrier
 
 Each provider attempt reports an explicit failure phase. Automatic fallback is
@@ -52,8 +67,8 @@ or a provider/model pair, allowing separate breaker scopes.
 
 ## Current integration boundary
 
-The policy, state machine, schemas, and tests are complete. HTTP bridge route
-execution, persistent logical-model configuration, CLI/UI controls, and
-user-visible fallback events are the next Phase 4 integration blocks. Until
-that wiring lands, existing single-provider bridges still perform no automatic
-fallback.
+The policy, state machine, schemas, persistent logical-model configuration, and
+CLI controls are complete. HTTP bridge route execution, runtime session wiring,
+UI controls, and user-visible fallback events are the next Phase 4 integration
+blocks. Until that wiring lands, existing single-provider bridges still perform
+no automatic fallback.

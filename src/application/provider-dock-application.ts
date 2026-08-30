@@ -1,4 +1,12 @@
 import type { ProviderProbeResult, ProviderProbeService } from "../core/health/provider-probe-service.js";
+import {
+  parseLogicalModelGroup,
+  type LogicalModelGroup,
+} from "../core/fallback/logical-model.js";
+import {
+  MemoryLogicalModelRepository,
+  type LogicalModelRepository,
+} from "../core/fallback/logical-model-repository.js";
 import type { ProviderProfile } from "../core/providers/provider-profile.js";
 import { parseProviderProfile } from "../core/providers/provider-profile.js";
 import type { ProviderProfileRepository } from "../core/providers/provider-profile-repository.js";
@@ -36,6 +44,27 @@ export class SecretVaultUnavailableError extends Error {
   }
 }
 
+export class LogicalModelNotFoundError extends Error {
+  constructor(readonly logicalModelId: string) {
+    super(`Logical model '${logicalModelId}' is not configured.`);
+    this.name = "LogicalModelNotFoundError";
+  }
+}
+
+export class ProviderInUseByLogicalModelError extends Error {
+  constructor(
+    readonly providerId: string,
+    readonly logicalModelIds: readonly string[],
+  ) {
+    super(
+      `Provider '${providerId}' is used by logical model${
+        logicalModelIds.length === 1 ? "" : "s"
+      } ${logicalModelIds.map((id) => `'${id}'`).join(", ")}. Remove those routes first.`,
+    );
+    this.name = "ProviderInUseByLogicalModelError";
+  }
+}
+
 export class ProviderDockApplication {
   constructor(
     private readonly profiles: ProviderProfileRepository,
@@ -45,6 +74,8 @@ export class ProviderDockApplication {
     private readonly adapters?: ProviderAdapterRegistry,
     private readonly doctor?: ProviderDoctor,
     private readonly claudeLauncher?: ClaudeLauncher,
+    private readonly logicalModels: LogicalModelRepository =
+      new MemoryLogicalModelRepository(),
   ) {}
 
   async listProviders(): Promise<readonly ProviderProfile[]> {
@@ -62,7 +93,40 @@ export class ProviderDockApplication {
   }
 
   async removeProvider(id: string): Promise<void> {
+    const references = (await this.logicalModels.list())
+      .filter((logicalModel) =>
+        logicalModel.routes.some((route) => route.providerId === id),
+      )
+      .map((logicalModel) => logicalModel.id);
+    if (references.length > 0) {
+      throw new ProviderInUseByLogicalModelError(id, references);
+    }
     if (!(await this.profiles.delete(id))) throw new ProviderNotFoundError(id);
+  }
+
+  async listLogicalModels(): Promise<readonly LogicalModelGroup[]> {
+    return this.logicalModels.list();
+  }
+
+  async getLogicalModel(id: string): Promise<LogicalModelGroup> {
+    const logicalModel = await this.logicalModels.get(id);
+    if (!logicalModel) throw new LogicalModelNotFoundError(id);
+    return logicalModel;
+  }
+
+  async setLogicalModel(input: unknown): Promise<LogicalModelGroup> {
+    const logicalModel = parseLogicalModelGroup(input);
+    const providerIds = [...new Set(logicalModel.routes.map((route) => route.providerId))];
+    await Promise.all(
+      providerIds.map(async (providerId) => {
+        if (!(await this.profiles.get(providerId))) throw new ProviderNotFoundError(providerId);
+      }),
+    );
+    return this.logicalModels.upsert(logicalModel);
+  }
+
+  async removeLogicalModel(id: string): Promise<void> {
+    if (!(await this.logicalModels.delete(id))) throw new LogicalModelNotFoundError(id);
   }
 
   async probeProvider(id: string): Promise<ProviderProbeResult> {

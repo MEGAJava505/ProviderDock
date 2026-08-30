@@ -2,6 +2,8 @@ import { parseArgs } from "node:util";
 import { z } from "zod";
 import type { ProviderDockApplication } from "../application/provider-dock-application.js";
 import {
+  LogicalModelNotFoundError,
+  ProviderInUseByLogicalModelError,
   ProviderNotFoundError,
   SecretVaultUnavailableError,
 } from "../application/provider-dock-application.js";
@@ -15,6 +17,10 @@ import {
   type ProviderProfile,
 } from "../core/providers/provider-profile.js";
 import type { ProviderProbeResult } from "../core/health/provider-probe-service.js";
+import type {
+  LogicalModelGroup,
+  LogicalModelRoute,
+} from "../core/fallback/logical-model.js";
 import type { DoctorLevel, DoctorReport } from "../diagnostics/provider-doctor.js";
 
 export interface CliIo {
@@ -44,6 +50,8 @@ export async function runProviderDockCli(
   } catch (error) {
     if (
       error instanceof CliUsageError ||
+      error instanceof LogicalModelNotFoundError ||
+      error instanceof ProviderInUseByLogicalModelError ||
       error instanceof ProviderNotFoundError ||
       error instanceof SecretVaultUnavailableError ||
       error instanceof SecretProtectionError ||
@@ -53,7 +61,7 @@ export async function runProviderDockCli(
       return 1;
     }
     if (error instanceof z.ZodError) {
-      io.stderr(`Error: invalid provider profile\n${error.issues.map(formatZodIssue).join("\n")}`);
+      io.stderr(`Error: invalid configuration\n${error.issues.map(formatZodIssue).join("\n")}`);
       return 1;
     }
     if (isParseArgsError(error)) {
@@ -78,6 +86,7 @@ async function execute(
   }
 
   if (command === "providers") return executeProviders(rest, application, io);
+  if (command === "logical-models") return executeLogicalModels(rest, application, io);
   if (command === "probe") return executeProbe(rest, application, io);
   if (command === "doctor") return executeDoctor(rest, application, io);
   if (command === "secrets") return executeSecrets(rest, application, io, environment);
@@ -85,6 +94,83 @@ async function execute(
   if (command === "recover") return executeRecovery(rest, application, io);
 
   throw new CliUsageError(`Unknown command '${command}'. Run 'providerdock help'.`);
+}
+
+async function executeLogicalModels(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+): Promise<number> {
+  const [command, ...rest] = argv;
+  switch (command) {
+    case "list": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: { json: { type: "boolean", default: false } },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const logicalModels = await application.listLogicalModels();
+      if (values.json) io.stdout(JSON.stringify(logicalModels, null, 2));
+      else if (logicalModels.length === 0) io.stdout("No logical models configured.");
+      else io.stdout(renderLogicalModelTable(logicalModels));
+      return 0;
+    }
+    case "show": {
+      const { positionals } = parseArgs({
+        args: [...rest],
+        allowPositionals: true,
+        strict: true,
+      });
+      const id = requireSinglePositional(positionals, "logical-models show <logical-model-id>");
+      io.stdout(JSON.stringify(await application.getLogicalModel(id), null, 2));
+      return 0;
+    }
+    case "set": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: {
+          id: { type: "string" },
+          route: { type: "string", multiple: true },
+          "disabled-route": { type: "string", multiple: true },
+        },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const routes = [
+        ...(values.route ?? []).map((value) => parseLogicalModelRoute(value, true)),
+        ...(values["disabled-route"] ?? []).map((value) =>
+          parseLogicalModelRoute(value, false),
+        ),
+      ];
+      if (routes.length === 0) {
+        throw new CliUsageError("At least one --route is required.");
+      }
+      const logicalModel = await application.setLogicalModel({
+        id: requireString(values.id, "--id"),
+        routes,
+      });
+      io.stdout(`Saved logical model '${logicalModel.id}'.`);
+      return 0;
+    }
+    case "remove": {
+      const { positionals } = parseArgs({
+        args: [...rest],
+        allowPositionals: true,
+        strict: true,
+      });
+      const id = requireSinglePositional(positionals, "logical-models remove <logical-model-id>");
+      await application.removeLogicalModel(id);
+      io.stdout(`Removed logical model '${id}'.`);
+      return 0;
+    }
+    default:
+      throw new CliUsageError(
+        "Expected logical-models subcommand: list, show, set, or remove.",
+      );
+  }
 }
 
 async function executeLaunch(
@@ -514,6 +600,32 @@ function parseInteger(value: string | boolean | string[], optionName: string): n
   return Number(value);
 }
 
+function parseLogicalModelRoute(value: string, enabled: boolean): LogicalModelRoute {
+  const providerSeparator = value.indexOf("=");
+  if (providerSeparator <= 0 || providerSeparator === value.length - 1) {
+    throw new CliUsageError(
+      "--route expects PROVIDER=MODEL[@PRIORITY], for example primary=gpt-x@100.",
+    );
+  }
+
+  const providerId = value.slice(0, providerSeparator);
+  let modelId = value.slice(providerSeparator + 1);
+  let priority = 0;
+  const prioritySeparator = modelId.lastIndexOf("@");
+  if (prioritySeparator > 0) {
+    const priorityText = modelId.slice(prioritySeparator + 1);
+    if (/^-?\d+$/.test(priorityText)) {
+      priority = Number(priorityText);
+      if (!Number.isSafeInteger(priority)) {
+        throw new CliUsageError("Route priority must be a safe integer.");
+      }
+      modelId = modelId.slice(0, prioritySeparator);
+    }
+  }
+
+  return { providerId, modelId, priority, enabled };
+}
+
 function requireString(value: string | boolean | string[] | undefined, optionName: string): string {
   if (typeof value !== "string" || value.length === 0) {
     throw new CliUsageError(`${optionName} is required.`);
@@ -542,6 +654,29 @@ function renderProviderTable(profiles: readonly ProviderProfile[]): string {
       profile.apiType,
       profile.enabled ? "yes" : "no",
       profile.baseUrl,
+    ]),
+  );
+}
+
+function renderLogicalModelTable(logicalModels: readonly LogicalModelGroup[]): string {
+  return renderTable(
+    ["LOGICAL MODEL", "ROUTES (HIGH TO LOW PRIORITY)"],
+    logicalModels.map((logicalModel) => [
+      logicalModel.id,
+      [...logicalModel.routes]
+        .sort(
+          (left, right) =>
+            right.priority - left.priority ||
+            left.providerId.localeCompare(right.providerId) ||
+            left.modelId.localeCompare(right.modelId),
+        )
+        .map(
+          (route) =>
+            `${route.providerId}=${route.modelId}@${route.priority}${
+              route.enabled ? "" : " (disabled)"
+            }`,
+        )
+        .join(", "),
     ]),
   );
 }
@@ -608,6 +743,10 @@ Usage:
   providerdock providers show <provider-id>
   providerdock providers set --id ID --name NAME --base-url URL [options]
   providerdock providers remove <provider-id>
+  providerdock logical-models list [--json]
+  providerdock logical-models show <logical-model-id>
+  providerdock logical-models set --id ID --route PROVIDER=MODEL@PRIORITY [--route ...]
+  providerdock logical-models remove <logical-model-id>
   providerdock probe <provider-id> [--json]
   providerdock doctor <provider-id> [--model MODEL] [--level 0|1|2|3] [--json]
   providerdock secrets list
@@ -642,5 +781,10 @@ Additional repeatable options:
   --header NAME=VALUE                  (non-secret values only)
   --secret-header NAME=ENVIRONMENT_VARIABLE
   --query NAME=VALUE
+
+Logical-model routes:
+  --route PROVIDER=MODEL[@PRIORITY]
+  --disabled-route PROVIDER=MODEL[@PRIORITY]
+  Higher priorities are attempted first; ties use provider/model lexical order.
 
 Actual secret values are never accepted as provider profile fields.`;

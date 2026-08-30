@@ -9,6 +9,9 @@ describe("ProviderDock paths", () => {
     expect(paths.providersFile).toBe(
       join("C:\\Users\\test", ".provider-switcher", "providers", "providers.json"),
     );
+    expect(paths.logicalModelsFile).toBe(
+      join("C:\\Users\\test", ".provider-switcher", "fallback", "logical-models.json"),
+    );
     expect(paths.secretsDirectory).toBe(
       join("C:\\Users\\test", ".provider-switcher", "secrets"),
     );

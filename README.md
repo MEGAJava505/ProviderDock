@@ -31,6 +31,8 @@ Development has started with Phase 1. The first core slice provides:
 - a `generic-anthropic` provider adapter for Anthropic-native model discovery;
 - a provider-independent safe-fallback policy core with logical-model priority,
   sticky sessions, circuit breakers, continuation checks, and side-effect barriers;
+- versioned, atomic logical-model route storage plus CLI CRUD with provider-reference
+  validation and protection against dangling routes;
 - unit tests using fully local HTTP mocks.
 
 There is no production UI yet. The Codex launcher automatically owns a compatibility
@@ -66,6 +68,23 @@ node dist/cli.js probe agentrouter
 node dist/cli.js doctor agentrouter --level 2
 node dist/cli.js providers remove agentrouter
 ```
+
+Map one client-facing logical model to priority-ordered provider/model routes:
+
+```powershell
+node dist/cli.js logical-models set `
+  --id gpt-x `
+  --route agentrouter=gpt-x@100 `
+  --route gorouter=gpt-x@90
+
+node dist/cli.js logical-models list
+node dist/cli.js logical-models show gpt-x
+```
+
+Logical-model configuration is stored atomically under
+`~/.provider-switcher/fallback/logical-models.json`. Every referenced provider must
+already exist. A provider cannot be removed while one of these routes still references
+it; remove or update the logical model first.
 
 For AgentRouter, select its scoped adapter so the established client-identity headers and
 model filtering are applied automatically:

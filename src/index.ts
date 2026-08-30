@@ -11,6 +11,7 @@ export * from "./core/errors/provider-error.js";
 export * from "./core/fallback/circuit-breaker.js";
 export * from "./core/fallback/fallback-session-router.js";
 export * from "./core/fallback/logical-model.js";
+export * from "./core/fallback/logical-model-repository.js";
 export * from "./core/health/provider-probe-service.js";
 export * from "./core/providers/model-catalog.js";
 export * from "./core/providers/provider-adapter.js";

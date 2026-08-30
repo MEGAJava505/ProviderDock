@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { ProviderProbeService } from "../core/health/provider-probe-service.js";
+import { FileLogicalModelRepository } from "../core/fallback/logical-model-repository.js";
 import { ProviderAdapterRegistry } from "../core/providers/provider-adapter-registry.js";
 import { FileProviderProfileRepository } from "../core/providers/provider-profile-repository.js";
 import { DpapiFileSecretVault, WindowsDpapiProtector } from "../core/security/dpapi-secret-vault.js";
@@ -31,6 +32,7 @@ import { ProviderDockApplication } from "./provider-dock-application.js";
 export interface ProviderDockPaths {
   readonly dataDirectory: string;
   readonly providersFile: string;
+  readonly logicalModelsFile: string;
   readonly secretsDirectory: string;
   readonly runtimeDirectory: string;
   readonly codexHome: string;
@@ -57,6 +59,7 @@ export function resolveProviderDockPaths(
   return {
     dataDirectory,
     providersFile: join(dataDirectory, "providers", "providers.json"),
+    logicalModelsFile: join(dataDirectory, "fallback", "logical-models.json"),
     secretsDirectory: join(dataDirectory, "secrets"),
     runtimeDirectory: join(dataDirectory, "runtime"),
     codexHome: configuredCodexHome
@@ -78,6 +81,7 @@ export function createDefaultApplication(
   const environment = options.environment ?? process.env;
   const paths = resolveProviderDockPaths(options);
   const profiles = new FileProviderProfileRepository(paths.providersFile);
+  const logicalModels = new FileLogicalModelRepository(paths.logicalModelsFile);
   const environmentSecrets = new EnvironmentSecretStore(environment);
   const platform = options.platform ?? process.platform;
   let secretVault: SecretVault | undefined;
@@ -138,5 +142,6 @@ export function createDefaultApplication(
     adapters,
     doctor,
     claudeLauncher,
+    logicalModels,
   );
 }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   MemoryProviderProfileRepository,
+  LogicalModelNotFoundError,
   ProviderAdapterRegistry,
   ProviderDockApplication,
+  ProviderInUseByLogicalModelError,
   ProviderNotFoundError,
   ProviderProbeService,
   SecretVaultUnavailableError,
@@ -37,6 +39,45 @@ describe("ProviderDockApplication", () => {
     await expect(application.setSecret("ROUTER_KEY", "secret")).rejects.toBeInstanceOf(
       SecretVaultUnavailableError,
     );
+  });
+
+  it("validates logical-model provider references and protects routes from dangling", async () => {
+    const application = createApplication();
+    await application.setProvider({
+      id: "primary",
+      displayName: "Primary",
+      baseUrl: "https://primary.example.test/v1",
+    });
+    await application.setProvider({
+      id: "secondary",
+      displayName: "Secondary",
+      baseUrl: "https://secondary.example.test/v1",
+    });
+
+    await expect(
+      application.setLogicalModel({
+        id: "bad",
+        routes: [{ providerId: "missing", modelId: "gpt-x" }],
+      }),
+    ).rejects.toBeInstanceOf(ProviderNotFoundError);
+
+    await application.setLogicalModel({
+      id: "gpt-x",
+      routes: [
+        { providerId: "primary", modelId: "gpt-x", priority: 100 },
+        { providerId: "secondary", modelId: "gpt-x", priority: 90 },
+      ],
+    });
+    expect(await application.getLogicalModel("gpt-x")).toMatchObject({ id: "gpt-x" });
+    await expect(application.removeProvider("primary")).rejects.toBeInstanceOf(
+      ProviderInUseByLogicalModelError,
+    );
+
+    await application.removeLogicalModel("gpt-x");
+    await expect(application.getLogicalModel("gpt-x")).rejects.toBeInstanceOf(
+      LogicalModelNotFoundError,
+    );
+    await application.removeProvider("primary");
   });
 });
 

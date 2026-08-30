@@ -156,6 +156,72 @@ describe("ProviderDock management CLI", () => {
       "No secrets stored.",
     ]);
   });
+
+  it("manages validated logical-model routes and protects referenced providers", async () => {
+    const application = createApplication();
+    for (const id of ["primary", "secondary"]) {
+      await application.setProvider({
+        id,
+        displayName: id,
+        baseUrl: `https://${id}.example.test/v1`,
+      });
+    }
+
+    const saved = await runCli(application, [
+      "logical-models",
+      "set",
+      "--id",
+      "gpt-x",
+      "--route",
+      "primary=gpt-x@100",
+      "--route",
+      "secondary=gpt-x@90",
+    ]);
+    expect(saved).toMatchObject({ code: 0, stdout: ["Saved logical model 'gpt-x'."] });
+
+    const listed = await runCli(application, ["logical-models", "list", "--json"]);
+    expect(JSON.parse(listed.stdout[0] ?? "[]")).toMatchObject([
+      {
+        id: "gpt-x",
+        routes: [
+          { providerId: "primary", modelId: "gpt-x", priority: 100, enabled: true },
+          { providerId: "secondary", modelId: "gpt-x", priority: 90, enabled: true },
+        ],
+      },
+    ]);
+    expect(
+      (await runCli(application, ["providers", "remove", "primary"])).stderr.join("\n"),
+    ).toContain("used by logical model 'gpt-x'");
+
+    expect(
+      await runCli(application, ["logical-models", "remove", "gpt-x"]),
+    ).toMatchObject({ code: 0, stdout: ["Removed logical model 'gpt-x'."] });
+  });
+
+  it("rejects malformed routes and routes to unknown providers", async () => {
+    const application = createApplication();
+    const malformed = await runCli(application, [
+      "logical-models",
+      "set",
+      "--id",
+      "gpt-x",
+      "--route",
+      "missing-separator",
+    ]);
+    expect(malformed).toMatchObject({ code: 1 });
+    expect(malformed.stderr.join("\n")).toContain("PROVIDER=MODEL");
+
+    const unknown = await runCli(application, [
+      "logical-models",
+      "set",
+      "--id",
+      "gpt-x",
+      "--route",
+      "missing=gpt-x@100",
+    ]);
+    expect(unknown).toMatchObject({ code: 1 });
+    expect(unknown.stderr.join("\n")).toContain("Provider 'missing' is not configured");
+  });
 });
 
 function createApplication(fetchImpl: typeof fetch = vi.fn<typeof fetch>()): ProviderDockApplication {
