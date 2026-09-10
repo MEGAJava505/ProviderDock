@@ -57,13 +57,74 @@ describe("Codex management CLI", () => {
     expect(fixture.runner.request).toMatchObject({
       executable: "codex-test",
       cwd: fixture.projectDirectory,
-      args: ["--strict-config", "--profile", `providerdock-${sessionId}`],
+      args: [
+        "--strict-config",
+        "--profile",
+        `providerdock-${sessionId}`,
+        "--sandbox",
+        "read-only",
+        "--ask-for-approval",
+        "on-request",
+      ],
     });
     expect(Object.values(fixture.runner.request?.environment ?? {})).not.toContain("secret-value");
     expect(fixture.bridges.input?.profile.id).toBe("router");
 
     const recovery = await runCli(fixture.application, ["recover", "codex"]);
     expect(recovery).toMatchObject({ code: 0, stdout: ["No stale Codex sessions found."] });
+  });
+
+  it("passes the selected approval level to the Codex CLI", async () => {
+    const fixture = await createCliFixture();
+    await fixture.application.setProvider({
+      id: "router",
+      displayName: "Router",
+      baseUrl: "https://example.test/v1",
+      apiType: "openai-responses",
+      auth: { kind: "bearer", secretRef: "ROUTER_KEY" },
+    });
+
+    const result = await runCli(
+      fixture.application,
+      [
+        "launch",
+        "codex",
+        "--provider",
+        "router",
+        "--model",
+        "model-x",
+        "--project",
+        fixture.projectDirectory,
+        "--approval",
+        "full-auto",
+      ],
+      { PATH: "test-path" },
+    );
+
+    expect(result).toMatchObject({ code: 0, stderr: [] });
+    expect(fixture.runner.request?.args).toEqual([
+      "--strict-config",
+      "--profile",
+      `providerdock-${sessionId}`,
+      "--dangerously-bypass-approvals-and-sandbox",
+    ]);
+
+    const invalid = await runCli(fixture.application, [
+      "launch",
+      "codex",
+      "--provider",
+      "router",
+      "--model",
+      "model-x",
+      "--project",
+      fixture.projectDirectory,
+      "--approval",
+      "yolo",
+    ]);
+    expect(invalid).toMatchObject({
+      code: 1,
+      stderr: ["Error: --approval must be one of: ask, auto, full-auto."],
+    });
   });
 
   it("launches a logical model through the managed fallback bridge and reports switches", async () => {
@@ -166,6 +227,10 @@ describe("Codex management CLI", () => {
       "--strict-config",
       "--profile",
       `providerdock-${sessionId}`,
+      "--sandbox",
+      "read-only",
+      "--ask-for-approval",
+      "on-request",
       "--no-alt-screen",
     ]);
   });

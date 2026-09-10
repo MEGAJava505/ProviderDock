@@ -23,6 +23,10 @@ The current official Codex configuration reference states that:
 Source: [OpenAI Codex Configuration Reference](https://learn.chatgpt.com/docs/config-file/config-reference),
 retrieved 2026-08-29.
 
+## Approval levels
+
+Every launch defaults to `ask`: Codex starts with `--sandbox read-only --ask-for-approval on-request`. `--approval auto` maps to `--sandbox workspace-write --ask-for-approval on-request`. `--approval full-auto` maps to `--dangerously-bypass-approvals-and-sandbox`; use it only when the absence of prompts and the sandbox is intentional.
+
 ## Route selection
 
 The CLI uses `auto` routing unless `--bridge-url` names an external bridge. Auto routing:

@@ -222,6 +222,10 @@ describe("CodexLauncher", () => {
       "--strict-config",
       "--profile",
       `providerdock-${sessionId}`,
+      "--sandbox",
+      "read-only",
+      "--ask-for-approval",
+      "on-request",
       "--no-alt-screen",
     ]);
     expect(runner.request?.environment.CODEX_HOME).toBe(fixture.codexHome);

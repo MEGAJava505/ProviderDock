@@ -7,9 +7,9 @@ Chat providers through a managed loopback Anthropic Messages bridge (spec
 ## Launch
 
 ```text
-providerdock launch claude --provider ID --model MODEL --project DIRECTORY
-providerdock launch claude --logical-model ID --project DIRECTORY
-providerdock launch claude --prompt-profile ID --project DIRECTORY
+providerdock launch claude --provider ID --model MODEL --project DIRECTORY [--approval LEVEL]
+providerdock launch claude --logical-model ID --project DIRECTORY [--approval LEVEL]
+providerdock launch claude --prompt-profile ID --project DIRECTORY [--approval LEVEL]
 ```
 
 Lifecycle:
@@ -27,6 +27,8 @@ Lifecycle:
    Stale `ANTHROPIC_*` variables inherited from the shell are stripped so they
    cannot bypass the bridge. The global environment is never mutated.
 3. When Claude Code exits, the bridge stops and the session is cleaned up.
+
+The default approval level is `ask`, which launches Claude Code with `--permission-mode manual`. `--approval auto` maps to `--permission-mode acceptEdits`; `--approval full-auto` maps to `--dangerously-skip-permissions` and should be used only when skipping prompts is intentional.
 
 For `--logical-model`, `ANTHROPIC_MODEL` contains the logical ID. The bridge
 selects an enabled priority route, rewrites the request model to that route's

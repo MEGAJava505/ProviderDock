@@ -50,7 +50,7 @@ export const providerDashboardHtml = `<!doctype html>
           <span id="provider-count" class="count">0</span>
           <details class="help"><summary aria-label="Подсказка">?</summary><div class="help-body">«Проверить API» проверяет адрес, ключ и список моделей. «Тест L1» отправляет один минимальный запрос модели и может потратить несколько токенов.</div></details>
           <span class="spacer"></span>
-          <div class="provider-head-actions"><button class="button" type="button" data-open-launch>▷ Запустить агента</button><button id="open-cookie-overview" class="button" type="button">Общий импорт</button><button id="add-provider" class="button primary" type="button">Добавить провайдера</button></div>
+          <div class="provider-head-actions"><button id="open-cookie-overview" class="button" type="button">Общий импорт</button><button id="add-provider" class="button primary" type="button">Добавить провайдера</button></div>
         </div>
         <div class="provider-filters"><label class="search-field">Найти провайдера<input id="provider-search" type="search" placeholder="Название, адрес или ID"></label><span class="hint">Откройте «Модели и цены» на карточке провайдера</span></div>
         <div id="providers" class="provider-list"></div>
@@ -170,6 +170,7 @@ export const providerDashboardHtml = `<!doctype html>
 <dialog id="launch-dialog" aria-labelledby="launch-dialog-title"><div class="dialog-card launch-dialog-card"><div class="dialog-head"><div><span class="eyebrow">РАБОЧАЯ СЕССИЯ</span><h2 id="launch-dialog-title">Запустить агента</h2></div><button type="button" class="icon-button" data-close-dialog="launch-dialog" aria-label="Закрыть">×</button></div>        <form class="dialog-body" id="launch-form" novalidate>
           <label>Папка проекта<span class="input-action"><input id="launch-project" name="projectDirectory" required readonly placeholder="Папка не выбрана"><button id="pick-launch-project" class="button" type="button">Выбрать папку</button></span></label>
           <label>Агент<select id="launch-client" name="client"><option value="auto">Авто</option><option value="codex">Codex CLI</option><option value="claude-code">Claude Code</option></select></label>
+          <label>Подтверждение действий<select id="launch-approval" name="approvalLevel"><option value="ask">Подтверждать действия</option><option value="auto">Автоматически в проекте</option><option value="full-auto">Без подтверждений (опасно)</option></select><small>«Автоматически» разрешает правки только в папке проекта. «Без подтверждений» отключает запросы и песочницу.</small></label>
           <div class="field-label">Маршрут</div>
           <div class="route-tabs" id="route-tabs">
             <button type="button" class="route-tab active" data-route="provider">Модель</button>

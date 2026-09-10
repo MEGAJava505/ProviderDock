@@ -54,6 +54,7 @@ import type {
   LaunchCodexInput,
 } from "../clients/codex/codex-launcher.js";
 import { CodexRuntimeConfigurationError } from "../clients/codex/codex-runtime-config.js";
+import type { AgentApprovalLevel } from "../clients/agent-approval.js";
 import type { CodexRecoveryOutcome } from "../clients/codex/codex-runtime-session.js";
 import {
   ClaudeRuntimeConfigurationError,
@@ -222,6 +223,7 @@ export type ResolvedLaunchClient = "codex" | "claude-code";
 
 export interface AutomaticLaunchOptions {
   readonly projectDirectory: string;
+  readonly approvalLevel?: AgentApprovalLevel;
   readonly executable?: string;
   readonly parentEnvironment?: NodeJS.ProcessEnv;
   readonly onFallback?: (notification: FallbackNotification) => void;

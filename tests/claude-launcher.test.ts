@@ -319,6 +319,30 @@ describe("ClaudeLauncher", () => {
       }),
     ).rejects.toThrow(ClaudeRuntimeConfigurationError);
   });
+
+  it("passes the selected approval level to the Claude Code CLI", async () => {
+    const bridge = { start: vi.fn(async () => ({ host: "127.0.0.1" as const, port: 1, url: "http://127.0.0.1:1" })), stop: vi.fn(async () => undefined) };
+    const bridges: ClaudeBridgeFactory = { create: () => bridge };
+    let startedRequest: ClaudeProcessStartRequest | undefined;
+    const processes: ClaudeProcessRunner = {
+      start: async (request) => {
+        startedRequest = request;
+        return { pid: 44, wait: async () => ({ exitCode: 0, signal: null }) };
+      },
+    };
+
+    const launcher = new ClaudeLauncher(bridges, processes);
+    const exit = await launcher.launch({
+      profile: testProfile(),
+      modelId: "claude-x",
+      projectDirectory: "/tmp/project",
+      approvalLevel: "auto",
+      additionalArgs: ["--verbose"],
+    });
+
+    expect(exit).toEqual({ exitCode: 0, signal: null });
+    expect(startedRequest?.args).toEqual(["--permission-mode", "acceptEdits", "--verbose"]);
+  });
 });
 
 function testProfile(overrides: Record<string, unknown> = {}) {

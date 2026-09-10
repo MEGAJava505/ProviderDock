@@ -60,7 +60,8 @@ describe("ProviderDashboardServer", () => {
     expect(pageBody).toContain("Запустить агента");
     expect(pageBody).toContain("Импорт аккаунта");
     expect(pageBody).toContain("Access Token");
-    expect(pageBody.match(/data-open-launch/g)).toHaveLength(1);
+    expect(pageBody).not.toContain("data-open-launch");
+    expect(pageBody).toContain('id="launch-approval"');
     const importDialog = pageBody.slice(
       pageBody.indexOf('id="cookie-import-dialog"'),
       pageBody.indexOf("</form></dialog>", pageBody.indexOf('id="cookie-import-dialog"')),
@@ -339,6 +340,7 @@ describe("ProviderDashboardServer", () => {
         projectDirectory: "C:\\Projects\\example",
         providerId: "provider-a",
         modelId: "model-a",
+        approvalLevel: "ask",
         onFallback: expect.any(Function),
         onStarted: expect.any(Function),
       }),

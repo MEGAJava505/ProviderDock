@@ -52,6 +52,7 @@ The dashboard provides:
 - a native Windows folder chooser in the project launch form, while manual path entry
   remains available;
 - `Auto`, Codex CLI, and Claude Code client selection;
+- a pre-launch action-confirmation selector: ask (default), project-directory edits, or dangerous full-auto;
 - in-process launch state and fallback notifications;
 - persisted content-free managed-session request/fallback/protocol-error summaries;
 - managed-bridge usage totals without prompt or response content.

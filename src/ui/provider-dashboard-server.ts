@@ -8,6 +8,7 @@ import {
 import type { AddressInfo } from "node:net";
 import { z } from "zod";
 import type { ProviderDockApplication } from "../application/provider-dock-application.js";
+import { agentApprovalLevels, defaultAgentApprovalLevel } from "../clients/agent-approval.js";
 import type { FallbackNotification } from "../core/fallback/fallback-session-router.js";
 import { providerErrorGuidance } from "../core/errors/provider-error.js";
 import type { ProviderHealthRecord } from "../core/health/provider-health-repository.js";
@@ -133,6 +134,7 @@ const projectProfileWriteRequestSchema = projectProfileDeleteRequestSchema.exten
 const launchRequestSchema = z
   .object({
     client: z.enum(["auto", "codex", "claude-code"]).default("auto"),
+    approvalLevel: z.enum(agentApprovalLevels).default(defaultAgentApprovalLevel),
     projectDirectory: z.string().trim().min(1).max(4_096),
     providerId: z
       .string()
@@ -837,6 +839,7 @@ export class ProviderDashboardServer {
   }> {
     const shared = {
       projectDirectory: request.projectDirectory,
+      approvalLevel: request.approvalLevel,
       onFallback,
       onStarted,
     };

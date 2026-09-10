@@ -22,6 +22,7 @@ import {
 } from "../application/provider-dock-application.js";
 import { SecretProtectionError } from "../core/security/dpapi-secret-vault.js";
 import { CodexRuntimeConfigurationError } from "../clients/codex/codex-runtime-config.js";
+import { agentApprovalLevels, type AgentApprovalLevel } from "../clients/agent-approval.js";
 import {
   preferredClients,
   parseProviderAdapterId,
@@ -710,6 +711,14 @@ async function executeProjectProfiles(
   }
 }
 
+function approvalOption(value: string | undefined): { approvalLevel?: AgentApprovalLevel } {
+  if (value === undefined) return {};
+  if (!(agentApprovalLevels as readonly string[]).includes(value)) {
+    throw new CliUsageError("--approval must be one of: ask, auto, full-auto.");
+  }
+  return { approvalLevel: value as AgentApprovalLevel };
+}
+
 async function executeLaunch(
   argv: readonly string[],
   application: ProviderDockApplication,
@@ -732,6 +741,7 @@ async function executeLaunch(
       project: { type: "string" },
       "bridge-url": { type: "string" },
       executable: { type: "string" },
+      approval: { type: "string" },
     },
     allowPositionals: true,
     strict: true,
@@ -756,6 +766,7 @@ async function executeLaunch(
       promptProfileId,
       projectDirectory: requireString(values.project, "--project"),
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -776,6 +787,7 @@ async function executeLaunch(
       projectDirectory: requireString(values.project, "--project"),
       route: { kind: "auto" },
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -793,6 +805,7 @@ async function executeLaunch(
     exit = await application.launchCodexProjectProfile({
       projectDirectory: requireString(values.project, "--project"),
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -809,6 +822,7 @@ async function executeLaunch(
       projectDirectory: requireString(values.project, "--project"),
       route: bridgeUrl ? { kind: "bridge", baseUrl: bridgeUrl } : { kind: "auto" },
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
     });
   }
@@ -832,6 +846,7 @@ async function executeLaunchAuto(
       "prompt-profile": { type: "string" },
       project: { type: "string" },
       executable: { type: "string" },
+      approval: { type: "string" },
     },
     allowPositionals: true,
     strict: true,
@@ -841,6 +856,7 @@ async function executeLaunchAuto(
   const common = {
     projectDirectory,
     ...(values.executable ? { executable: values.executable } : {}),
+    ...approvalOption(values.approval),
     parentEnvironment: environment,
     onFallback: (notification: FallbackNotification) => {
       io.stderr(
@@ -912,6 +928,7 @@ async function executeLaunchClaude(
       "prompt-profile": { type: "string" },
       project: { type: "string" },
       executable: { type: "string" },
+      approval: { type: "string" },
     },
     allowPositionals: true,
     strict: true,
@@ -934,6 +951,7 @@ async function executeLaunchClaude(
       promptProfileId,
       projectDirectory: requireString(values.project, "--project"),
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -953,6 +971,7 @@ async function executeLaunchClaude(
       logicalModelId,
       projectDirectory: requireString(values.project, "--project"),
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -966,6 +985,7 @@ async function executeLaunchClaude(
     exit = await application.launchClaudeProjectProfile({
       projectDirectory: requireString(values.project, "--project"),
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -981,6 +1001,7 @@ async function executeLaunchClaude(
       modelId: requireString(values.model, "--model"),
       projectDirectory: requireString(values.project, "--project"),
       ...(values.executable ? { executable: values.executable } : {}),
+      ...approvalOption(values.approval),
       parentEnvironment: environment,
     });
   }
@@ -1930,16 +1951,16 @@ Usage:
   providerdock secrets list
   providerdock secrets set <reference> --from-env VARIABLE
   providerdock secrets remove <reference>
-  providerdock launch codex --provider ID --model MODEL --project DIRECTORY [--bridge-url URL]
-  providerdock launch codex --logical-model ID --project DIRECTORY
-  providerdock launch codex --prompt-profile ID --project DIRECTORY
-  providerdock launch claude --provider ID --model MODEL --project DIRECTORY
-  providerdock launch claude --logical-model ID --project DIRECTORY
-  providerdock launch claude --prompt-profile ID --project DIRECTORY
-  providerdock launch auto --provider ID --model MODEL --project DIRECTORY
-  providerdock launch auto --logical-model ID --project DIRECTORY
-  providerdock launch auto --prompt-profile ID --project DIRECTORY
-  providerdock launch auto --project DIRECTORY
+  providerdock launch codex --provider ID --model MODEL --project DIRECTORY [--bridge-url URL] [--approval LEVEL]
+  providerdock launch codex --logical-model ID --project DIRECTORY [--approval LEVEL]
+  providerdock launch codex --prompt-profile ID --project DIRECTORY [--approval LEVEL]
+  providerdock launch claude --provider ID --model MODEL --project DIRECTORY [--approval LEVEL]
+  providerdock launch claude --logical-model ID --project DIRECTORY [--approval LEVEL]
+  providerdock launch claude --prompt-profile ID --project DIRECTORY [--approval LEVEL]
+  providerdock launch auto --provider ID --model MODEL --project DIRECTORY [--approval LEVEL]
+  providerdock launch auto --logical-model ID --project DIRECTORY [--approval LEVEL]
+  providerdock launch auto --prompt-profile ID --project DIRECTORY [--approval LEVEL]
+  providerdock launch auto --project DIRECTORY [--approval LEVEL]
   providerdock recover codex [--json]
 
 Doctor levels (run manually; deeper levels send real inference requests):
@@ -1947,6 +1968,11 @@ Doctor levels (run manually; deeper levels send real inference requests):
   1  plus one minimal inference request (default)
   2  plus a streaming check
   3  plus a synthetic side-effect-free tool round-trip
+
+Launch approval levels (--approval):
+  ask        confirm actions before changes (default)
+  auto       automatic edits inside the project directory only
+  full-auto  no approval prompts and no sandbox (dangerous)
 
 Codex launch routing:
   Without --bridge-url, ProviderDock selects direct or managed compatibility bridge mode.

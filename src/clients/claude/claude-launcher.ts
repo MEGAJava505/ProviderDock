@@ -5,6 +5,7 @@ import type { ProviderFallbackConfiguration } from "../../core/fallback/provider
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { ClaudeBridgeFactory, ManagedClaudeBridge } from "./claude-bridge-factory.js";
 import { spawnAgentTerminalProcess } from "../agent-terminal-process.js";
+import { claudeApprovalArgs, type AgentApprovalLevel } from "../agent-approval.js";
 
 export class ClaudeRuntimeConfigurationError extends Error {
   constructor(message: string) {
@@ -51,6 +52,8 @@ export interface LaunchClaudeInput {
   readonly projectDirectory: string;
   readonly executable?: string;
   readonly additionalArgs?: readonly string[];
+  /** Pre-launch action-confirmation level passed to the client CLI. */
+  readonly approvalLevel?: AgentApprovalLevel;
   readonly parentEnvironment?: NodeJS.ProcessEnv;
   /** Extra Anthropic headers to expose via ANTHROPIC_CUSTOM_HEADERS. */
   readonly customHeaders?: Readonly<Record<string, string>>;
@@ -138,7 +141,7 @@ export class ClaudeLauncher {
 
       const processHandle = await this.processes.start({
         executable: input.executable ?? "claude",
-        args: [...(input.additionalArgs ?? [])],
+        args: [...claudeApprovalArgs(input.approvalLevel), ...(input.additionalArgs ?? [])],
         cwd: input.projectDirectory,
         environment,
       });

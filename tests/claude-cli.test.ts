@@ -145,7 +145,7 @@ describe("Claude management CLI", () => {
       sessionInstructions: "Review all affected invariants.",
       fallback: { logicalModel: { id: "logical-claude" } },
     });
-    expect(fixture.runner.request?.args).toEqual(["--verbose"]);
+    expect(fixture.runner.request?.args).toEqual(["--permission-mode", "manual", "--verbose"]);
     expect(fixture.runner.request?.environment.ANTHROPIC_MODEL).toBe(
       "logical-claude",
     );

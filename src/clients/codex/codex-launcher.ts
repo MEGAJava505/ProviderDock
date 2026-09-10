@@ -3,6 +3,7 @@ import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { FallbackNotification } from "../../core/fallback/fallback-session-router.js";
 import type { ResponsesBridgeFallbackConfiguration } from "../../bridge/responses/responses-bridge-server.js";
 import { spawnAgentTerminalProcess } from "../agent-terminal-process.js";
+import { codexApprovalArgs, type AgentApprovalLevel } from "../agent-approval.js";
 import {
   CodexRuntimeConfigurationError,
   type CodexLaunchRoute,
@@ -56,6 +57,8 @@ export interface LaunchCodexInput {
   readonly route: CodexLaunchRoute;
   readonly executable?: string;
   readonly additionalArgs?: readonly string[];
+  /** Pre-launch action-confirmation level passed to the client CLI. */
+  readonly approvalLevel?: AgentApprovalLevel;
   readonly parentEnvironment?: NodeJS.ProcessEnv;
   readonly fallback?: ResponsesBridgeFallbackConfiguration;
   readonly onFallback?: (notification: FallbackNotification) => void;
@@ -115,6 +118,7 @@ export class CodexLauncher {
           "--strict-config",
           "--profile",
           runtime.profileName,
+          ...codexApprovalArgs(input.approvalLevel),
           ...(input.additionalArgs ?? []),
         ],
         cwd: runtime.projectDirectory,
