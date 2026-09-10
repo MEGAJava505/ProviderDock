@@ -33,6 +33,9 @@ describe("ProviderDock paths", () => {
     expect(paths.codexHome).toBe(
       join("C:\\Users\\test", ".provider-switcher", "runtime", "codex-home"),
     );
+    expect(paths.claudeHome).toBe(
+      join("C:\\Users\\test", ".provider-switcher", "runtime", "claude-home"),
+    );
   });
 
   it("supports an isolated directory override", () => {
@@ -44,14 +47,21 @@ describe("ProviderDock paths", () => {
     expect(paths.codexHome).toBe(
       join(resolve(".test-provider-dock"), "runtime", "codex-home"),
     );
+    expect(paths.claudeHome).toBe(
+      join(resolve(".test-provider-dock"), "runtime", "claude-home"),
+    );
   });
 
-  it("honors an explicit CODEX_HOME override", () => {
+  it("honors explicit agent home overrides", () => {
     const paths = resolveProviderDockPaths({
-      environment: { CODEX_HOME: "C:\\isolated-codex" },
+      environment: {
+        CODEX_HOME: "C:\\isolated-codex",
+        CLAUDE_CONFIG_DIR: "C:\\isolated-claude",
+      },
       userHome: "C:\\Users\\test",
     });
 
     expect(paths.codexHome).toBe("C:\\isolated-codex");
+    expect(paths.claudeHome).toBe("C:\\isolated-claude");
   });
 });

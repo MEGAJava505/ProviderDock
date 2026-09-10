@@ -6,6 +6,7 @@ import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { ClaudeBridgeFactory, ManagedClaudeBridge } from "./claude-bridge-factory.js";
 import { spawnAgentTerminalProcess } from "../agent-terminal-process.js";
 import { claudeApprovalArgs, type AgentApprovalLevel } from "../agent-approval.js";
+import type { AgentSessionHomeManager } from "../agent-session-home.js";
 
 export class ClaudeRuntimeConfigurationError extends Error {
   constructor(message: string) {
@@ -84,12 +85,15 @@ const managedAnthropicVariables = [
  * Anthropic variables inherited from the shell are stripped so they cannot
  * bypass the bridge. Provider credentials never reach the child; the bridge
  * injects real authentication upstream while the child only holds a random
- * per-session loopback token.
+ * per-session loopback token. Claude Code also receives a provider-scoped
+ * `CLAUDE_CONFIG_DIR`, and completed conversation history is retained per
+ * provider with oldest sessions pruned first.
  */
 export class ClaudeLauncher {
   constructor(
     private readonly bridges: ClaudeBridgeFactory,
-    private readonly processes: ClaudeProcessRunner = new NodeClaudeProcessRunner(),
+    private readonly processes: ClaudeProcessRunner,
+    private readonly sessionHomes: AgentSessionHomeManager,
   ) {}
 
   async launch(input: LaunchClaudeInput): Promise<ClaudeProcessExit> {
@@ -116,7 +120,9 @@ export class ClaudeLauncher {
     }
 
     let bridge: ManagedClaudeBridge | undefined;
+    let sessionHome: string | undefined;
     try {
+      sessionHome = await this.sessionHomes.beginSession(input.profile.id);
       const sessionToken = `providerdock-${randomBytes(16).toString("hex")}`;
       const sessionId = randomBytes(16).toString("hex");
       bridge = this.bridges.create({
@@ -138,6 +144,7 @@ export class ClaudeLauncher {
         sessionToken,
         ...(input.customHeaders === undefined ? {} : { customHeaders: input.customHeaders }),
       });
+      environment["CLAUDE_CONFIG_DIR"] = sessionHome;
 
       const processHandle = await this.processes.start({
         executable: input.executable ?? "claude",
@@ -153,6 +160,11 @@ export class ClaudeLauncher {
     } finally {
       if (bridge !== undefined) {
         await disposeClaudeBridge(bridge).catch(() => undefined);
+      }
+      if (sessionHome !== undefined) {
+        // Session retention is housekeeping; it must not turn an already-completed
+        // Claude run into a launcher failure if the filesystem rejects deletion.
+        await this.sessionHomes.endSession(input.profile.id).catch(() => undefined);
       }
     }
   }

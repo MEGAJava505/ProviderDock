@@ -28,6 +28,22 @@ Lifecycle:
    cannot bypass the bridge. The global environment is never mutated.
 3. When Claude Code exits, the bridge stops and the session is cleaned up.
 
+Claude configuration homes are stored as:
+
+```text
+<CLAUDE_CONFIG_DIR root>/providers/<provider-id>
+```
+
+The root defaults to `~/.provider-switcher/runtime/claude-home` and can be moved with
+`CLAUDE_CONFIG_DIR`. The nested directory is passed only to the child process, keeping
+conversation files separated by provider.
+
+After Claude Code exits and no other Claude launch from the same ProviderDock process is
+active for that provider, ProviderDock retains the 50 newest conversation JSONL files and
+deletes older ones first. Ordering uses file modification time. Only UUID-named
+`projects/**/*.jsonl` conversation files are eligible; settings, credentials, plugins,
+caches, and other Claude state are never removed.
+
 The default approval level is `ask`, which launches Claude Code with `--permission-mode manual`. `--approval auto` maps to `--permission-mode acceptEdits`; `--approval full-auto` maps to `--dangerously-skip-permissions` and should be used only when skipping prompts is intentional.
 
 For `--logical-model`, `ANTHROPIC_MODEL` contains the logical ID. The bridge

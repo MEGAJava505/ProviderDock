@@ -2,6 +2,7 @@ export * from "./application/create-default-application.js";
 export * from "./application/provider-dock-application.js";
 export * from "./cli/provider-dock-cli.js";
 export * from "./clients/agent-approval.js";
+export * from "./clients/agent-session-home.js";
 export * from "./clients/codex/codex-launcher.js";
 export * from "./clients/codex/codex-runtime-config.js";
 export * from "./clients/codex/codex-bridge-factory.js";

@@ -1,11 +1,13 @@
-import { mkdtemp, readFile, readdir } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  AgentSessionHomeManager,
   AnthropicClaudeBridgeFactory,
   ClaudeLauncher,
   ClaudeRuntimeConfigurationError,
+  claudeAgentSessionLayout,
   buildClaudeChildEnvironment,
   MemorySecretStore,
   parseLogicalModelGroup,
@@ -111,6 +113,7 @@ describe("ClaudeLauncher", () => {
         runtimeRoot,
       }),
       processes,
+      createSessionHomes(root),
     );
 
     await launcher.launch({
@@ -208,6 +211,7 @@ describe("ClaudeLauncher", () => {
         runtimeRoot,
       }),
       processes,
+      createSessionHomes(root),
     );
 
     await launcher.launch({
@@ -240,6 +244,72 @@ describe("ClaudeLauncher", () => {
     expect(await readdir(runtimeRoot)).toEqual([]);
   });
 
+  it("scopes Claude sessions by provider and prunes only the oldest transcripts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "providerdock-claude-session-retention-"));
+    const sessionHomes = new AgentSessionHomeManager({
+      rootDirectory: join(root, "claude-home"),
+      retainedSessionsPerProvider: 2,
+      layout: claudeAgentSessionLayout,
+    });
+    const providerHome = join(root, "claude-home", "providers", "anthropic");
+    const projectDirectory = join(providerHome, "projects", "project");
+    await mkdir(projectDirectory, { recursive: true });
+    const oldSession = join(projectDirectory, "00000000-0000-4000-8000-000000000001.jsonl");
+    const middleSession = join(projectDirectory, "00000000-0000-4000-8000-000000000002.jsonl");
+    const newestSession = join(projectDirectory, "00000000-0000-4000-8000-000000000003.jsonl");
+    await Promise.all([
+      writeFile(oldSession, "old\n", "utf8"),
+      writeFile(middleSession, "middle\n", "utf8"),
+      writeFile(newestSession, "newest\n", "utf8"),
+      writeFile(join(providerHome, "settings.json"), "{}\n", "utf8"),
+      writeFile(join(providerHome, ".credentials.json"), "{}\n", "utf8"),
+    ]);
+    await utimes(oldSession, new Date("2026-09-01T00:00:00Z"), new Date("2026-09-01T00:00:00Z"));
+    await utimes(middleSession, new Date("2026-09-02T00:00:00Z"), new Date("2026-09-02T00:00:00Z"));
+    await utimes(newestSession, new Date("2026-09-03T00:00:00Z"), new Date("2026-09-03T00:00:00Z"));
+
+    const otherProviderHome = join(root, "claude-home", "providers", "other", "projects", "project");
+    const otherProviderSession = join(
+      otherProviderHome,
+      "00000000-0000-4000-8000-000000000004.jsonl",
+    );
+    await mkdir(otherProviderHome, { recursive: true });
+    await writeFile(otherProviderSession, "other provider\n", "utf8");
+
+    const bridge = {
+      start: vi.fn(async () => ({ host: "127.0.0.1" as const, port: 45678, url: "http://127.0.0.1:45678" })),
+      stop: vi.fn(async () => undefined),
+    };
+    const bridges: ClaudeBridgeFactory = { create: () => bridge };
+    let startedRequest: ClaudeProcessStartRequest | undefined;
+    const processes: ClaudeProcessRunner = {
+      start: async (request) => {
+        startedRequest = request;
+        return { pid: 45, wait: async () => ({ exitCode: 0, signal: null }) };
+      },
+    };
+    const parentEnvironment: NodeJS.ProcessEnv = {
+      CLAUDE_CONFIG_DIR: "C:\\global-claude",
+    };
+    const launcher = new ClaudeLauncher(bridges, processes, sessionHomes);
+
+    await launcher.launch({
+      profile: testProfile(),
+      modelId: "claude-x",
+      projectDirectory: "/tmp/project",
+      parentEnvironment,
+    });
+
+    expect(startedRequest?.environment.CLAUDE_CONFIG_DIR).toBe(providerHome);
+    expect(parentEnvironment.CLAUDE_CONFIG_DIR).toBe("C:\\global-claude");
+    await expect(access(oldSession)).rejects.toThrow();
+    expect(await readFile(middleSession, "utf8")).toBe("middle\n");
+    expect(await readFile(newestSession, "utf8")).toBe("newest\n");
+    expect(await readFile(otherProviderSession, "utf8")).toBe("other provider\n");
+    expect(await readFile(join(providerHome, "settings.json"), "utf8")).toBe("{}\n");
+    expect(await readFile(join(providerHome, ".credentials.json"), "utf8")).toBe("{}\n");
+  });
+
   it("starts the bridge, spawns claude with child-only env, then stops the bridge", async () => {
     const order: string[] = [];
     const bridge = {
@@ -267,7 +337,11 @@ describe("ClaudeLauncher", () => {
       },
     };
 
-    const launcher = new ClaudeLauncher(bridges, processes);
+    const launcher = new ClaudeLauncher(
+      bridges,
+      processes,
+      createSessionHomes(await mkdtemp(join(tmpdir(), "providerdock-claude-session-home-"))),
+    );
     const exit = await launcher.launch({
       profile: testProfile(),
       modelId: "claude-x",
@@ -300,7 +374,11 @@ describe("ClaudeLauncher", () => {
       },
     };
 
-    const launcher = new ClaudeLauncher(bridges, processes);
+    const launcher = new ClaudeLauncher(
+      bridges,
+      processes,
+      createSessionHomes(await mkdtemp(join(tmpdir(), "providerdock-claude-session-home-"))),
+    );
     await expect(
       launcher.launch({
         profile: testProfile(),
@@ -331,7 +409,11 @@ describe("ClaudeLauncher", () => {
       },
     };
 
-    const launcher = new ClaudeLauncher(bridges, processes);
+    const launcher = new ClaudeLauncher(
+      bridges,
+      processes,
+      createSessionHomes(await mkdtemp(join(tmpdir(), "providerdock-claude-session-home-"))),
+    );
     const exit = await launcher.launch({
       profile: testProfile(),
       modelId: "claude-x",
@@ -344,6 +426,13 @@ describe("ClaudeLauncher", () => {
     expect(startedRequest?.args).toEqual(["--permission-mode", "acceptEdits", "--verbose"]);
   });
 });
+
+function createSessionHomes(root: string) {
+  return new AgentSessionHomeManager({
+    rootDirectory: join(root, "claude-home"),
+    layout: claudeAgentSessionLayout,
+  });
+}
 
 function testProfile(overrides: Record<string, unknown> = {}) {
   return parseProviderProfile({

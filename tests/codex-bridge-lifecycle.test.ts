@@ -87,7 +87,7 @@ describe("managed Codex bridge lifecycle", () => {
     expect(upstreamFetch).toHaveBeenCalledTimes(1);
     await expect(fetch(`${runner.bridgeBaseUrl}/health`)).rejects.toThrow();
     await expect(access(join(runtimeRoot, sessionId))).rejects.toThrow();
-    await expect(access(join(codexHome, `providerdock-${sessionId}.config.toml`))).rejects.toThrow();
+    await expect(access(join(codexHome, "providers", "query-router", `providerdock-${sessionId}.config.toml`))).rejects.toThrow();
   });
 
   it("automatically routes Chat Completions profiles through the managed bridge", async () => {

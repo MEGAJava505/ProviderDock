@@ -125,7 +125,7 @@ export class CodexLauncher {
         environment: {
           ...(input.parentEnvironment ?? process.env),
           ...runtime.environment,
-          CODEX_HOME: this.sessions.codexHome,
+          CODEX_HOME: runtime.codexHome,
         },
       });
       await this.sessions.markActive(runtime, processHandle.pid);

@@ -14,6 +14,10 @@ import { z } from "zod";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
 import {
+  AgentSessionHomeManager,
+  codexAgentSessionLayout,
+} from "../agent-session-home.js";
+import {
   CodexRuntimeConfigFactory,
   CodexRuntimeConfigurationError,
   type CodexProviderRoute,
@@ -91,6 +95,7 @@ export interface PreparedCodexRuntime {
   readonly sessionId: string;
   readonly profileName: string;
   readonly profilePath: string;
+  readonly codexHome: string;
   readonly sessionDirectory: string;
   readonly manifestPath: string;
   readonly projectDirectory: string;
@@ -113,6 +118,7 @@ export interface CodexRuntimeSessionManagerOptions {
   readonly codexHome: string;
   readonly runtimeRoot: string;
   readonly secrets: SecretStore;
+  readonly retainedSessionsPerProvider?: number;
   readonly now?: () => Date;
   readonly randomId?: () => string;
   readonly isProcessAlive?: (pid: number) => boolean;
@@ -122,6 +128,7 @@ export interface CodexRuntimeSessionManagerOptions {
 export class CodexRuntimeSessionManager {
   readonly codexHome: string;
   private readonly runtimeRoot: string;
+  private readonly sessionHomes: AgentSessionHomeManager;
   private readonly configFactory: CodexRuntimeConfigFactory;
   private readonly now: () => Date;
   private readonly randomId: () => string;
@@ -131,6 +138,13 @@ export class CodexRuntimeSessionManager {
   constructor(options: CodexRuntimeSessionManagerOptions) {
     this.codexHome = options.codexHome;
     this.runtimeRoot = options.runtimeRoot;
+    this.sessionHomes = new AgentSessionHomeManager({
+      rootDirectory: options.codexHome,
+      ...(options.retainedSessionsPerProvider === undefined
+        ? {}
+        : { retainedSessionsPerProvider: options.retainedSessionsPerProvider }),
+      layout: codexAgentSessionLayout,
+    });
     this.configFactory = new CodexRuntimeConfigFactory(options.secrets);
     this.now = options.now ?? (() => new Date());
     this.randomId = options.randomId ?? (() => randomUUID().replaceAll("-", ""));
@@ -163,9 +177,10 @@ export class CodexRuntimeSessionManager {
       sessionId,
     });
     const profileSha256 = sha256(built.contents);
+    const providerCodexHome = await this.sessionHomes.prepare(input.profile.id);
     const sessionDirectory = join(this.runtimeRoot, sessionId);
     const manifestPath = join(sessionDirectory, "manifest.json");
-    const profilePath = join(this.codexHome, `${built.profileName}.config.toml`);
+    const profilePath = join(providerCodexHome, `${built.profileName}.config.toml`);
     const route: CodexRuntimeManifestV2["route"] =
       input.route.kind === "direct"
         ? { kind: "direct" }
@@ -190,7 +205,6 @@ export class CodexRuntimeSessionManager {
 
     await mkdir(this.runtimeRoot, { recursive: true });
     await mkdir(sessionDirectory, { recursive: false });
-    await mkdir(this.codexHome, { recursive: true });
     await writeFile(manifestPath, serializeManifest(manifest), { encoding: "utf8", flag: "wx" });
     await writeFile(profilePath, built.contents, { encoding: "utf8", flag: "wx" });
     await this.writeManifest(manifestPath, { ...manifest, state: "READY" });
@@ -199,6 +213,7 @@ export class CodexRuntimeSessionManager {
       sessionId,
       profileName: built.profileName,
       profilePath,
+      codexHome: providerCodexHome,
       sessionDirectory,
       manifestPath,
       projectDirectory: input.projectDirectory,
@@ -228,6 +243,10 @@ export class CodexRuntimeSessionManager {
   async cleanup(runtime: PreparedCodexRuntime): Promise<void> {
     const manifest = await this.readPreparedManifest(runtime);
     await this.removeProfileIfUnchanged(manifest);
+    await this.retainSessionsWhenProviderIsIdle(
+      manifest.providerId,
+      manifest.sessionId,
+    );
     await this.removeSessionDirectory(runtime.sessionId);
   }
 
@@ -283,6 +302,7 @@ export class CodexRuntimeSessionManager {
 
       try {
         await this.removeProfileIfUnchanged(manifest);
+        await this.retainSessionsWhenProviderIsIdle(manifest.providerId, sessionId);
         await this.removeSessionDirectory(sessionId);
         outcomes.push({ sessionId, status: "RECOVERED" });
       } catch (error) {
@@ -318,13 +338,24 @@ export class CodexRuntimeSessionManager {
   }
 
   private async removeProfileIfUnchanged(manifest: CodexRuntimeManifest): Promise<void> {
-    const profilePath = this.profilePath(manifest);
+    let profilePath = this.profilePath(manifest);
     let contents: string;
     try {
       contents = await readFile(profilePath, "utf8");
     } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") return;
-      throw error;
+      if (!isNodeError(error) || error.code !== "ENOENT") throw error;
+
+      // Builds before provider-scoped CODEX_HOME placed profiles directly in the
+      // configured root. Recover those old temporary files when the new path is absent.
+      const legacyProfilePath = join(this.codexHome, `${manifest.profileName}.config.toml`);
+      if (legacyProfilePath === profilePath) return;
+      try {
+        contents = await readFile(legacyProfilePath, "utf8");
+        profilePath = legacyProfilePath;
+      } catch (legacyError) {
+        if (isNodeError(legacyError) && legacyError.code === "ENOENT") return;
+        throw legacyError;
+      }
     }
     if (
       sha256(contents) !== manifest.profileSha256 &&
@@ -342,8 +373,54 @@ export class CodexRuntimeSessionManager {
     await rm(join(this.runtimeRoot, sessionId), { recursive: true, force: true });
   }
 
+  private async retainSessionsWhenProviderIsIdle(
+    providerId: string,
+    excludedSessionId: string,
+  ): Promise<void> {
+    if (await this.hasActiveRuntimeSession(providerId, excludedSessionId)) return;
+    await this.sessionHomes.retain(providerId);
+  }
+
+  private async hasActiveRuntimeSession(
+    providerId: string,
+    excludedSessionId: string,
+  ): Promise<boolean> {
+    let directoryNames: string[];
+    try {
+      directoryNames = await readdir(this.runtimeRoot);
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") return false;
+      throw error;
+    }
+
+    for (const sessionId of directoryNames) {
+      if (sessionId === excludedSessionId || !sessionIdSchema.safeParse(sessionId).success) {
+        continue;
+      }
+      try {
+        const manifest = manifestSchema.parse(
+          JSON.parse(await readFile(join(this.runtimeRoot, sessionId, "manifest.json"), "utf8")),
+        );
+        if (
+          manifest.providerId === providerId &&
+          manifest.state === "ACTIVE" &&
+          manifest.pid !== undefined &&
+          this.isProcessAlive(manifest.pid)
+        ) {
+          return true;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return false;
+  }
+
   private profilePath(manifest: CodexRuntimeManifest): string {
-    return join(this.codexHome, `${manifest.profileName}.config.toml`);
+    return join(
+      this.sessionHomes.homeFor(manifest.providerId),
+      `${manifest.profileName}.config.toml`,
+    );
   }
 
   private async writeManifest(path: string, manifest: CodexRuntimeManifest): Promise<void> {

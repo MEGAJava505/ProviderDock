@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  AgentSessionHomeManager,
   ClaudeLauncher,
+  claudeAgentSessionLayout,
   MemoryLogicalModelRepository,
   MemoryProviderProfileRepository,
   ProviderAdapterRegistry,
@@ -207,7 +209,14 @@ async function createCliFixture() {
     undefined,
     undefined,
     undefined,
-    new ClaudeLauncher(bridges, runner),
+    new ClaudeLauncher(
+      bridges,
+      runner,
+      new AgentSessionHomeManager({
+        rootDirectory: join(root, "claude-home"),
+        layout: claudeAgentSessionLayout,
+      }),
+    ),
     new MemoryLogicalModelRepository(),
   );
   return { application, runner, bridges, projectDirectory };

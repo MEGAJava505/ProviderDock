@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  AgentSessionHomeManager,
   ClaudeLauncher,
+  claudeAgentSessionLayout,
   CodexLauncher,
   CodexRuntimeSessionManager,
   MemoryLogicalModelRepository,
@@ -244,7 +246,11 @@ async function createFixture() {
     codexRunner,
     new NoopCodexBridgeFactory(),
   );
-  const claudeLauncher = new ClaudeLauncher(claudeBridges, claudeRunner);
+  const claudeSessionHomes = new AgentSessionHomeManager({
+    rootDirectory: join(root, "claude-home"),
+    layout: claudeAgentSessionLayout,
+  });
+  const claudeLauncher = new ClaudeLauncher(claudeBridges, claudeRunner, claudeSessionHomes);
   const application = new ProviderDockApplication(
     new MemoryProviderProfileRepository(),
     new ProviderProbeService(new ProviderAdapterRegistry()),

@@ -32,6 +32,10 @@ import {
 } from "../clients/claude/claude-launcher.js";
 import { AnthropicClaudeBridgeFactory } from "../clients/claude/claude-bridge-factory.js";
 import { CodexRuntimeSessionManager } from "../clients/codex/codex-runtime-session.js";
+import {
+  AgentSessionHomeManager,
+  claudeAgentSessionLayout,
+} from "../clients/agent-session-home.js";
 import { ProviderDoctor } from "../diagnostics/provider-doctor.js";
 import { ProviderDockApplication } from "./provider-dock-application.js";
 import {
@@ -57,6 +61,7 @@ export interface ProviderDockPaths {
   readonly secretsDirectory: string;
   readonly runtimeDirectory: string;
   readonly codexHome: string;
+  readonly claudeHome: string;
 }
 
 export interface ResolveProviderDockPathsOptions {
@@ -71,6 +76,7 @@ export function resolveProviderDockPaths(
   const userHome = options.userHome ?? homedir();
   const configuredDirectory = environment.PROVIDER_DOCK_HOME?.trim();
   const configuredCodexHome = environment.CODEX_HOME?.trim();
+  const configuredClaudeHome = environment.CLAUDE_CONFIG_DIR?.trim();
   const dataDirectory = configuredDirectory
     ? isAbsolute(configuredDirectory)
       ? configuredDirectory
@@ -92,6 +98,11 @@ export function resolveProviderDockPaths(
         ? configuredCodexHome
         : resolve(configuredCodexHome)
       : join(dataDirectory, "runtime", "codex-home"),
+    claudeHome: configuredClaudeHome
+      ? isAbsolute(configuredClaudeHome)
+        ? configuredClaudeHome
+        : resolve(configuredClaudeHome)
+      : join(dataDirectory, "runtime", "claude-home"),
   };
 }
 
@@ -257,6 +268,10 @@ function assembleDefaultApplication(
     }),
   );
 
+  const claudeSessionHomes = new AgentSessionHomeManager({
+    rootDirectory: paths.claudeHome,
+    layout: claudeAgentSessionLayout,
+  });
   const claudeLauncher = new ClaudeLauncher(
     new AnthropicClaudeBridgeFactory({
       secretStore: secrets,
@@ -271,6 +286,7 @@ function assembleDefaultApplication(
         : { fetchImpl: runtime.fetchImpl }),
     }),
     new NodeClaudeProcessRunner(),
+    claudeSessionHomes,
   );
 
   const doctor = new ProviderDoctor({

@@ -54,7 +54,7 @@ validate project/provider
   → resolve direct, managed bridge, or external bridge route
   → start managed bridge on a Fetch-compatible random loopback port when required
   → write PREPARING manifest
-  → create random $CODEX_HOME/providerdock-*.config.toml with create-new semantics
+  → create random $CODEX_HOME/providers/<provider-id>/providerdock-*.config.toml with create-new semantics
   → include trust for the explicitly selected project directory in that isolated profile
   → mark manifest READY
   → start codex --strict-config --profile providerdock-*
@@ -69,6 +69,25 @@ The user's main config is never modified. Managed sessions keep upstream secrets
 the bridge. For explicitly selected direct mode, secrets use randomly named child-process
 environment variables referenced by `env_key` or `env_http_headers`; they are not written
 into TOML or the recovery manifest.
+
+## Provider-scoped session history
+
+Codex receives a provider-specific `CODEX_HOME`:
+
+```text
+<configured CODEX_HOME root>/providers/<provider-id>
+```
+
+The root defaults to `~/.provider-switcher/runtime/codex-home` and can be moved with the
+`CODEX_HOME` environment variable. ProviderDock passes the nested provider directory to
+the child, so rollout files under `sessions/` never mix between providers. Existing shared
+history is left in place rather than guessed or migrated.
+
+After a Codex process exits (and no other ProviderDock runtime for that provider is
+active), ProviderDock keeps the 50 newest Codex session files for that provider and deletes
+older files first. Ordering uses file modification time. Retention touches only
+`sessions/**/rollout-*.jsonl`; provider configuration, credentials, caches, and other
+Codex state are never removed.
 
 On startup, stale session manifests can be recovered. ProviderDock removes a temporary
 profile only when its path is derived from the recorded random profile name and its

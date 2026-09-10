@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CodexLauncher,
@@ -166,6 +166,103 @@ describe("CodexRuntimeSessionManager", () => {
     ]);
   });
 
+  it("keeps Codex sessions isolated by provider after runtime cleanup", async () => {
+    const fixture = await createFixture();
+    const runtime = await fixture.manager.prepare(runtimeInput(fixture.projectDirectory));
+    const providerHome = join(fixture.codexHome, "providers", "router");
+    const sessionPath = join(providerHome, "sessions", "rollout-2026-09-10T00-00-00-test.jsonl");
+    const otherProviderSession = join(
+      fixture.codexHome,
+      "providers",
+      "other-router",
+      "sessions",
+      "rollout-2026-09-09T00-00-00-test.jsonl",
+    );
+    await mkdir(dirname(sessionPath), { recursive: true });
+    await mkdir(dirname(otherProviderSession), { recursive: true });
+    await Promise.all([
+      writeFile(sessionPath, "router session\n", "utf8"),
+      writeFile(otherProviderSession, "other provider session\n", "utf8"),
+    ]);
+
+    expect(runtime.codexHome).toBe(providerHome);
+    expect(runtime.profilePath).toBe(
+      join(providerHome, `providerdock-${sessionId}.config.toml`),
+    );
+
+    await fixture.manager.cleanup(runtime);
+
+    expect(await readFile(sessionPath, "utf8")).toBe("router session\n");
+    expect(await readFile(otherProviderSession, "utf8")).toBe("other provider session\n");
+    await expect(access(runtime.profilePath)).rejects.toThrow();
+    await expect(access(runtime.sessionDirectory)).rejects.toThrow();
+  });
+
+  it("prunes only the oldest Codex sessions for the cleaned-up provider", async () => {
+    const fixture = await createFixture(undefined, undefined, 2);
+    const runtime = await fixture.manager.prepare(runtimeInput(fixture.projectDirectory));
+    const sessionsDirectory = join(runtime.codexHome, "sessions");
+    await mkdir(sessionsDirectory, { recursive: true });
+    const oldest = join(sessionsDirectory, "rollout-oldest.jsonl");
+    const older = join(sessionsDirectory, "rollout-older.jsonl");
+    const newer = join(sessionsDirectory, "rollout-newer.jsonl");
+    const newest = join(sessionsDirectory, "rollout-newest.jsonl");
+    const otherProviderSession = join(
+      fixture.codexHome,
+      "providers",
+      "other-router",
+      "sessions",
+      "rollout-other.jsonl",
+    );
+    await mkdir(dirname(otherProviderSession), { recursive: true });
+    await Promise.all([
+      writeFile(oldest, "oldest\n", "utf8"),
+      writeFile(older, "older\n", "utf8"),
+      writeFile(newer, "newer\n", "utf8"),
+      writeFile(newest, "newest\n", "utf8"),
+      writeFile(join(runtime.codexHome, "config.toml"), "user config\n", "utf8"),
+      writeFile(otherProviderSession, "other provider\n", "utf8"),
+    ]);
+    await setModifiedTimes([
+      [oldest, "2026-09-01T00:00:00.000Z"],
+      [older, "2026-09-02T00:00:00.000Z"],
+      [newer, "2026-09-03T00:00:00.000Z"],
+      [newest, "2026-09-04T00:00:00.000Z"],
+    ]);
+
+    await fixture.manager.cleanup(runtime);
+
+    await expect(access(oldest)).rejects.toThrow();
+    await expect(access(older)).rejects.toThrow();
+    expect(await readFile(newer, "utf8")).toBe("newer\n");
+    expect(await readFile(newest, "utf8")).toBe("newest\n");
+    expect(await readFile(join(runtime.codexHome, "config.toml"), "utf8")).toBe("user config\n");
+    expect(await readFile(otherProviderSession, "utf8")).toBe("other provider\n");
+  });
+
+  it("does not prune a provider's sessions while another runtime process is active", async () => {
+    const fixture = await createFixture(() => true, undefined, 1);
+    const activeSessionId = "11111111111111111111111111111111";
+    const activeRuntime = await fixture.manager.prepare({
+      ...runtimeInput(fixture.projectDirectory),
+      sessionId: activeSessionId,
+    });
+    await fixture.manager.markActive(activeRuntime, 9876);
+
+    const runtime = await fixture.manager.prepare(runtimeInput(fixture.projectDirectory));
+    const oldSession = join(
+      runtime.codexHome,
+      "sessions",
+      "rollout-still-active-provider.jsonl",
+    );
+    await mkdir(dirname(oldSession), { recursive: true });
+    await writeFile(oldSession, "preserve while active\n", "utf8");
+
+    await fixture.manager.cleanup(runtime);
+
+    expect(await readFile(oldSession, "utf8")).toBe("preserve while active\n");
+  });
+
   it("rejects non-loopback ownership claims before creating runtime files", async () => {
     const fixture = await createFixture();
 
@@ -228,10 +325,14 @@ describe("CodexLauncher", () => {
       "on-request",
       "--no-alt-screen",
     ]);
-    expect(runner.request?.environment.CODEX_HOME).toBe(fixture.codexHome);
+    expect(runner.request?.environment.CODEX_HOME).toBe(
+      join(fixture.codexHome, "providers", "router"),
+    );
     expect(runner.request?.environment.PATH).toBe("test-path");
     expect(Object.values(runner.request?.environment ?? {})).toContain("secret-value");
-    await expect(access(join(fixture.codexHome, `providerdock-${sessionId}.config.toml`))).rejects.toThrow();
+    await expect(
+      access(join(fixture.codexHome, "providers", "router", `providerdock-${sessionId}.config.toml`)),
+    ).rejects.toThrow();
   });
 
   it("cleans the temporary profile when process start fails", async () => {
@@ -246,7 +347,7 @@ describe("CodexLauncher", () => {
       "spawn failed",
     );
     await expect(
-      access(join(fixture.codexHome, `providerdock-${sessionId}.config.toml`)),
+      access(join(fixture.codexHome, "providers", "router", `providerdock-${sessionId}.config.toml`)),
     ).rejects.toThrow();
     await expect(access(join(fixture.runtimeRoot, sessionId))).rejects.toThrow();
   });
@@ -383,6 +484,7 @@ describe("CodexLauncher", () => {
 async function createFixture(
   isProcessAlive: (pid: number) => boolean = () => false,
   isBridgeAlive: (baseUrl: string) => Promise<boolean> = async () => true,
+  retainedSessionsPerProvider?: number,
 ) {
   const root = await mkdtemp(join(tmpdir(), "provider-dock-codex-runtime-"));
   const codexHome = join(root, "codex-home");
@@ -395,12 +497,26 @@ async function createFixture(
     codexHome,
     runtimeRoot,
     secrets: new MemorySecretStore({ API_KEY: "secret-value" }),
+    ...(retainedSessionsPerProvider === undefined
+      ? {}
+      : { retainedSessionsPerProvider }),
     randomId: () => sessionId,
     now: () => new Date("2026-08-29T00:00:00.000Z"),
     isProcessAlive,
     isBridgeAlive,
   });
   return { root, codexHome, runtimeRoot, projectDirectory, manager };
+}
+
+async function setModifiedTimes(
+  files: readonly (readonly [path: string, isoTimestamp: string])[],
+): Promise<void> {
+  await Promise.all(
+    files.map(async ([path, isoTimestamp]) => {
+      const modifiedAt = new Date(isoTimestamp);
+      await utimes(path, modifiedAt, modifiedAt);
+    }),
+  );
 }
 
 function runtimeInput(projectDirectory: string) {

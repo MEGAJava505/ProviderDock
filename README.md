@@ -72,7 +72,8 @@ Phase 6 advanced features. The current core provides:
 The local web dashboard includes a searchable model storefront across providers, manual
 tariff editing and per-model streaming/tool checks. Bundle import/export, arbitrary
 Doctor levels and plugin inventory also remain available in the CLI. Codex `auto` routes
-and Claude Code sessions use managed compatibility bridges.
+and Claude Code sessions use managed compatibility bridges and provider-scoped retained
+agent histories.
 
 Russian implementation notes: [stability fixes and limits](./docs/stability-update-ru.md).
 New API account connections can read wallets and daily check-in status using separate
