@@ -37,9 +37,6 @@ export function translateChatResponseToAnthropic(
   const stopReason = mapStopReason(choice.finish_reason);
   const content: Record<string, unknown>[] = [];
   const reasoning = firstString(message.reasoning_content, message.reasoning);
-  if (reasoning !== undefined && reasoning !== "") {
-    content.push({ type: "thinking", thinking: reasoning, signature: "" });
-  }
 
   const parsedContent = parseAssistantContent(message.content);
   const refusal = [
@@ -61,6 +58,16 @@ export function translateChatResponseToAnthropic(
   }
   if (stopReason !== "tool_use" && toolCalls.length > 0) {
     throw protocolError("Chat provider returned tool calls with a non-tool finish reason.");
+  }
+  if (
+    content.length === 0 &&
+    reasoning !== undefined &&
+    reasoning !== ""
+  ) {
+    // Chat reasoning fields do not carry the encrypted Anthropic signature
+    // required for a real thinking block. Use them only as a last-resort text
+    // response when the provider returned no normal text or tool call.
+    content.push({ type: "text", text: reasoning });
   }
   if (content.length === 0) {
     throw new AnthropicTranslationError(
@@ -108,11 +115,17 @@ export function mapStopReason(value: unknown): string {
 export function mapUsage(usage: unknown): Record<string, unknown> {
   if (!isRecord(usage)) return { input_tokens: 0, output_tokens: 0 };
   const promptDetails = isRecord(usage.prompt_tokens_details) ? usage.prompt_tokens_details : {};
+  const promptTokens = nonNegativeInteger(usage.prompt_tokens);
+  const cachedTokens = Math.min(
+    promptTokens,
+    nonNegativeInteger(promptDetails.cached_tokens),
+  );
   const result: Record<string, unknown> = {
-    input_tokens: nonNegativeInteger(usage.prompt_tokens),
+    // Anthropic reports uncached, cache-read, and cache-write input classes
+    // separately; OpenAI Chat prompt_tokens includes cached tokens.
+    input_tokens: Math.max(0, promptTokens - cachedTokens),
     output_tokens: nonNegativeInteger(usage.completion_tokens),
   };
-  const cachedTokens = nonNegativeInteger(promptDetails.cached_tokens);
   if (cachedTokens > 0) result.cache_read_input_tokens = cachedTokens;
   return result;
 }

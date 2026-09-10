@@ -65,6 +65,12 @@ monotonic sequence numbers and one validated terminal event. It maps length/cont
 finishes to `response.incomplete`, and emits `response.failed` if `[DONE]` or the transport
 ends without a supported finish reason. `[DONE]` is held until this validation completes.
 
+After `finish_reason`, both Chat translators reject additional meaningful content. The
+relays allow up to one second for trailing usage, then close even if the provider omits
+EOF and `[DONE]`. A delayed usage chunk may therefore remain unavailable; termination
+must not be confused with complete billing telemetry. For Codex, missing/invalid token
+counts stay `usage: null` instead of producing fabricated zero usage.
+
 The loopback bridge now selects `/chat/completions` for Chat profiles, and the Codex
 launcher starts/stops that bridge automatically. A regression scenario verifies
 `tool_call → tool_result → final answer` across two HTTP requests with the original call

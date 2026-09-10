@@ -32,6 +32,7 @@ describe("ProviderHttpRequestBuilder", () => {
     expect(request.headers.get("content-type")).toBe("application/json");
     expect(request.headers.get("originator")).toBe("providerdock");
     expect(request.headers.get("x-api-key")).toBe("header-secret");
+    expect(request.redactionValues).toEqual(["query-secret", "header-secret"]);
   });
 
   it("fails before constructing a usable request when a secret is unavailable", async () => {

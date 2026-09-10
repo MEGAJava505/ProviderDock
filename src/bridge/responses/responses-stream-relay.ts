@@ -38,6 +38,7 @@ export async function relayResponsesStream(
   const reader = options.body.getReader();
   let sawDoneMarker = false;
   let protocolFailure = false;
+  let deliveryFailure = false;
   let clientClosed = false;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -58,8 +59,9 @@ export async function relayResponsesStream(
       const chunk = await reader.read();
       if (chunk.done) {
         for (const event of decoder.finish()) {
-          if (await processEvent(event, state, options.response, options.beforeForwardEvent)) {
-            sawDoneMarker = true;
+          const done = await processEvent(event, state, options.response, options.beforeForwardEvent);
+          if (done || state.terminalEventSeen) {
+            sawDoneMarker = done;
             finished = true;
             break;
           }
@@ -69,8 +71,9 @@ export async function relayResponsesStream(
 
       resetIdleTimer();
       for (const event of decoder.push(chunk.value)) {
-        if (await processEvent(event, state, options.response, options.beforeForwardEvent)) {
-          sawDoneMarker = true;
+        const done = await processEvent(event, state, options.response, options.beforeForwardEvent);
+        if (done || state.terminalEventSeen) {
+          sawDoneMarker = done;
           finished = true;
           await reader.cancel().catch(() => undefined);
           break;
@@ -78,6 +81,7 @@ export async function relayResponsesStream(
       }
     }
   } catch (error) {
+    deliveryFailure = true;
     clientClosed = options.response.destroyed || options.response.writableEnded;
     protocolFailure =
       error instanceof SseDecodeError || error instanceof ResponsesStreamProtocolError;
@@ -100,12 +104,13 @@ export async function relayResponsesStream(
   }
 
   const repair = state.buildTerminalRepair({
-    forceFailure: protocolFailure,
+    forceFailure: deliveryFailure,
     message: protocolFailure
       ? "Upstream sent a malformed or conflicting Responses stream event."
       : "Upstream stream ended before a terminal Responses event was received.",
   });
   if (repair !== undefined) {
+    await options.beforeForwardEvent?.(repair);
     await writeJsonEvent(options.response, repair);
   }
   if (sawDoneMarker) {

@@ -15,6 +15,8 @@ export interface RelayChatCompletionsStreamOptions {
   readonly heartbeatIntervalMs?: number;
   readonly idleTimeoutMs?: number;
   readonly maxEventCharacters?: number;
+  /** Bounded wait for trailing usage after finish_reason, even if [DONE] is missing. */
+  readonly completionDrainTimeoutMs?: number;
   readonly beforeForwardEvent?: (
     event: ResponsesStreamEventRecord,
   ) => void | Promise<void>;
@@ -43,6 +45,7 @@ export async function relayChatCompletionsStream(
   let protocolFailure = false;
   let clientClosed = false;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  let completionTimer: ReturnType<typeof setTimeout> | undefined;
 
   const resetIdleTimer = (): void => {
     if (idleTimer !== undefined) clearTimeout(idleTimer);
@@ -85,6 +88,12 @@ export async function relayChatCompletionsStream(
           seenEventIds,
           options.beforeForwardEvent,
         );
+        if (translator.generationFinished && completionTimer === undefined) {
+          completionTimer = setTimeout(() => {
+            void reader.cancel().catch(() => undefined);
+          }, options.completionDrainTimeoutMs ?? 1_000);
+          completionTimer.unref?.();
+        }
         if (outcome === "done") {
           sawDoneMarker = true;
           finished = true;
@@ -101,6 +110,7 @@ export async function relayChatCompletionsStream(
   } finally {
     stopHeartbeat();
     if (idleTimer !== undefined) clearTimeout(idleTimer);
+    if (completionTimer !== undefined) clearTimeout(completionTimer);
     reader.releaseLock();
   }
 

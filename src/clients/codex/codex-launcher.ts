@@ -1,5 +1,8 @@
-import { spawn } from "node:child_process";
+import { assertModelEnabled } from "../../core/providers/model-access.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
+import type { FallbackNotification } from "../../core/fallback/fallback-session-router.js";
+import type { ResponsesBridgeFallbackConfiguration } from "../../bridge/responses/responses-bridge-server.js";
+import { spawnAgentTerminalProcess } from "../agent-terminal-process.js";
 import {
   CodexRuntimeConfigurationError,
   type CodexLaunchRoute,
@@ -37,29 +40,12 @@ export interface CodexProcessRunner {
 
 export class NodeCodexProcessRunner implements CodexProcessRunner {
   async start(request: CodexProcessStartRequest): Promise<RunningCodexProcess> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(request.executable, [...request.args], {
-        cwd: request.cwd,
-        env: request.environment,
-        shell: false,
-        stdio: "inherit",
-      });
-      const exit = new Promise<CodexProcessExit>((resolveExit) => {
-        child.once("exit", (exitCode, signal) => resolveExit({ exitCode, signal }));
-      });
-      child.once("error", reject);
-      child.once("spawn", () => {
-        const pid = child.pid;
-        if (!pid) {
-          reject(new CodexRuntimeConfigurationError("Codex process started without a PID."));
-          return;
-        }
-        resolve({
-          pid,
-          wait: () => exit,
-        });
-      });
+    const terminal = spawnAgentTerminalProcess(request);
+    const exit = new Promise<CodexProcessExit>((resolveExit) => {
+      terminal.child.once("exit", (exitCode, signal) => resolveExit({ exitCode, signal }));
     });
+    const pid = await terminal.ready();
+    return { pid, wait: () => exit };
   }
 }
 
@@ -71,6 +57,13 @@ export interface LaunchCodexInput {
   readonly executable?: string;
   readonly additionalArgs?: readonly string[];
   readonly parentEnvironment?: NodeJS.ProcessEnv;
+  readonly fallback?: ResponsesBridgeFallbackConfiguration;
+  readonly onFallback?: (notification: FallbackNotification) => void;
+  readonly onStarted?: (client: "codex") => void;
+  readonly sessionInstructions?: string;
+  readonly defaultReasoningLevel?: string;
+  /** Forces the managed bridge even when the physical provider supports direct Responses. */
+  readonly forceManagedBridge?: boolean;
 }
 
 export class CodexLauncher {
@@ -86,6 +79,19 @@ export class CodexLauncher {
     if (!input.profile.enabled) {
       throw new CodexRuntimeConfigurationError(
         `Provider '${input.profile.id}' is disabled and cannot be launched.`,
+      );
+    }
+    if (!input.fallback) assertModelEnabled(input.profile, input.modelId);
+    for (const route of input.fallback?.logicalModel.routes ?? []) {
+      const profile = input.fallback?.profiles.find(item => item.id === route.providerId);
+      if (route.enabled && profile) assertModelEnabled(profile, route.modelId);
+    }
+    const disabledFallbackProfile = input.fallback?.profiles.find(
+      (profile) => !profile.enabled,
+    );
+    if (disabledFallbackProfile !== undefined) {
+      throw new CodexRuntimeConfigurationError(
+        `Fallback provider '${disabledFallbackProfile.id}' is disabled and cannot be launched.`,
       );
     }
 
@@ -119,6 +125,7 @@ export class CodexLauncher {
         },
       });
       await this.sessions.markActive(runtime, processHandle.pid);
+      input.onStarted?.("codex");
       const exit = await processHandle.wait();
       if (resolution.kind === "managed") {
         await resolution.bridge.stop();
@@ -144,6 +151,11 @@ export class CodexLauncher {
     input: LaunchCodexInput,
     sessionId: string,
   ): Promise<ResolvedCodexRoute> {
+    if (input.fallback !== undefined && input.route.kind !== "auto") {
+      throw new CodexRuntimeConfigurationError(
+        "Logical-model fallback requires the managed ProviderDock bridge (route kind 'auto').",
+      );
+    }
     if (input.route.kind === "direct") {
       return { kind: "direct", route: input.route };
     }
@@ -151,23 +163,22 @@ export class CodexLauncher {
       return { kind: "external", route: input.route };
     }
 
-    if (
-      !["auto", "openai-responses", "openai-chat-completions"].includes(
-        input.profile.apiType,
-      )
-    ) {
+    const routingProfiles = input.fallback?.profiles ?? [input.profile];
+    const unsupportedProfile = routingProfiles.find(
+      (profile) =>
+        !["auto", "openai-responses", "openai-chat-completions"].includes(
+          profile.apiType,
+        ),
+    );
+    if (unsupportedProfile !== undefined) {
       throw new CodexRuntimeConfigurationError(
-        `Automatic Codex routing cannot translate provider API type '${input.profile.apiType}' yet. ` +
+        `Automatic Codex routing cannot translate provider API type '${unsupportedProfile.apiType}' yet. ` +
           "Configure a compatible external bridge explicitly.",
       );
     }
 
-    const requiresBridge =
-      input.profile.apiType === "openai-chat-completions" ||
-      input.profile.adapterId === "agentrouter" ||
-      input.profile.auth.kind === "query" ||
-      Object.keys(input.profile.queryParameters).length > 0;
-    if (!requiresBridge) return { kind: "direct", route: { kind: "direct" } };
+    // Automatic launches always receive normalization and persistent replay protection.
+    // Explicit direct/external routes were handled above.
     if (this.bridges === undefined) {
       throw new CodexRuntimeConfigurationError(
         `Provider '${input.profile.id}' requires a managed Responses bridge, but no bridge factory is configured.`,
@@ -178,6 +189,14 @@ export class CodexLauncher {
       profile: input.profile,
       modelId: input.modelId,
       sessionId,
+      ...(input.fallback === undefined ? {} : { fallback: input.fallback }),
+      ...(input.onFallback === undefined ? {} : { onFallback: input.onFallback }),
+      ...(input.sessionInstructions === undefined
+        ? {}
+        : { sessionInstructions: input.sessionInstructions }),
+      ...(input.defaultReasoningLevel === undefined
+        ? {}
+        : { defaultReasoningLevel: input.defaultReasoningLevel }),
     });
     try {
       const address = await bridge.start();

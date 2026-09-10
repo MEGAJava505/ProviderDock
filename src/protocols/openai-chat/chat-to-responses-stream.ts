@@ -81,6 +81,10 @@ export class ChatToResponsesStreamTranslator {
     return this.terminal;
   }
 
+  get generationFinished(): boolean {
+    return this.finishReason != null;
+  }
+
   get terminalEventType():
     | "response.completed"
     | "response.failed"
@@ -108,6 +112,7 @@ export class ChatToResponsesStreamTranslator {
     if (chunk.choices.length === 0) return events;
 
     const choice = requireRecord(chunk.choices[0], "Chat stream choice must be an object.");
+    const previouslyFinished = this.finishReason != null;
     if (choice.finish_reason !== undefined && choice.finish_reason !== null) {
       if (
         this.finishReason !== undefined &&
@@ -123,6 +128,10 @@ export class ChatToResponsesStreamTranslator {
       : isRecord(choice.message)
         ? choice.message
         : {};
+    if (previouslyFinished && Object.values(delta).some((value) =>
+      value != null && value !== "" && !(Array.isArray(value) && value.length === 0))) {
+      throw protocolError("Chat stream sent more content after finish_reason.");
+    }
     if (delta.role !== undefined && delta.role !== "assistant") {
       throw protocolError("Chat stream delta role must be assistant.");
     }

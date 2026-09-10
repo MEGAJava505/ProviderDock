@@ -23,7 +23,21 @@ export const providerAdapterIds = [
   "gorouter",
   "custom",
 ] as const;
-export const providerAdapterIdSchema = z.enum(providerAdapterIds);
+export const pluginAdapterIdPattern =
+  /^plugin:[a-z0-9][a-z0-9_-]{0,63}\/[a-z0-9][a-z0-9_-]{0,63}$/;
+export const providerAdapterIdSchema = z.union([
+  z.enum(providerAdapterIds),
+  z
+    .string()
+    .regex(
+      pluginAdapterIdPattern,
+      "Plugin adapter IDs must use plugin:PLUGIN_ID/ADAPTER_ID.",
+    ),
+]);
+
+export function parseProviderAdapterId(value: unknown): string {
+  return providerAdapterIdSchema.parse(value);
+}
 
 export const secretReferenceSchema = z
   .string()
@@ -116,6 +130,34 @@ export const healthCheckPolicySchema = z
   })
   .strict();
 
+const pricePerMillionSchema = z
+  .number()
+  .finite()
+  .nonnegative()
+  .max(1_000_000);
+
+export const modelTokenPricingSchema = z
+  .object({
+    currency: z
+      .string()
+      .trim()
+      .regex(/^(?:[A-Z]{3}|USDT)$/, "Use an uppercase currency code or USDT.")
+      .default("USD"),
+    inputPerMillion: pricePerMillionSchema,
+    outputPerMillion: pricePerMillionSchema,
+    cacheReadInputPerMillion: pricePerMillionSchema.optional(),
+    cacheWriteInputPerMillion: pricePerMillionSchema.optional(),
+    webSearchPerThousand: pricePerMillionSchema.optional(),
+  })
+  .strict();
+
+export type ModelTokenPricing = z.infer<typeof modelTokenPricingSchema>;
+
+const modelPricingRecordSchema = z.record(
+  z.string().min(1).max(256),
+  modelTokenPricingSchema,
+);
+
 export const providerProfileSchema = z
   .object({
     id: z
@@ -142,8 +184,10 @@ export const providerProfileSchema = z
     queryParameters: queryParameterRecordSchema.default({}),
     modelsEndpoint: z.string().trim().min(1).max(2_048).default("models"),
     manualModelIds: z.array(z.string().trim().min(1).max(256)).max(1_000).default([]),
+    disabledModelIds: z.array(z.string().trim().min(1).max(256)).max(5_000).default([]),
+    modelPricing: modelPricingRecordSchema.default({}),
     preferredClient: preferredClientSchema.default("auto"),
-    timeoutMs: z.number().int().min(250).max(300_000).default(10_000),
+    timeoutMs: z.number().int().min(250).max(300_000).default(120_000),
     healthCheck: healthCheckPolicySchema.default({}),
   })
   .strict()

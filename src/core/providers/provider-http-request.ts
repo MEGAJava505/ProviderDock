@@ -10,6 +10,8 @@ export interface BuildProviderRequestOptions {
 export interface BuiltProviderRequest {
   readonly url: URL;
   readonly headers: Headers;
+  /** In-memory only; pass to the central error redactor and never serialize. */
+  readonly redactionValues: readonly string[];
 }
 
 /** Builds an upstream request without persisting secret values in provider profiles. */
@@ -22,11 +24,24 @@ export class ProviderHttpRequestBuilder {
     options: BuildProviderRequestOptions = {},
   ): Promise<BuiltProviderRequest> {
     const base = profile.baseUrl.endsWith("/") ? profile.baseUrl : `${profile.baseUrl}/`;
-    const url = new URL(endpoint, base);
+    const baseUrl = new URL(base);
+    const url = new URL(endpoint, baseUrl);
+    if (url.origin !== baseUrl.origin) {
+      throw new ProviderRequestError(
+        "INVALID_REQUEST",
+        "Provider endpoint must remain on the configured base URL origin.",
+      );
+    }
     const headers = new Headers({
       Accept: options.accept ?? "application/json",
       ...profile.staticHeaders,
     });
+    const redactionValues: string[] = [];
+    const requireSensitiveValue = async (reference: string): Promise<string> => {
+      const value = await this.requireSecret(reference);
+      if (!redactionValues.includes(value)) redactionValues.push(value);
+      return value;
+    };
 
     if (options.contentType !== undefined) {
       headers.set("Content-Type", options.contentType);
@@ -39,22 +54,22 @@ export class ProviderHttpRequestBuilder {
     if (profile.auth.kind === "bearer") {
       headers.set(
         "Authorization",
-        `Bearer ${await this.requireSecret(profile.auth.secretRef)}`,
+        `Bearer ${await requireSensitiveValue(profile.auth.secretRef)}`,
       );
     } else if (profile.auth.kind === "header") {
-      headers.set(profile.auth.headerName, await this.requireSecret(profile.auth.secretRef));
+      headers.set(profile.auth.headerName, await requireSensitiveValue(profile.auth.secretRef));
     } else if (profile.auth.kind === "query") {
       url.searchParams.set(
         profile.auth.parameterName,
-        await this.requireSecret(profile.auth.secretRef),
+        await requireSensitiveValue(profile.auth.secretRef),
       );
     }
 
     for (const [headerName, secretRef] of Object.entries(profile.secretHeaders)) {
-      headers.set(headerName, await this.requireSecret(secretRef));
+      headers.set(headerName, await requireSensitiveValue(secretRef));
     }
 
-    return { url, headers };
+    return { url, headers, redactionValues };
   }
 
   private async requireSecret(reference: string): Promise<string> {

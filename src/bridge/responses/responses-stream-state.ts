@@ -1,3 +1,5 @@
+import { normalizeResponsesResponse, type ResponsesTerminalStatus } from "../../protocols/openai-responses/response-normalization.js";
+
 export type JsonRecord = Record<string, unknown>;
 
 export type StreamEventObservation =
@@ -82,6 +84,10 @@ export class ResponsesStreamState {
     }
 
     if (isRecord(event.response)) {
+      if (this.responseSnapshot?.id !== undefined && event.response.id !== undefined &&
+        event.response.id !== this.responseSnapshot.id) {
+        throw new ResponsesStreamProtocolError("Responses stream changed response id between events.");
+      }
       this.responseSnapshot = { ...this.responseSnapshot, ...event.response };
     }
 
@@ -91,6 +97,11 @@ export class ResponsesStreamState {
       this.rememberItemIndex(event.item, index);
     } else if (event.type === "response.output_item.done" && event.item !== undefined) {
       const index = this.resolveOutputIndex(event);
+      const previous = this.completedOutputItems.get(index);
+      if (previous !== undefined) {
+        if (JSON.stringify(previous) === JSON.stringify(event.item)) return { kind: "duplicate" };
+        throw new ResponsesStreamProtocolError("Responses stream changed an already completed output item.");
+      }
       this.pendingOutputIndexes.delete(index);
       this.completedOutputItems.set(index, event.item);
       this.rememberItemIndex(event.item, index);
@@ -114,7 +125,7 @@ export class ResponsesStreamState {
     let forwarded = event;
     if (event.type === "response.completed" && isRecord(event.response)) {
       const output = event.response.output;
-      if (Array.isArray(output) && output.length === 0 && this.completedOutputItems.size > 0) {
+      if ((output === undefined || (Array.isArray(output) && output.length === 0)) && this.completedOutputItems.size > 0) {
         forwarded = {
           ...event,
           response: {
@@ -127,6 +138,19 @@ export class ResponsesStreamState {
     }
 
     if (terminalType) {
+      try {
+        forwarded = {
+          ...forwarded,
+          response: normalizeResponsesResponse(
+            { ...this.responseSnapshot, ...(forwarded.response as JsonRecord) },
+            String(event.type).slice("response.".length) as ResponsesTerminalStatus,
+          ),
+        };
+      } catch (error) {
+        throw new ResponsesStreamProtocolError(
+          error instanceof Error ? error.message : "Invalid terminal response.", { cause: error },
+        );
+      }
       this.terminal = true;
       this.terminalType = event.type as
         | "response.completed"
@@ -138,30 +162,28 @@ export class ResponsesStreamState {
   }
 
   buildTerminalRepair(options: BuildTerminalRepairOptions = {}): JsonRecord | undefined {
-    if (this.terminal) return undefined;
+    if (this.terminal && options.forceFailure !== true) return undefined;
 
-    const output = this.completedOutput();
-    const canComplete =
-      options.forceFailure !== true && output.length > 0 && this.pendingOutputIndexes.size === 0;
-    const type = canComplete ? "response.completed" : "response.failed";
+    // Done items, EOF and [DONE] do not prove that all response items arrived.
+    // A forced failure also handles a terminal event rejected before delivery.
+    const type = "response.failed";
     const message =
       options.message ?? "Upstream stream ended before a terminal Responses event was received.";
     const response: JsonRecord = {
       ...this.responseSnapshot,
       id: this.responseSnapshot?.id ?? this.responseIdFactory(),
       object: "response",
-      status: canComplete ? "completed" : "failed",
-      completed_at: Math.floor(this.now() / 1_000),
-      output,
-      error: canComplete
-        ? null
-        : {
-            code: "INCOMPLETE_RESPONSE",
-            type: "providerdock_incomplete_response",
-            message,
-          },
+      status: "failed",
+      output: [],
+      usage: null,
+      error: {
+        code: "INCOMPLETE_RESPONSE",
+        type: "providerdock_incomplete_response",
+        message,
+      },
       incomplete_details: null,
     };
+    delete response.completed_at;
 
     this.terminal = true;
     this.terminalType = type;

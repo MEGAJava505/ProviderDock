@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { normalizeOpenAiUsage } from "../openai-responses/response-normalization.js";
 import {
   ProviderRequestError,
   type NormalizedErrorType,
@@ -110,32 +111,15 @@ export function translateChatResponseToResponses(
   return { response, terminalEventType: terminal.type };
 }
 
-export function normalizeChatUsage(value: unknown): Readonly<Record<string, unknown>> {
-  const usage = isRecord(value) ? value : {};
-  const promptDetails = isRecord(usage.prompt_tokens_details)
-    ? usage.prompt_tokens_details
-    : isRecord(usage.input_tokens_details)
-      ? usage.input_tokens_details
-      : {};
-  const completionDetails = isRecord(usage.completion_tokens_details)
-    ? usage.completion_tokens_details
-    : isRecord(usage.output_tokens_details)
-      ? usage.output_tokens_details
-      : {};
-  const inputTokens = nonNegativeInteger(usage.input_tokens, usage.prompt_tokens, 0);
-  const outputTokens = nonNegativeInteger(usage.output_tokens, usage.completion_tokens, 0);
-  const totalTokens = nonNegativeInteger(usage.total_tokens, inputTokens + outputTokens);
-
+export function normalizeChatUsage(value: unknown): Readonly<Record<string, unknown>> | null {
+  const usage = normalizeOpenAiUsage(value);
+  if (usage === null) return null;
   return {
-    input_tokens: inputTokens,
-    input_tokens_details: {
-      cached_tokens: nonNegativeInteger(promptDetails.cached_tokens, 0),
-    },
-    output_tokens: outputTokens,
-    output_tokens_details: {
-      reasoning_tokens: nonNegativeInteger(completionDetails.reasoning_tokens, 0),
-    },
-    total_tokens: totalTokens,
+    input_tokens: usage.input_tokens,
+    input_tokens_details: usage.input_tokens_details,
+    output_tokens: usage.output_tokens,
+    output_tokens_details: usage.output_tokens_details,
+    total_tokens: usage.total_tokens,
   };
 }
 
@@ -410,13 +394,6 @@ function toResponseId(upstreamId: string): string {
 
 export function deterministicItemId(prefix: string, ...parts: readonly string[]): string {
   return `${prefix}_${createHash("sha256").update(parts.join("\0"), "utf8").digest("hex").slice(0, 24)}`;
-}
-
-function nonNegativeInteger(...values: readonly unknown[]): number {
-  for (const value of values) {
-    if (isNonNegativeInteger(value)) return value;
-  }
-  return 0;
 }
 
 function firstString(...values: readonly unknown[]): string | undefined {

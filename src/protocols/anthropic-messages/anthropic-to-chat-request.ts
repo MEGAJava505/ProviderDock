@@ -75,12 +75,14 @@ export function translateAnthropicRequestToChat(
     body.user = request.metadata.user_id;
   }
 
-  if (request.thinking !== undefined) {
-    throw translationError(
-      "UNSUPPORTED_FEATURE",
-      "Anthropic extended-thinking configuration cannot be translated safely to generic Chat Completions.",
-    );
-  }
+  // `thinking` and `output_config` are Anthropic-only request controls and
+  // have no portable Chat Completions equivalent. Generic OpenAI-compatible
+  // providers vary widely here: some enable reasoning through the model id
+  // (for example a `-thinking` suffix), some expose `reasoning_content`, and
+  // others reject unknown reasoning fields. Omit the controls instead of
+  // rejecting the whole Claude Code request or guessing a vendor extension.
+  // Assistant thinking history is still preserved as `reasoning_content` by
+  // translateAssistantBlocks above.
 
   return {
     chatRequest: body,
@@ -116,10 +118,17 @@ function parseSystem(value: unknown): string | undefined {
 function translateMessage(rawMessage: unknown, index: number): Record<string, unknown>[] {
   const message = requireRecord(rawMessage, `Anthropic message ${index} must be an object.`);
   const role = message.role;
+  // Current coding clients may put instruction turns in the messages array
+  // instead of the top-level Anthropic `system` field. Normalize both aliases
+  // for OpenAI-compatible providers instead of rejecting the whole session.
+  if (role === "system" || role === "developer") {
+    const content = parseSystem(message.content);
+    return content === undefined ? [] : [{ role: "system", content }];
+  }
   if (role !== "user" && role !== "assistant") {
     throw translationError(
       "INVALID_REQUEST",
-      `Anthropic message ${index} role must be 'user' or 'assistant'.`,
+      `Anthropic message ${index} has unsupported role '${String(role)}'.`,
     );
   }
 

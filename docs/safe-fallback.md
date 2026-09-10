@@ -65,10 +65,60 @@ configurable failure threshold and cooldown. Exactly one HALF_OPEN probe is
 admitted; concurrent probes are blocked. Keys may represent either a provider
 or a provider/model pair, allowing separate breaker scopes.
 
+## Responses bridge and Codex integration
+
+`providerdock launch codex --logical-model ID --project DIRECTORY` resolves the
+enabled routes and provider profiles, starts one managed loopback Responses
+bridge, and exposes only the logical-model ID to Codex. Each upstream attempt
+rewrites that ID to the route's provider-specific model ID and may use either
+native Responses or the existing Chat Completions translation path.
+
+The bridge can select another unused healthy route only when it has evidence of
+a safe boundary:
+
+- a proven connection-establishment failure;
+- an explicit request rejection such as HTTP 401/403/404/429/501/503;
+- a continuation whose complete tool call/result history is retained.
+
+Connection resets with unknown execution state, ambiguous gateway errors, partial
+streams, and unresolved tool histories never trigger a second upstream request.
+Fallback responses identify the active provider and switch in
+`x-providerdock-*` headers. `/health` retains the stable primary bridge identity
+for crash recovery and reports `active_provider_id`, the sticky route snapshot,
+and the last fallback notification. The CLI prints every switch to stderr.
+
+## Anthropic bridge and Claude Code integration
+
+`providerdock launch claude --logical-model ID --project DIRECTORY` uses the
+same provider-independent fallback policy through Claude Code's managed
+Anthropic Messages bridge. Claude sees only the logical-model ID in
+`ANTHROPIC_MODEL`; every upstream attempt rewrites it to that route's physical
+model ID.
+
+Routes may mix native `anthropic-messages` providers with `auto` or
+`openai-chat-completions` providers. Native routes preserve Anthropic headers
+and relay `/messages`; Chat routes use the existing validated
+Messages-to-Chat request and Chat-to-Messages response/SSE translators.
+Explicit `openai-responses` routes remain unsupported because no safe
+Anthropic-to-Responses translator exists.
+
+The Claude bridge applies the same fail-closed boundaries as the Responses
+bridge: proven connection-establishment failures and explicit safe HTTP
+rejections may select another route, while ambiguous transport/gateway state,
+header timeouts, unresolved tool history, and any failure after response
+headers/output never cause replay. Complete `tool_use`/`tool_result` history
+can continue on the selected route. Route and fallback diagnostics are exposed
+through `x-providerdock-*` headers and `/health`, and the CLI prints switches
+to stderr.
+
 ## Current integration boundary
 
-The policy, state machine, schemas, persistent logical-model configuration, and
-CLI controls are complete. HTTP bridge route execution, runtime session wiring,
-UI controls, and user-visible fallback events are the next Phase 4 integration
-blocks. Until that wiring lands, existing single-provider bridges still perform
-no automatic fallback.
+The Phase 4 routing core, persisted logical models, managed Codex and Claude
+bridge routing, route-specific protocol translation, safe pre-output fallback,
+sticky sessions, circuit breakers, continuation barriers, and CLI
+notifications are connected. Existing single-provider bridge launches still
+make exactly one upstream attempt.
+
+Remaining Phase 4 work includes richer session/UI event storage, persisted
+circuit/route diagnostics across a bridge-process crash, and the production UI
+for interactive route/fallback visibility.

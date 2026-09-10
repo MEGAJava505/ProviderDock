@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   CodexLauncher,
   CodexRuntimeSessionManager,
+  MemoryLogicalModelRepository,
   MemoryProviderProfileRepository,
   MemorySecretStore,
   ProviderAdapterRegistry,
@@ -12,6 +13,8 @@ import {
   ProviderProbeService,
   runProviderDockCli,
   type CliIo,
+  type CodexBridgeFactory,
+  type CreateCodexBridgeInput,
   type CodexProcessRunner,
   type CodexProcessStartRequest,
 } from "../src/index.js";
@@ -56,10 +59,115 @@ describe("Codex management CLI", () => {
       cwd: fixture.projectDirectory,
       args: ["--strict-config", "--profile", `providerdock-${sessionId}`],
     });
-    expect(Object.values(fixture.runner.request?.environment ?? {})).toContain("secret-value");
+    expect(Object.values(fixture.runner.request?.environment ?? {})).not.toContain("secret-value");
+    expect(fixture.bridges.input?.profile.id).toBe("router");
 
     const recovery = await runCli(fixture.application, ["recover", "codex"]);
     expect(recovery).toMatchObject({ code: 0, stdout: ["No stale Codex sessions found."] });
+  });
+
+  it("launches a logical model through the managed fallback bridge and reports switches", async () => {
+    const fixture = await createCliFixture();
+    for (const id of ["primary", "secondary"]) {
+      await fixture.application.setProvider({
+        id,
+        displayName: id,
+        baseUrl: `https://${id}.example.test/v1`,
+        apiType: "openai-responses",
+      });
+    }
+    await fixture.application.setLogicalModel({
+      id: "logical-x",
+      routes: [
+        { providerId: "primary", modelId: "primary-model", priority: 100 },
+        { providerId: "secondary", modelId: "secondary-model", priority: 90 },
+      ],
+    });
+
+    const result = await runCli(fixture.application, [
+      "launch",
+      "codex",
+      "--logical-model",
+      "logical-x",
+      "--project",
+      fixture.projectDirectory,
+    ]);
+
+    expect(result).toMatchObject({
+      code: 0,
+      stdout: ["Codex session finished with exit code 0."],
+      stderr: [
+        "ProviderDock fallback: primary/primary-model -> secondary/secondary-model (NETWORK_ERROR).",
+      ],
+    });
+    expect(fixture.bridges.input).toMatchObject({
+      modelId: "logical-x",
+      fallback: {
+        logicalModel: { id: "logical-x" },
+        profiles: [{ id: "primary" }, { id: "secondary" }],
+      },
+    });
+    expect(fixture.bridges.stopCount).toBe(1);
+  });
+
+  it("launches project defaults with injected instructions, reasoning, flags, and fallback", async () => {
+    const fixture = await createCliFixture();
+    for (const id of ["primary", "secondary"]) {
+      await fixture.application.setProvider({
+        id,
+        displayName: id,
+        baseUrl: `https://${id}.example.test/v1`,
+        apiType: "openai-responses",
+      });
+    }
+    await fixture.application.setLogicalModel({
+      id: "logical-x",
+      routes: [
+        { providerId: "primary", modelId: "primary-model", priority: 100 },
+        { providerId: "secondary", modelId: "secondary-model", priority: 90 },
+      ],
+    });
+    await fixture.application.setPromptProfile({
+      id: "practical",
+      name: "Practical Coding",
+      instructions: "Inspect the implementation before changing it.",
+      preferredLogicalModelId: "logical-x",
+      preferredClient: "codex",
+      reasoningLevel: "xhigh",
+      fallbackPolicy: "logical-model",
+      clientFlags: { codex: ["--no-alt-screen"] },
+    });
+    await fixture.application.setProjectProfile({
+      projectDirectory: fixture.projectDirectory,
+      promptProfileId: "practical",
+    });
+
+    const result = await runCli(fixture.application, [
+      "launch",
+      "codex",
+      "--project",
+      fixture.projectDirectory,
+    ]);
+
+    expect(result).toMatchObject({
+      code: 0,
+      stdout: ["Codex session finished with exit code 0."],
+      stderr: [
+        "ProviderDock fallback: primary/primary-model -> secondary/secondary-model (NETWORK_ERROR).",
+      ],
+    });
+    expect(fixture.bridges.input).toMatchObject({
+      modelId: "logical-x",
+      sessionInstructions: "Inspect the implementation before changing it.",
+      defaultReasoningLevel: "xhigh",
+      fallback: { logicalModel: { id: "logical-x" } },
+    });
+    expect(fixture.runner.request?.args).toEqual([
+      "--strict-config",
+      "--profile",
+      `providerdock-${sessionId}`,
+      "--no-alt-screen",
+    ]);
   });
 });
 
@@ -77,13 +185,18 @@ async function createCliFixture() {
     isProcessAlive: () => false,
   });
   const runner = new FakeProcessRunner();
+  const bridges = new RecordingBridgeFactory();
   const application = new ProviderDockApplication(
     new MemoryProviderProfileRepository(),
     new ProviderProbeService(new ProviderAdapterRegistry()),
     secrets,
-    new CodexLauncher(sessions, runner),
+    new CodexLauncher(sessions, runner, bridges),
+    undefined,
+    undefined,
+    undefined,
+    new MemoryLogicalModelRepository(),
   );
-  return { application, runner, projectDirectory };
+  return { application, runner, bridges, projectDirectory };
 }
 
 async function runCli(
@@ -107,5 +220,39 @@ class FakeProcessRunner implements CodexProcessRunner {
   async start(request: CodexProcessStartRequest) {
     this.request = request;
     return { pid: 5432, wait: async () => ({ exitCode: 0, signal: null }) };
+  }
+}
+
+class RecordingBridgeFactory implements CodexBridgeFactory {
+  input: CreateCodexBridgeInput | undefined;
+  stopCount = 0;
+
+  create(input: CreateCodexBridgeInput) {
+    this.input = input;
+    return {
+      start: async () => {
+        const [from, to] = input.fallback?.logicalModel.routes ?? [];
+        if (from !== undefined && to !== undefined) {
+          input.onFallback?.({
+            kind: "FALLBACK",
+            logicalModelId: input.fallback?.logicalModel.id ?? input.modelId,
+            from,
+            to,
+            errorType: "NETWORK_ERROR",
+            phase: "connection-failed",
+            message: "Primary connection failed.",
+          });
+        }
+        return {
+          host: "127.0.0.1" as const,
+          port: 45678,
+          url: "http://127.0.0.1:45678",
+          baseUrl: "http://127.0.0.1:45678/v1",
+        };
+      },
+      stop: async () => {
+        this.stopCount += 1;
+      },
+    };
   }
 }

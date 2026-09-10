@@ -158,6 +158,7 @@ export class CodexRuntimeSessionManager {
     const built = await this.configFactory.build({
       profile: input.profile,
       modelId: input.modelId,
+      projectDirectory: input.projectDirectory,
       route: input.route,
       sessionId,
     });
@@ -325,7 +326,10 @@ export class CodexRuntimeSessionManager {
       if (isNodeError(error) && error.code === "ENOENT") return;
       throw error;
     }
-    if (sha256(contents) !== manifest.profileSha256) {
+    if (
+      sha256(contents) !== manifest.profileSha256 &&
+      !isLegacyCodexTrustAppend(manifest, contents)
+    ) {
       throw new CodexRuntimeConfigurationError(
         `Temporary Codex profile '${basename(profilePath)}' changed after creation; it was not removed.`,
       );
@@ -398,6 +402,36 @@ function manifestBridgeDiagnostics(
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function isLegacyCodexTrustAppend(
+  manifest: CodexRuntimeManifest,
+  contents: string,
+): boolean {
+  const match = /\n\[projects\.(?:'([^'\r\n]*)'|("(?:\\.|[^"\\])*"))\]\ntrust_level = "trusted"\n?$/.exec(
+    contents,
+  );
+  if (!match || sha256(contents.slice(0, match.index)) !== manifest.profileSha256) {
+    return false;
+  }
+
+  let projectDirectory: string;
+  try {
+    projectDirectory = match[1] ?? JSON.parse(match[2] ?? "");
+  } catch {
+    return false;
+  }
+  return sameProjectDirectory(projectDirectory, manifest.projectDirectory);
+}
+
+function sameProjectDirectory(left: string, right: string): boolean {
+  const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "");
+  const normalizedLeft = normalize(left);
+  const normalizedRight = normalize(right);
+  const windowsPaths = /^[a-z]:\//i.test(normalizedLeft) && /^[a-z]:\//i.test(normalizedRight);
+  return windowsPaths
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
 }
 
 function defaultIsProcessAlive(pid: number): boolean {

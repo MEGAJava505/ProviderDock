@@ -5,6 +5,16 @@ import {
 } from "../src/index.js";
 
 describe("ResponsesStreamState", () => {
+  it("suppresses repeated done items without sequence IDs and rejects conflicting items", () => {
+    const state = new ResponsesStreamState();
+    const done = { type: "response.output_item.done", output_index: 0, item: {
+      id: "fc-once", type: "function_call", call_id: "call-once", name: "lookup", arguments: "{}", status: "completed",
+    } };
+    expect(state.observe(done).kind).toBe("forward");
+    expect(state.observe(done).kind).toBe("duplicate");
+    expect(() => state.observe({ ...done, item: { ...done.item, arguments: '{"changed":true}' } })).toThrow(/already completed/);
+  });
+
   it("repairs an empty completed response from completed output items", () => {
     const state = new ResponsesStreamState({ now: () => 5_000 });
     state.observe({
@@ -37,7 +47,7 @@ describe("ResponsesStreamState", () => {
     expect(state.buildTerminalRepair()).toBeUndefined();
   });
 
-  it("synthesizes success only when every observed output item is completed", () => {
+  it("does not infer response completion from completed items at EOF", () => {
     const complete = new ResponsesStreamState({
       now: () => 10_000,
       responseIdFactory: () => "resp-generated",
@@ -50,9 +60,9 @@ describe("ResponsesStreamState", () => {
     });
 
     expect(complete.buildTerminalRepair()).toMatchObject({
-      type: "response.completed",
+      type: "response.failed",
       sequence_number: 5,
-      response: { id: "resp-generated", status: "completed" },
+      response: { id: "resp-generated", status: "failed", output: [] },
     });
 
     const pending = new ResponsesStreamState({ responseIdFactory: () => "resp-pending" });

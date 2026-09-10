@@ -90,7 +90,10 @@ export class ProviderProbeService {
             appliedFixes,
           ),
           errorType: normalized.type,
-          errorMessage: normalized.message,
+          errorMessage:
+            normalized.sanitizedDetail === undefined
+              ? normalized.message
+              : `${normalized.message} ${normalized.sanitizedDetail}`,
           ...(normalized.httpStatus === undefined ? {} : { httpStatus: normalized.httpStatus }),
         },
         models: mergeModelCatalog(profile, []),

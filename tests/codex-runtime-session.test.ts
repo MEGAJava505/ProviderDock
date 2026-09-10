@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { access, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -88,6 +89,30 @@ describe("CodexRuntimeSessionManager", () => {
     expect(outcomes[0]).toMatchObject({ sessionId, status: "CONFLICT" });
     expect(await readFile(runtime.profilePath, "utf8")).toBe("user changed this file\n");
     expect(await readFile(runtime.manifestPath, "utf8")).toContain(sessionId);
+  });
+
+  it("recovers a legacy profile when Codex only appended trust for the same project", async () => {
+    const fixture = await createFixture();
+    const runtime = await fixture.manager.prepare(runtimeInput(fixture.projectDirectory));
+    const current = await readFile(runtime.profilePath, "utf8");
+    const legacy = current.slice(0, current.lastIndexOf("\n[projects."));
+    const manifest = JSON.parse(await readFile(runtime.manifestPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    manifest.profileSha256 = createHash("sha256").update(legacy, "utf8").digest("hex");
+    await writeFile(runtime.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    await writeFile(
+      runtime.profilePath,
+      `${legacy}\n[projects.'${fixture.projectDirectory.toLowerCase()}']\ntrust_level = "trusted"\n`,
+      "utf8",
+    );
+
+    expect(await fixture.manager.recoverStaleSessions()).toEqual([
+      { sessionId, status: "RECOVERED" },
+    ]);
+    await expect(access(runtime.profilePath)).rejects.toThrow();
+    await expect(access(runtime.sessionDirectory)).rejects.toThrow();
   });
 
   it("does not recover a session whose recorded process is still alive", async () => {
@@ -242,6 +267,10 @@ describe("CodexLauncher", () => {
       projectDirectory: fixture.projectDirectory,
       route: { kind: "auto" },
       parentEnvironment: { PATH: "test-path" },
+      onStarted: (client) => {
+        expect(client).toBe("codex");
+        lifecycle.push("codex:ready");
+      },
     });
 
     expect(exit).toEqual({ exitCode: 0, signal: null });
@@ -250,7 +279,7 @@ describe("CodexLauncher", () => {
       modelId: "model-x",
       sessionId,
     });
-    expect(lifecycle).toEqual(["bridge:start", "codex:start", "codex:wait", "bridge:stop"]);
+    expect(lifecycle).toEqual(["bridge:start", "codex:start", "codex:ready", "codex:wait", "bridge:stop"]);
     expect(runner.configContents).toContain('base_url = "http://127.0.0.1:45678/v1"');
     expect(runner.configContents).not.toContain("secret-value");
     expect(Object.values(runner.request?.environment ?? {})).not.toContain("secret-value");

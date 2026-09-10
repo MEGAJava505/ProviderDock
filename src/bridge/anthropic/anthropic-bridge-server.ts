@@ -1,3 +1,6 @@
+import type { ModelProtocolResolver } from "../../core/providers/model-protocol.js";
+import { assertModelEnabled, ModelDisabledError, type ModelAccessCheck } from "../../core/providers/model-access.js";
+import { chatRequestToResponses, responsesTransportToChat } from "./responses-transport.js";
 import {
   createServer,
   type IncomingMessage,
@@ -5,20 +8,38 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import {
   normalizeHttpStatus,
+  providerErrorGuidance,
   ProviderRequestError,
   type NormalizedErrorType,
 } from "../../core/errors/provider-error.js";
+import {
+  fallbackFailurePhaseForHttpStatus,
+  isConnectionEstablishmentFailure,
+} from "../../core/fallback/fallback-failure-policy.js";
+import {
+  FallbackSessionRouter,
+  type FallbackFailure,
+  type FallbackFailurePhase,
+  type FallbackNotification,
+} from "../../core/fallback/fallback-session-router.js";
+import {
+  logicalRouteKey,
+  type LogicalModelRoute,
+} from "../../core/fallback/logical-model.js";
+import type { ProviderFallbackConfiguration } from "../../core/fallback/provider-fallback-configuration.js";
 import { ProviderHttpRequestBuilder } from "../../core/providers/provider-http-request.js";
 import type { ProviderAdapterRegistry } from "../../core/providers/provider-adapter-registry.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
+import { sanitizeProviderErrorBody } from "../../core/security/provider-error-redaction.js";
 import {
   TurnLedgerViolationError,
   extractAnthropicDeliveredToolCalls,
   extractAnthropicTurnSignature,
+  type TurnSignature,
   type TurnToken,
 } from "../../core/state-machine/turn-ledger.js";
 import {
@@ -27,17 +48,32 @@ import {
   type TurnLedgerStore,
 } from "../../core/state-machine/persistent-turn-ledger.js";
 import { SseDecodeError, SseDecoder, encodeSseEvent } from "../sse/sse-decoder.js";
-import { isBridgePortAllowed } from "../responses/responses-bridge-server.js";
+import { isLoopbackPortAllowed as isBridgePortAllowed } from "../../core/http/loopback-port.js";
 import {
   AnthropicTranslationError,
   translateAnthropicRequestToChat,
   isRecord,
+  type AnthropicToChatTranslation,
 } from "../../protocols/anthropic-messages/anthropic-to-chat-request.js";
 import { translateChatResponseToAnthropic } from "../../protocols/anthropic-messages/chat-to-anthropic-response.js";
 import {
   ChatToAnthropicStreamTranslator,
   type AnthropicStreamEvent,
 } from "../../protocols/anthropic-messages/chat-to-anthropic-stream.js";
+import {
+  TokenUsageAccumulator,
+  createUsageTelemetryEvent,
+  extractAnthropicTokenUsage,
+  type NormalizedTokenUsage,
+  type UsageEventSink,
+  type UsageOutcome,
+  type UsageProtocol,
+} from "../../core/usage/usage-event.js";
+import {
+  createProviderRuntimeHealthSignal,
+  type ProviderRuntimeHealthSignalSink,
+  type ProviderRuntimeOutcome,
+} from "../../core/health/provider-runtime-health.js";
 
 const loopbackHost = "127.0.0.1";
 const defaultBodyLimitBytes = 64 * 1024 * 1024;
@@ -45,7 +81,13 @@ const defaultBodyLimitBytes = 64 * 1024 * 1024;
 export interface AnthropicBridgeServerOptions {
   readonly profile: ProviderProfile;
   readonly secretStore: SecretStore;
+  readonly modelAccessCheck?: ModelAccessCheck;
+  readonly protocolResolver?: ModelProtocolResolver;
   readonly adapterRegistry?: ProviderAdapterRegistry;
+  readonly fallback?: ProviderFallbackConfiguration;
+  readonly onFallback?: (notification: FallbackNotification) => void;
+  /** Session-scoped prompt-profile instructions prepended to every turn. */
+  readonly sessionInstructions?: string;
   readonly messagesEndpoint?: string;
   readonly chatCompletionsEndpoint?: string;
   readonly fetchImpl?: typeof fetch;
@@ -55,6 +97,9 @@ export interface AnthropicBridgeServerOptions {
   /** Optional bearer/x-api-key required from the loopback Claude client. */
   readonly clientToken?: string;
   readonly turnLedgerStore?: TurnLedgerStore;
+  readonly sessionId?: string;
+  readonly usageSink?: UsageEventSink;
+  readonly healthSignalSink?: ProviderRuntimeHealthSignalSink;
 }
 
 export interface AnthropicBridgeAddress {
@@ -64,6 +109,33 @@ export interface AnthropicBridgeAddress {
 }
 
 type BridgeMode = "native-anthropic" | "openai-chat";
+
+interface ResolvedAnthropicRoute {
+  readonly route: LogicalModelRoute;
+  readonly profile: ProviderProfile;
+  readonly mode: BridgeMode;
+}
+
+interface OpenedAnthropicUpstream {
+  readonly upstream: Response;
+  readonly redactionValues: readonly string[];
+  readonly effectiveMode: BridgeMode;
+  readonly translation?: AnthropicToChatTranslation;
+}
+
+interface AnthropicRouteSelectionMetadata {
+  readonly route: ResolvedAnthropicRoute;
+  readonly notification?: FallbackNotification;
+}
+
+interface SelectedAnthropicUpstream
+  extends OpenedAnthropicUpstream,
+    AnthropicRouteSelectionMetadata {
+  readonly fallbackBlock?: {
+    readonly code: string;
+    readonly message: string;
+  };
+}
 
 /**
  * Loopback-only Anthropic Messages bridge for Claude Code (spec Phase 3).
@@ -86,15 +158,81 @@ export class AnthropicBridgeServer {
   private readonly streamIdleTimeoutMs: number;
   private readonly clientToken: string | undefined;
   private readonly turnLedger: PersistentTurnLedger;
+  private readonly fallbackSession: FallbackSessionRouter | undefined;
+  private readonly fallbackRoutes = new Map<string, ResolvedAnthropicRoute>();
+  private readonly onFallback: ((notification: FallbackNotification) => void) | undefined;
+  private readonly sessionInstructions: string | undefined;
+  private readonly sessionId: string;
+  private readonly usageSink: UsageEventSink | undefined;
+  private readonly healthSignalSink: ProviderRuntimeHealthSignalSink | undefined;
+  private readonly pendingHealthSignals = new Set<Promise<void>>();
+  private readonly nativeMessagesSupport = new Map<string, boolean>();
+  private lastFallback: FallbackNotification | undefined;
   private readonly activeUpstreamRequests = new Set<AbortController>();
   private server: Server | undefined;
   private startTask: Promise<AnthropicBridgeAddress> | undefined;
   private stopTask: Promise<void> | undefined;
 
+  private readonly modelAccessCheck: ModelAccessCheck | undefined;
+  private readonly protocolResolver: ModelProtocolResolver | undefined;
+  private readonly resolvedProtocols = new Map<string, UsageProtocol>();
+
   constructor(options: AnthropicBridgeServerOptions) {
-    this.profile = options.adapterRegistry?.prepareProfile(options.profile) ?? options.profile;
+    const prepareProfile = (profile: ProviderProfile): ProviderProfile =>
+      options.adapterRegistry?.prepareProfile(profile) ?? profile;
+    const preparedPrimary = prepareProfile(options.profile);
+    if (options.fallback === undefined) {
+    this.modelAccessCheck = options.modelAccessCheck;
+    this.protocolResolver = options.protocolResolver;
+    this.profile = preparedPrimary;
+      this.fallbackSession = undefined;
+    } else {
+      this.fallbackSession = new FallbackSessionRouter(options.fallback.logicalModel);
+      const profiles = new Map<string, ProviderProfile>();
+      for (const rawProfile of options.fallback.profiles) {
+        const profile = prepareProfile(rawProfile);
+        if (profiles.has(profile.id)) {
+          throw new TypeError(`Duplicate fallback provider profile '${profile.id}'.`);
+        }
+        profiles.set(profile.id, profile);
+      }
+      for (const route of this.fallbackSession.routes) {
+        const profile = profiles.get(route.providerId);
+        if (profile === undefined) {
+          throw new TypeError(
+            `Logical model '${this.fallbackSession.group.id}' has no profile for provider '${route.providerId}'.`,
+          );
+        }
+        if (!profile.enabled) {
+          throw new TypeError(
+            `Logical model '${this.fallbackSession.group.id}' route '${logicalRouteKey(route)}' uses a disabled provider.`,
+          );
+        }
+        this.fallbackRoutes.set(logicalRouteKey(route), {
+          route,
+          profile,
+          mode: resolveBridgeMode(profile),
+        });
+      }
+      const preferred = this.fallbackSession.routes[0];
+      if (preferred === undefined) {
+        throw new TypeError("A fallback bridge requires at least one enabled route.");
+      }
+      const preferredProfile = this.requireFallbackRoute(preferred).profile;
+      if (preparedPrimary.id !== preferredProfile.id) {
+        throw new TypeError(
+          `Fallback bridge primary profile '${preparedPrimary.id}' does not match preferred route provider '${preferredProfile.id}'.`,
+        );
+      }
+      this.profile = preferredProfile;
+    }
     this.requests = new ProviderHttpRequestBuilder(options.secretStore);
     this.mode = resolveBridgeMode(this.profile);
+    this.onFallback = options.onFallback;
+    this.sessionInstructions = normalizeSessionInstructions(options.sessionInstructions);
+    this.sessionId = options.sessionId ?? `bridge-${randomUUID()}`;
+    this.usageSink = options.usageSink;
+    this.healthSignalSink = options.healthSignalSink;
     this.messagesEndpoint = options.messagesEndpoint ?? "messages";
     this.chatCompletionsEndpoint = options.chatCompletionsEndpoint ?? "chat/completions";
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -169,7 +307,10 @@ export class AnthropicBridgeServer {
     }
     const server = this.server;
     this.server = undefined;
-    if (server === undefined) return;
+    if (server === undefined) {
+      await this.flushHealthSignals();
+      return;
+    }
     for (const controller of this.activeUpstreamRequests) {
       controller.abort(new Error("ProviderDock Anthropic bridge is stopping."));
     }
@@ -178,6 +319,7 @@ export class AnthropicBridgeServer {
       server.close((error) => (error ? reject(error) : resolve()));
       server.closeAllConnections?.();
     });
+    await this.flushHealthSignals();
   }
 
   private async handleRequest(
@@ -187,10 +329,22 @@ export class AnthropicBridgeServer {
     const requestUrl = new URL(request.url ?? "/", `http://${loopbackHost}`);
 
     if (requestUrl.pathname === "/health") {
+      const activeRoute = this.activeRoute();
       sendJson(response, 200, {
         status: "ok",
+        // Keep the primary identity stable for managed runtime ownership checks.
         provider_id: this.profile.id,
-        mode: this.mode,
+        mode: activeRoute.mode,
+        ...(this.fallbackSession === undefined
+          ? {}
+          : {
+              logical_model_id: this.fallbackSession.group.id,
+              active_provider_id: activeRoute.profile.id,
+              fallback: this.fallbackSession.snapshot(),
+              ...(this.lastFallback === undefined
+                ? {}
+                : { last_fallback: this.lastFallback }),
+            }),
         active_requests: this.activeUpstreamRequests.size,
       });
       return;
@@ -230,9 +384,13 @@ export class AnthropicBridgeServer {
 
     let turnToken: TurnToken | undefined;
     let turnOutcome: "complete" | "fail" | "cancel" | "incomplete" = "fail";
+    const usageRequestId = randomUUID();
     try {
-      const body = await readJsonObject(request, this.requestBodyLimitBytes);
-      const admission = await this.turnLedger.admit(extractAnthropicTurnSignature(body));
+      const body = this.applySessionInstructions(
+        await readJsonObject(request, this.requestBodyLimitBytes),
+      );
+      const turnSignature = extractAnthropicTurnSignature(body);
+      const admission = await this.turnLedger.admit(turnSignature);
       if (admission.decision === "blocked") {
         const headers = new Headers({ "x-providerdock-turn-block": admission.code });
         sendAnthropicError(response, 409, "INVALID_REQUEST", admission.message, headers);
@@ -242,91 +400,98 @@ export class AnthropicBridgeServer {
       turnToken = admission.token;
       const wantsStream = body.stream === true;
 
-      const translation =
-        this.mode === "openai-chat" ? translateAnthropicRequestToChat(body) : undefined;
-      const upstreamPayload = translation?.chatRequest ?? body;
-      const endpoint =
-        translation === undefined ? this.messagesEndpoint : this.chatCompletionsEndpoint;
-      const built = await this.requests.build(this.profile, endpoint, {
-        accept: wantsStream ? "text/event-stream, application/json" : "application/json",
-        contentType: "application/json",
-      });
-      if (translation === undefined) {
-        forwardAnthropicHeaders(request, built.headers);
-      }
-
-      let headerTimedOut = false;
-      const headerTimer = setTimeout(() => {
-        headerTimedOut = true;
-        controller.abort(new Error("Upstream response headers timed out."));
-      }, this.profile.timeoutMs);
-      headerTimer.unref?.();
-
-      let upstream: Response;
+      let selectedForHealth: SelectedAnthropicUpstream | undefined;
       try {
-        upstream = await this.fetchImpl(built.url, {
-          method: "POST",
-          headers: built.headers,
-          body: JSON.stringify(upstreamPayload),
-          signal: controller.signal,
-        });
+        const selected = await this.openUpstream(
+          body,
+          wantsStream,
+          controller,
+          turnSignature,
+          request,
+          usageRequestId,
+        );
+        selectedForHealth = selected;
+        const { upstream, translation } = selected;
+
+        if (!upstream.ok) {
+          const errorBody = await readUpstreamText(upstream, 64 * 1024);
+          const sanitizedDetail = sanitizeProviderErrorBody(errorBody, {
+            sensitiveValues: selected.redactionValues,
+          });
+          const headers = this.routeHeaders(safeHeaders(upstream), selected);
+          if (selected.fallbackBlock !== undefined) {
+            headers.set("x-providerdock-fallback-block", selected.fallbackBlock.code);
+          }
+          sendAnthropicError(
+            response,
+            upstream.status,
+            normalizeHttpStatus(upstream.status),
+            `Provider '${selected.route.profile.displayName}' returned HTTP ${upstream.status}.${sanitizedDetail === undefined ? "" : ` ${sanitizedDetail}`}`,
+            headers,
+          );
+          return;
+        }
+
+        const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
+        const isEventStream = contentType.includes("text/event-stream");
+        if (!wantsStream && isEventStream) {
+          await upstream.body?.cancel().catch(() => undefined);
+          throw new BridgeRequestError(
+            502,
+            "PROTOCOL_ERROR",
+            "Provider returned SSE for a non-streaming Messages request.",
+            { headers: this.routeHeaders(new Headers(), selected) },
+          );
+        }
+
+        if (translation === undefined) {
+          turnOutcome = await this.relayNative(
+            response,
+            upstream,
+            wantsStream,
+            isEventStream,
+            turnToken,
+            selected,
+            usageRequestId,
+          );
+        } else {
+          turnOutcome = await this.relayTranslated(
+            response,
+            upstream,
+            wantsStream,
+            isEventStream,
+            translation.model,
+            translation.toolNames,
+            turnToken,
+            selected,
+            usageRequestId,
+          );
+        }
       } catch (error) {
-        if (response.destroyed || (controller.signal.aborted && !headerTimedOut)) {
+        if (error instanceof BridgeRequestCancelledError) {
           turnOutcome = "cancel";
           return;
         }
-        if (headerTimedOut) {
-          throw new BridgeRequestError(504, "TIMEOUT", "Provider response headers timed out.");
+        const failure = runtimeFailureFromError(error);
+        if (selectedForHealth !== undefined && failure !== undefined) {
+          await this.recordRuntimeHealth(
+            selectedForHealth.route,
+            anthropicProtocolForRoute(selectedForHealth.route),
+            "failed",
+            usageRequestId,
+            failure,
+          );
         }
-        throw new BridgeRequestError(502, "NETWORK_ERROR", "Provider request failed.", {
-          cause: error,
-        });
-      } finally {
-        clearTimeout(headerTimer);
-      }
-
-      if (!upstream.ok) {
-        const errorBody = await readUpstreamText(upstream, 64 * 1024);
-        sendAnthropicError(
-          response,
-          upstream.status,
-          normalizeHttpStatus(upstream.status),
-          `Provider '${this.profile.displayName}' returned HTTP ${upstream.status}.`,
-          undefined,
-          this.mode === "native-anthropic" ? errorBody : undefined,
-        );
-        return;
-      }
-
-      const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
-      const isEventStream = contentType.includes("text/event-stream");
-      if (!wantsStream && isEventStream) {
-        await upstream.body?.cancel().catch(() => undefined);
-        throw new BridgeRequestError(
-          502,
-          "PROTOCOL_ERROR",
-          "Provider returned SSE for a non-streaming Messages request.",
-        );
-      }
-
-      if (translation === undefined) {
-        turnOutcome = await this.relayNative(response, upstream, wantsStream, isEventStream, turnToken);
-      } else {
-        turnOutcome = await this.relayTranslated(
-          response,
-          upstream,
-          wantsStream,
-          isEventStream,
-          translation.model,
-          translation.toolNames,
-          turnToken,
-        );
+        throw error;
       }
     } catch (error) {
       if (response.destroyed) return;
       if (response.headersSent) {
         turnOutcome = "incomplete";
-        response.destroy();
+        if (!response.writableEnded) response.end(encodeAnthropicEvent({
+          event: "error",
+          data: { type: "error", error: { type: "api_error", message: "Provider stream was interrupted or invalid; the request was not replayed." } },
+        }));
         return;
       }
       this.handleUnexpectedError(response, error);
@@ -342,24 +507,473 @@ export class AnthropicBridgeServer {
     }
   }
 
+  private async openUpstream(
+    body: Readonly<Record<string, unknown>>,
+    wantsStream: boolean,
+    controller: AbortController,
+    signature: TurnSignature,
+    request: IncomingMessage,
+    requestId: string,
+  ): Promise<SelectedAnthropicUpstream> {
+    if (this.fallbackSession === undefined) {
+      const route: ResolvedAnthropicRoute = {
+        profile: this.profile,
+        mode: this.mode,
+        route: {
+          providerId: this.profile.id,
+          modelId: typeof body.model === "string" ? body.model : "unknown",
+          priority: 0,
+          enabled: true,
+        },
+      };
+      try {
+        const opened = await this.fetchRoute(
+          body,
+          wantsStream,
+          controller,
+          request,
+          route,
+        );
+        const effectiveRoute: ResolvedAnthropicRoute = {
+          ...route,
+          mode: opened.effectiveMode,
+        };
+        if (!opened.upstream.ok) {
+          const errorType = normalizeHttpStatus(opened.upstream.status);
+          await this.recordRuntimeHealth(
+            effectiveRoute,
+            anthropicProtocolForRoute(effectiveRoute),
+            "failed",
+            requestId,
+            {
+              errorType,
+              phase: fallbackFailurePhaseForHttpStatus(opened.upstream.status),
+              message: `Provider '${route.profile.displayName}' returned HTTP ${opened.upstream.status}.`,
+              httpStatus: opened.upstream.status,
+            },
+          );
+        }
+        return { ...opened, route: effectiveRoute };
+      } catch (error) {
+        const failure = fallbackFailureFromError(error);
+        if (failure !== undefined) {
+          await this.recordRuntimeHealth(
+            route,
+            anthropicProtocolForRoute(route),
+            "failed",
+            requestId,
+            failure,
+          );
+        }
+        if (error instanceof UpstreamAttemptError) {
+          throw new BridgeRequestError(
+            providerErrorStatus(error.type),
+            error.type,
+            error.message,
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+    }
+
+    if (body.model !== this.fallbackSession.group.id) {
+      throw new BridgeRequestError(
+        400,
+        "INVALID_REQUEST",
+        `Fallback bridge exposes logical model '${this.fallbackSession.group.id}', not '${String(body.model)}'.`,
+      );
+    }
+
+    const toolResultIds = new Set(signature.toolResults.map((result) => result.callId));
+    const hasToolActivity = signature.toolCalls.length > 0 || signature.toolResults.length > 0;
+    const hasUnresolvedCall = signature.toolCalls.some(
+      (call) => !toolResultIds.has(call.callId),
+    );
+    const turn = this.fallbackSession.beginTurn({
+      sideEffectsPossible: hasToolActivity,
+      continuationState: !hasToolActivity
+        ? "none"
+        : !hasUnresolvedCall && signature.toolResults.length > 0
+          ? "complete"
+          : "ambiguous",
+    });
+    let selection = turn.start();
+    if (selection.decision === "blocked") {
+      throw new BridgeRequestError(503, "PROVIDER_UNAVAILABLE", selection.message, {
+        headers: fallbackBlockHeaders(selection.code),
+      });
+    }
+
+    let latestNotification = this.publishFallback(selection.notification);
+    while (selection.decision === "selected") {
+      const attempt = selection.attempt;
+      const route = this.requireFallbackRoute(attempt.route);
+      try {
+        const opened = await this.fetchRoute(
+          body,
+          wantsStream,
+          controller,
+          request,
+          route,
+        );
+        const effectiveRoute: ResolvedAnthropicRoute = {
+          ...route,
+          mode: opened.effectiveMode,
+        };
+        if (opened.upstream.ok) {
+          turn.reportSuccess(attempt);
+          return {
+            ...opened,
+            route: effectiveRoute,
+            ...(latestNotification === undefined
+              ? {}
+              : { notification: latestNotification }),
+          };
+        }
+
+        const errorType = normalizeHttpStatus(opened.upstream.status);
+        const failure: FallbackFailure & { readonly httpStatus: number } = {
+          errorType,
+          phase: fallbackFailurePhaseForHttpStatus(opened.upstream.status),
+          message: `Provider '${route.profile.displayName}' returned HTTP ${opened.upstream.status}.`,
+          httpStatus: opened.upstream.status,
+        };
+        await this.recordRuntimeHealth(
+          effectiveRoute,
+          anthropicProtocolForRoute(effectiveRoute),
+          "failed",
+          requestId,
+          failure,
+        );
+        const failed = turn.reportFailure(attempt, failure);
+        if (failed.decision === "selected") {
+          await opened.upstream.body?.cancel().catch(() => undefined);
+          latestNotification =
+            this.publishFallback(failed.notification) ?? latestNotification;
+          selection = failed;
+          continue;
+        }
+        return {
+          ...opened,
+          route: effectiveRoute,
+          ...(latestNotification === undefined
+            ? {}
+            : { notification: latestNotification }),
+          fallbackBlock: { code: failed.code, message: failed.message },
+        };
+      } catch (error) {
+        if (error instanceof BridgeRequestCancelledError) throw error;
+        const failure = fallbackFailureFromError(error);
+        if (failure === undefined) throw error;
+        await this.recordRuntimeHealth(
+          route,
+          anthropicProtocolForRoute(route),
+          "failed",
+          requestId,
+          failure,
+        );
+        const failed = turn.reportFailure(attempt, failure);
+        if (failed.decision === "selected") {
+          latestNotification =
+            this.publishFallback(failed.notification) ?? latestNotification;
+          selection = failed;
+          continue;
+        }
+
+        const headers = this.routeHeaders(new Headers(), {
+          route,
+          ...(latestNotification === undefined
+            ? {}
+            : { notification: latestNotification }),
+        });
+        headers.set("x-providerdock-fallback-block", failed.code);
+        throw new BridgeRequestError(
+          providerErrorStatus(failure.errorType),
+          failure.errorType,
+          failure.message ?? `Provider '${route.profile.displayName}' request failed.`,
+          { cause: error, headers },
+        );
+      }
+    }
+
+    throw new BridgeRequestError(
+      503,
+      "PROVIDER_UNAVAILABLE",
+      "No fallback route could be selected.",
+    );
+  }
+
+  private applySessionInstructions(
+    body: Readonly<Record<string, unknown>>,
+  ): Readonly<Record<string, unknown>> {
+    if (this.sessionInstructions === undefined) return body;
+    const existing = body.system;
+    if (existing === undefined || existing === null || existing === "") {
+      return { ...body, system: this.sessionInstructions };
+    }
+    if (typeof existing === "string") {
+      return {
+        ...body,
+        system: `${this.sessionInstructions}\n\n${existing}`,
+      };
+    }
+    if (Array.isArray(existing)) {
+      return {
+        ...body,
+        system: [
+          { type: "text", text: this.sessionInstructions },
+          ...existing,
+        ],
+      };
+    }
+    throw new BridgeRequestError(
+      400,
+      "INVALID_REQUEST",
+      "Anthropic system prompt must be a string or block array when a prompt profile is active.",
+    );
+  }
+
+  private async fetchRoute(
+    body: Readonly<Record<string, unknown>>,
+    wantsStream: boolean,
+    controller: AbortController,
+    request: IncomingMessage,
+    route: ResolvedAnthropicRoute,
+  ): Promise<OpenedAnthropicUpstream> {
+    const automatic = route.profile.apiType === "auto";
+    if (route.profile.apiType === "auto" && this.protocolResolver && !this.resolvedProtocols.has(logicalRouteKey(route.route))) {
+      const modelId = this.fallbackSession ? route.route.modelId : typeof body.model === "string" ? body.model : route.route.modelId;
+      const protocol = await this.protocolResolver(route.profile, modelId, "claude-code");
+      if (protocol) this.resolvedProtocols.set(logicalRouteKey(route.route), protocol);
+    }
+    const known = route.profile.apiType === "auto" ? this.resolvedProtocols.get(logicalRouteKey(route.route)) : undefined;
+    if (known) route = { ...route, profile: { ...route.profile, apiType: known }, mode: known === "anthropic-messages" ? "native-anthropic" : "openai-chat" };
+
+    const routedBody =
+      this.fallbackSession === undefined ? body : { ...body, model: route.route.modelId };
+    if (route.mode === "native-anthropic") {
+      const native = await this.fetchRouteAttempt(
+        routedBody,
+        wantsStream,
+        controller,
+        request,
+        route,
+      );
+      if (!automatic || !isDefinitiveNativeRouteRejection(native.upstream.status)) return native;
+      await native.upstream.body?.cancel().catch(() => undefined);
+      this.nativeMessagesSupport.set(logicalRouteKey(route.route), false);
+      route = { ...route, profile: { ...route.profile, apiType: "openai-chat-completions" }, mode: "openai-chat" };
+    }
+
+    if (this.shouldTryNativeMessages(route, routedBody)) {
+      const native = await this.fetchRouteAttempt(
+        routedBody,
+        wantsStream,
+        controller,
+        request,
+        route,
+      );
+      if (native.upstream.ok || !isDefinitiveNativeRouteRejection(native.upstream.status)) {
+        this.nativeMessagesSupport.set(logicalRouteKey(route.route), true);
+        return native;
+      }
+      await native.upstream.body?.cancel().catch(() => undefined);
+      this.nativeMessagesSupport.set(logicalRouteKey(route.route), false);
+    }
+
+    const translation = translateAnthropicRequestToChat(routedBody);
+    const translated = await this.fetchRouteAttempt(
+      translation.chatRequest,
+      wantsStream,
+      controller,
+      request,
+      route,
+      translation,
+    );
+    if (automatic && isDefinitiveNativeRouteRejection(translated.upstream.status)) {
+      await translated.upstream.body?.cancel().catch(() => undefined);
+      const apiType = route.profile.apiType === "openai-responses" ? "openai-chat-completions" : "openai-responses";
+      return this.fetchRouteAttempt(translation.chatRequest, wantsStream, controller, request,
+        { ...route, profile: { ...route.profile, apiType } }, translation);
+    }
+    return translated;
+  }
+
+  private shouldTryNativeMessages(
+    route: ResolvedAnthropicRoute,
+    body: Readonly<Record<string, unknown>>,
+  ): boolean {
+    if (route.profile.apiType !== "auto") return false;
+    const cached = this.nativeMessagesSupport.get(logicalRouteKey(route.route));
+    if (cached !== undefined) return cached;
+    const model = typeof body.model === "string" ? body.model : route.route.modelId;
+    return (
+      isClaudeModelId(model) ||
+      route.profile.manualModelIds.some((candidate) => isClaudeModelId(candidate))
+    );
+  }
+
+  private async fetchRouteAttempt(
+    upstreamPayload: Readonly<Record<string, unknown>>,
+    wantsStream: boolean,
+    controller: AbortController,
+    request: IncomingMessage,
+    route: ResolvedAnthropicRoute,
+    translation?: AnthropicToChatTranslation,
+  ): Promise<OpenedAnthropicUpstream> {
+    const useResponses = translation !== undefined && route.profile.apiType === "openai-responses";
+    const endpoint = useResponses ? "responses" : translation === undefined ? this.messagesEndpoint : this.chatCompletionsEndpoint;
+    this.resolvedProtocols.set(logicalRouteKey(route.route), useResponses ? "openai-responses" : translation === undefined ? "anthropic-messages" : "openai-chat-completions");
+    const requestedModel = typeof upstreamPayload.model === "string" ? upstreamPayload.model : route.route.modelId;
+    if (this.modelAccessCheck) await this.modelAccessCheck(route.profile.id, requestedModel);
+    else assertModelEnabled(route.profile, requestedModel);
+    const built = await this.requests.build(route.profile, endpoint, {
+      accept: wantsStream ? "text/event-stream, application/json" : "application/json",
+      contentType: "application/json",
+    });
+    if (translation === undefined) {
+      forwardAnthropicHeaders(request, built.headers);
+    }
+
+    let headerTimedOut = false;
+    const headerTimer = setTimeout(() => {
+      headerTimedOut = true;
+      controller.abort(new Error("Upstream response headers timed out."));
+    }, route.profile.timeoutMs);
+    headerTimer.unref?.();
+    try {
+      const upstream = await this.fetchImpl(built.url, {
+        method: "POST",
+        headers: built.headers,
+        body: JSON.stringify(useResponses ? chatRequestToResponses(upstreamPayload) : upstreamPayload),
+        signal: controller.signal,
+      });
+      clearTimeout(headerTimer);
+      return {
+        upstream: useResponses ? await responsesTransportToChat(upstream, controller.signal) : upstream,
+        redactionValues: built.redactionValues,
+        effectiveMode:
+          translation === undefined ? "native-anthropic" : "openai-chat",
+        ...(translation === undefined ? {} : { translation }),
+      };
+    } catch (error) {
+      if (controller.signal.aborted && !headerTimedOut) {
+        throw new BridgeRequestCancelledError();
+      }
+      if (headerTimedOut) {
+        throw new UpstreamAttemptError(
+          "TIMEOUT",
+          "unknown",
+          "Provider response headers timed out; execution state is unknown.",
+          { cause: error },
+        );
+      }
+      if (error instanceof ProviderRequestError) throw error;
+      const connectionFailed = isConnectionEstablishmentFailure(error);
+      throw new UpstreamAttemptError(
+        "NETWORK_ERROR",
+        connectionFailed ? "connection-failed" : "unknown",
+        connectionFailed
+          ? "Provider connection failed before the request was accepted."
+          : "Provider connection failed with an unknown execution state.",
+        { cause: error },
+      );
+    } finally {
+      clearTimeout(headerTimer);
+    }
+  }
+
+  private requireFallbackRoute(route: LogicalModelRoute): ResolvedAnthropicRoute {
+    const resolved = this.fallbackRoutes.get(logicalRouteKey(route));
+    if (resolved === undefined) {
+      throw new TypeError(`Fallback route '${logicalRouteKey(route)}' is not configured.`);
+    }
+    return resolved;
+  }
+
+  private activeRoute(): ResolvedAnthropicRoute {
+    const sticky = this.fallbackSession?.stickyRoute();
+    if (sticky !== undefined) return this.requireFallbackRoute(sticky);
+    if (this.fallbackSession !== undefined) {
+      const preferred = this.fallbackSession.routes[0];
+      if (preferred !== undefined) return this.requireFallbackRoute(preferred);
+    }
+    return {
+      profile: this.profile,
+      mode: this.mode,
+      route: {
+        providerId: this.profile.id,
+        modelId: this.profile.manualModelIds[0] ?? "unknown",
+        priority: 0,
+        enabled: true,
+      },
+    };
+  }
+
+  private publishFallback(
+    notification: FallbackNotification | undefined,
+  ): FallbackNotification | undefined {
+    if (notification === undefined) return undefined;
+    this.lastFallback = notification;
+    try {
+      this.onFallback?.(notification);
+    } catch {
+      // Observability callbacks must never change routing or replay behavior.
+    }
+    return notification;
+  }
+
+  private routeHeaders(
+    headers: Headers,
+    selected: AnthropicRouteSelectionMetadata,
+  ): Headers {
+    const result = new Headers(headers);
+    result.set("x-providerdock-provider-id", selected.route.profile.id);
+    if (this.fallbackSession !== undefined) {
+      result.set("x-providerdock-logical-model", this.fallbackSession.group.id);
+    }
+    if (selected.notification !== undefined) {
+      result.set("x-providerdock-fallback", "true");
+      result.set("x-providerdock-fallback-from", selected.notification.from.providerId);
+      result.set("x-providerdock-fallback-to", selected.notification.to.providerId);
+      if (selected.notification.errorType !== undefined) {
+        result.set("x-providerdock-fallback-reason", selected.notification.errorType);
+      }
+    }
+    return result;
+  }
+
   private async relayNative(
     response: ServerResponse,
     upstream: Response,
     wantsStream: boolean,
     isEventStream: boolean,
     turnToken: TurnToken,
+    selected: SelectedAnthropicUpstream,
+    usageRequestId: string,
   ): Promise<"complete" | "incomplete"> {
     if (wantsStream && isEventStream) {
       if (upstream.body === null) {
         throw new BridgeRequestError(502, "STREAM_ERROR", "Provider returned an empty stream body.");
       }
-      response.writeHead(200, sseHeaders("native-anthropic"));
+      response.writeHead(
+        200,
+        Object.fromEntries(
+          this.routeHeaders(
+            new Headers(sseHeaders("native-anthropic")),
+            selected,
+          ).entries(),
+        ),
+      );
       response.flushHeaders();
       await this.turnLedger.markStreamStarted(turnToken);
       const tracker = new NativeAnthropicStreamTracker();
+      const usage = new TokenUsageAccumulator();
       let terminalError = false;
       const ok = await this.pipeSse(response, upstream.body, async (event) => {
         if (event.data === undefined) return false;
+        usage.observe(extractAnthropicSseUsage(event.data));
         const observation = tracker.observe(event.data);
         if (observation.completedToolUse !== undefined) {
           await this.turnLedger.recordDeliveredToolCalls(
@@ -377,7 +991,15 @@ export class AnthropicBridgeServer {
         return observation.terminal;
       });
       if (!response.destroyed && !response.writableEnded) response.end();
-      return ok && !terminalError ? "complete" : "incomplete";
+      const outcome = ok && !terminalError ? "complete" : "incomplete";
+      await this.recordUsage(
+        selected,
+        usageRequestId,
+        "anthropic-messages",
+        usage.snapshot(),
+        outcome === "complete" ? "completed" : "incomplete",
+      );
+      return outcome;
     }
 
     const payload = await readUpstreamJson(upstream, this.responseBodyLimitBytes);
@@ -388,22 +1010,43 @@ export class AnthropicBridgeServer {
         "Provider returned an invalid Anthropic Messages payload.",
       );
     }
+    const outcome = nativeMessageOutcome(payload);
     await this.turnLedger.recordDeliveredToolCalls(
       turnToken,
       extractAnthropicDeliveredToolCalls(payload),
     );
-    await this.turnLedger.complete(turnToken);
+    if (outcome === "complete") await this.turnLedger.complete(turnToken); else await this.turnLedger.incomplete(turnToken);
     if (wantsStream) {
-      response.writeHead(200, sseHeaders("native-anthropic-json"));
+      response.writeHead(
+        200,
+        Object.fromEntries(
+          this.routeHeaders(
+            new Headers(sseHeaders("native-anthropic-json")),
+            selected,
+          ).entries(),
+        ),
+      );
       response.flushHeaders();
       for (const event of synthesizeAnthropicStream(payload)) {
         response.write(encodeAnthropicEvent(event));
       }
       response.end();
     } else {
-      sendJson(response, 200, payload, safeHeaders(upstream));
+      sendJson(
+        response,
+        200,
+        payload,
+        this.routeHeaders(safeHeaders(upstream), selected),
+      );
     }
-    return "complete";
+    await this.recordUsage(
+      selected,
+      usageRequestId,
+      "anthropic-messages",
+      extractAnthropicTokenUsage(payload),
+      outcome === "complete" ? "completed" : "incomplete",
+    );
+    return outcome;
   }
 
   private async relayTranslated(
@@ -414,6 +1057,8 @@ export class AnthropicBridgeServer {
     model: string,
     allowedToolNames: readonly string[],
     turnToken: TurnToken,
+    selected: SelectedAnthropicUpstream,
+    usageRequestId: string,
   ): Promise<"complete" | "incomplete"> {
     if (wantsStream && isEventStream) {
       if (upstream.body === null) {
@@ -423,10 +1068,16 @@ export class AnthropicBridgeServer {
           "Chat provider returned an empty stream body.",
         );
       }
-      response.writeHead(200, sseHeaders("openai-chat"));
+      response.writeHead(
+        200,
+        Object.fromEntries(
+          this.routeHeaders(new Headers(sseHeaders("openai-chat")), selected).entries(),
+        ),
+      );
       response.flushHeaders();
       await this.turnLedger.markStreamStarted(turnToken);
       const translator = new ChatToAnthropicStreamTranslator({ model, allowedToolNames });
+      const usage = new TokenUsageAccumulator();
       let protocolFailure = false;
       const ok = await this.pipeSse(
         response,
@@ -444,8 +1095,13 @@ export class AnthropicBridgeServer {
               { cause: error },
             );
           }
-          return translator.feed(parsed);
+          const translated = translator.feed(parsed);
+          for (const item of translated) {
+            usage.observe(extractAnthropicTokenUsage(item.data));
+          }
+          return translated;
         },
+        () => translator.generationFinished,
       ).catch((error: unknown) => {
         if (error instanceof AnthropicTranslationError || error instanceof SseDecodeError) {
           protocolFailure = true;
@@ -458,6 +1114,9 @@ export class AnthropicBridgeServer {
         const terminalEvents = protocolFailure
           ? translator.fail("Upstream sent a malformed Chat stream event.")
           : translator.finish();
+        for (const item of terminalEvents) {
+          usage.observe(extractAnthropicTokenUsage(item.data));
+        }
         if (translator.terminalSucceeded) {
           try {
             await this.turnLedger.recordDeliveredToolCalls(
@@ -493,9 +1152,17 @@ export class AnthropicBridgeServer {
         }
         response.end();
       }
-      return ok && !protocolFailure && translator.terminalSucceeded
+      const outcome = ok && !protocolFailure && translator.terminalSucceeded
         ? "complete"
         : "incomplete";
+      await this.recordUsage(
+        selected,
+        usageRequestId,
+        "openai-chat-completions",
+        usage.snapshot(),
+        outcome === "complete" ? "completed" : "incomplete",
+      );
+      return outcome;
     }
 
     const payload = await readUpstreamJson(upstream, this.responseBodyLimitBytes);
@@ -509,14 +1176,27 @@ export class AnthropicBridgeServer {
         turnToken,
         extractAnthropicDeliveredToolCalls(translated),
       );
-      await this.turnLedger.complete(turnToken);
-      response.writeHead(200, sseHeaders("openai-chat"));
+      const outcome = nativeMessageOutcome(translated);
+      if (outcome === "complete") await this.turnLedger.complete(turnToken); else await this.turnLedger.incomplete(turnToken);
+      response.writeHead(
+        200,
+        Object.fromEntries(
+          this.routeHeaders(new Headers(sseHeaders("openai-chat")), selected).entries(),
+        ),
+      );
       response.flushHeaders();
       for (const event of synthesizeAnthropicStream(translated)) {
         response.write(encodeAnthropicEvent(event));
       }
       response.end();
-      return "complete";
+      await this.recordUsage(
+        selected,
+        usageRequestId,
+        "openai-chat-completions",
+        extractAnthropicTokenUsage(translated),
+        outcome === "complete" ? "completed" : "incomplete",
+      );
+      return outcome;
     }
     const translated = translateChatResponseToAnthropic(payload, {
       model,
@@ -526,9 +1206,109 @@ export class AnthropicBridgeServer {
       turnToken,
       extractAnthropicDeliveredToolCalls(translated),
     );
-    await this.turnLedger.complete(turnToken);
-    sendJson(response, 200, translated, safeHeaders(upstream));
-    return "complete";
+    const outcome = nativeMessageOutcome(translated);
+    if (outcome === "complete") await this.turnLedger.complete(turnToken); else await this.turnLedger.incomplete(turnToken);
+    sendJson(
+      response,
+      200,
+      translated,
+      this.routeHeaders(safeHeaders(upstream), selected),
+    );
+    await this.recordUsage(
+      selected,
+      usageRequestId,
+      "openai-chat-completions",
+      extractAnthropicTokenUsage(translated),
+      outcome === "complete" ? "completed" : "incomplete",
+    );
+    return outcome;
+  }
+
+  private async recordUsage(
+    selected: SelectedAnthropicUpstream,
+    requestId: string,
+    protocol: UsageProtocol,
+    usage: NormalizedTokenUsage | undefined,
+    outcome: UsageOutcome,
+  ): Promise<void> {
+    protocol = this.resolvedProtocols.get(logicalRouteKey(selected.route.route)) ?? protocol;
+    await this.recordRuntimeHealth(
+      selected.route,
+      protocol,
+      outcome,
+      requestId,
+    );
+    if (this.usageSink === undefined || usage === undefined) return;
+    try {
+      await this.usageSink(
+        createUsageTelemetryEvent({
+          profile: selected.route.profile,
+          modelId: selected.route.route.modelId,
+          ...(this.fallbackSession === undefined
+            ? {}
+            : { logicalModelId: this.fallbackSession.group.id }),
+          client: "claude-code",
+          protocol,
+          sessionId: this.sessionId,
+          requestId,
+          outcome,
+          usage,
+        }),
+      );
+    } catch {
+      // Local telemetry must never change response or replay semantics.
+    }
+  }
+
+  private recordRuntimeHealth(
+    route: ResolvedAnthropicRoute,
+    protocol: UsageProtocol,
+    outcome: ProviderRuntimeOutcome,
+    requestId: string,
+    failure: (FallbackFailure & { readonly httpStatus?: number }) | undefined = undefined,
+  ): void {
+    if (this.healthSignalSink === undefined) return;
+    protocol = this.resolvedProtocols.get(logicalRouteKey(route.route)) ?? protocol;
+    try {
+      const task = Promise.resolve(this.healthSignalSink(
+        createProviderRuntimeHealthSignal({
+          providerId: route.profile.id,
+          modelId: route.route.modelId,
+          client: "claude-code",
+          protocol,
+          sessionId: this.sessionId,
+          requestId,
+          ...(this.fallbackSession === undefined
+            ? {}
+            : { logicalModelId: this.fallbackSession.group.id }),
+          outcome,
+          ...(failure?.errorType === undefined
+            ? {}
+            : { errorType: failure.errorType }),
+          ...(failure?.httpStatus === undefined
+            ? {}
+            : { httpStatus: failure.httpStatus }),
+          ...(failure?.phase === undefined
+            ? {}
+            : { executionPhase: failure.phase }),
+          ...(failure?.message === undefined
+            ? {}
+            : { errorMessage: failure.message }),
+        }),
+      ))
+        .catch(() => undefined)
+        .finally(() => {
+          this.pendingHealthSignals.delete(task);
+        });
+      this.pendingHealthSignals.add(task);
+    } catch {
+      // Health observability must never change response or replay semantics.
+    }
+  }
+
+  private async flushHealthSignals(): Promise<void> {
+    if (this.pendingHealthSignals.size === 0) return;
+    await Promise.allSettled([...this.pendingHealthSignals]);
   }
 
   /**
@@ -541,11 +1321,13 @@ export class AnthropicBridgeServer {
     body: ReadableStream<Uint8Array>,
     isTerminal: (event: { readonly data?: string }) => boolean | Promise<boolean>,
     translate?: (event: { readonly data?: string }) => readonly AnthropicStreamEvent[],
+    generationFinished?: () => boolean,
   ): Promise<boolean> {
     const decoder = new SseDecoder();
     const reader = body.getReader();
     let terminalSeen = false;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    let completionTimer: ReturnType<typeof setTimeout> | undefined;
     const resetIdle = (): void => {
       if (idleTimer !== undefined) clearTimeout(idleTimer);
       if (this.streamIdleTimeoutMs <= 0) return;
@@ -579,6 +1361,12 @@ export class AnthropicBridgeServer {
               response.write(encodeAnthropicEvent(translated));
             }
           }
+          if (generationFinished?.() === true && completionTimer === undefined) {
+            completionTimer = setTimeout(() => {
+              void reader.cancel().catch(() => undefined);
+            }, 1_000);
+            completionTimer.unref?.();
+          }
           if (terminal) {
             terminalSeen = true;
             finished = true;
@@ -590,8 +1378,14 @@ export class AnthropicBridgeServer {
       }
     } finally {
       if (idleTimer !== undefined) clearTimeout(idleTimer);
+      if (completionTimer !== undefined) clearTimeout(completionTimer);
+      await reader.cancel().catch(() => undefined);
       reader.releaseLock();
     }
+    if (!terminalSeen && translate === undefined && !response.destroyed && !response.writableEnded) response.write(encodeAnthropicEvent({
+      event: "error",
+      data: { type: "error", error: { type: "api_error", message: "Provider stream ended before a complete answer; the request was not replayed." } },
+    }));
     return terminalSeen;
   }
 
@@ -602,7 +1396,13 @@ export class AnthropicBridgeServer {
       return;
     }
     if (error instanceof BridgeRequestError) {
-      sendAnthropicError(response, error.status, error.type, error.message);
+      sendAnthropicError(
+        response,
+        error.status,
+        error.type,
+        error.message,
+        error.headers,
+      );
       return;
     }
     if (error instanceof AnthropicTranslationError) {
@@ -630,8 +1430,12 @@ export class AnthropicBridgeServer {
       return;
     }
     if (error instanceof ProviderRequestError) {
-      const status = error.type === "AUTH_ERROR" ? 401 : error.type === "TIMEOUT" ? 504 : 502;
-      sendAnthropicError(response, status, error.type, error.message);
+      sendAnthropicError(
+        response,
+        providerErrorStatus(error.type),
+        error.type,
+        error.message,
+      );
       return;
     }
     sendAnthropicError(response, 500, "UNKNOWN", "ProviderDock Anthropic bridge request failed.");
@@ -639,26 +1443,109 @@ export class AnthropicBridgeServer {
 }
 
 class BridgeRequestError extends Error {
+  readonly headers: Headers;
+
   constructor(
     readonly status: number,
     readonly type: NormalizedErrorType,
     message: string,
-    options: ErrorOptions = {},
+    options: ErrorOptions & { readonly headers?: Headers } = {},
   ) {
     super(message, options);
     this.name = "BridgeRequestError";
+    this.headers = options.headers ?? new Headers();
   }
 }
 
+class BridgeRequestCancelledError extends Error {
+  constructor() {
+    super("Bridge client cancelled the request.");
+    this.name = "BridgeRequestCancelledError";
+  }
+}
+
+class UpstreamAttemptError extends Error {
+  constructor(
+    readonly type: NormalizedErrorType,
+    readonly phase: FallbackFailurePhase,
+    message: string,
+    options: ErrorOptions = {},
+  ) {
+    super(message, options);
+    this.name = "UpstreamAttemptError";
+  }
+}
+
+function fallbackFailureFromError(error: unknown): FallbackFailure | undefined {
+  if (error instanceof ModelDisabledError) return undefined;
+  if (error instanceof UpstreamAttemptError) {
+    return { errorType: error.type, phase: error.phase, message: error.message };
+  }
+  if (error instanceof ProviderRequestError) {
+    return {
+      errorType: error.type,
+      phase: "request-rejected",
+      message: error.message,
+    };
+  }
+  return undefined;
+}
+
+function runtimeFailureFromError(error: unknown): FallbackFailure | undefined {
+  if (error instanceof ModelDisabledError) return undefined;
+  if (error instanceof BridgeRequestError) {
+    return { errorType: error.type, phase: "unknown", message: error.message };
+  }
+  if (error instanceof ProviderRequestError) {
+    return { errorType: error.type, phase: "unknown", message: error.message };
+  }
+  if (error instanceof AnthropicTranslationError || error instanceof SseDecodeError) {
+    return {
+      errorType:
+        error instanceof AnthropicTranslationError
+          ? error.type
+          : "STREAM_ERROR",
+      phase: "unknown",
+      message: error.message,
+    };
+  }
+  return undefined;
+}
+
+function anthropicProtocolForRoute(route: ResolvedAnthropicRoute): UsageProtocol {
+  return route.mode === "openai-chat"
+    ? "openai-chat-completions"
+    : "anthropic-messages";
+}
+
+function fallbackBlockHeaders(code: string): Headers {
+  return new Headers({ "x-providerdock-fallback-block": code });
+}
+
 function resolveBridgeMode(profile: ProviderProfile): BridgeMode {
-  if (profile.apiType === "anthropic-messages") return "native-anthropic";
-  if (["auto", "openai-chat-completions"].includes(profile.apiType)) {
+  // GoRouter exposes both OpenAI Chat Completions and the native Claude
+  // Messages endpoint. Claude Code must use the native route so thinking,
+  // signatures and new Anthropic fields are preserved without lossy mapping.
+  if (profile.apiType === "anthropic-messages" ||
+    (profile.apiType === "auto" && profile.adapterId === "gorouter")) {
+    return "native-anthropic";
+  }
+  if (["auto", "openai-chat-completions", "openai-responses"].includes(profile.apiType)) {
     return "openai-chat";
   }
   throw new ProviderRequestError(
     "UNSUPPORTED_FEATURE",
     `Anthropic bridge cannot serve provider API type '${profile.apiType}'.`,
   );
+}
+
+function isClaudeModelId(model: string): boolean {
+  return /(^|[/_.:-])claude([/_.:-]|$)/i.test(model);
+}
+
+/** Statuses that prove the native request was rejected before generation. */
+function isDefinitiveNativeRouteRejection(status: number): boolean {
+  return [400, 401, 403, 404, 405, 415, 422, 501].includes(status);
 }
 
 /** Preserves Anthropic-specific headers from the Claude Code client (spec 5.2). */
@@ -706,6 +1593,7 @@ interface NativeToolBlockState {
 /** Validates native Anthropic SSE and assembles tool input before block_stop is relayed. */
 class NativeAnthropicStreamTracker {
   private readonly toolBlocks = new Map<number, NativeToolBlockState>();
+  private stopReason: string | undefined;
 
   observe(data: string): NativeAnthropicStreamObservation {
     let parsed: unknown;
@@ -725,7 +1613,10 @@ class NativeAnthropicStreamTracker {
       );
     }
 
-    if (parsed.type === "content_block_start") {
+    if (parsed.type === "message_delta") {
+      const delta = isRecord(parsed.delta) ? parsed.delta : undefined;
+      if (typeof delta?.stop_reason === "string") this.stopReason = delta.stop_reason;
+    } else if (parsed.type === "content_block_start") {
       const index = requireStreamIndex(parsed.index);
       const block = isRecord(parsed.content_block) ? parsed.content_block : undefined;
       if (block?.type === "tool_use") {
@@ -774,8 +1665,9 @@ class NativeAnthropicStreamTracker {
         this.toolBlocks.delete(index);
         let input: unknown = state.initialInput;
         if (state.partialJson !== "") {
+          let deltaInput: unknown;
           try {
-            input = JSON.parse(state.partialJson);
+            deltaInput = JSON.parse(state.partialJson);
           } catch (error) {
             throw new AnthropicTranslationError(
               "PROTOCOL_ERROR",
@@ -783,6 +1675,18 @@ class NativeAnthropicStreamTracker {
               { cause: error },
             );
           }
+          if (!isRecord(deltaInput)) {
+            throw new AnthropicTranslationError(
+              "PROTOCOL_ERROR",
+              `Native Anthropic tool block ${index} input delta must be a JSON object.`,
+            );
+          }
+          // Anthropic normally starts tool input with {} and streams the full
+          // object as input_json_delta. Some compatible providers (including
+          // GoRouter/Bedrock routes) put defaulted fields in content_block_start
+          // and stream the remaining fields. Claude Code merges both pieces,
+          // so the anti-replay hash must be built from the same merged object.
+          input = { ...state.initialInput, ...deltaInput };
         }
         if (!isRecord(input)) {
           throw new AnthropicTranslationError(
@@ -808,11 +1712,24 @@ class NativeAnthropicStreamTracker {
           "Native Anthropic stream stopped with an unfinished tool block.",
         );
       }
-      return { terminal: true, terminalError: false };
+      if (!this.stopReason || !["end_turn", "stop_sequence", "tool_use", "max_tokens", "pause_turn", "refusal"].includes(this.stopReason)) {
+        throw new AnthropicTranslationError("PROTOCOL_ERROR", "Native Anthropic stream ended without a valid stop reason.");
+      }
+      return { terminal: true, terminalError: this.stopReason === "max_tokens" || this.stopReason === "pause_turn" };
     } else if (parsed.type === "error") {
       return { terminal: true, terminalError: true };
     }
     return { terminal: false, terminalError: false };
+  }
+}
+
+function extractAnthropicSseUsage(
+  data: string,
+): NormalizedTokenUsage | undefined {
+  try {
+    return extractAnthropicTokenUsage(JSON.parse(data));
+  } catch {
+    return undefined;
   }
 }
 
@@ -1021,35 +1938,24 @@ function sendAnthropicError(
   type: NormalizedErrorType,
   message: string,
   headers: Headers = new Headers(),
-  upstreamBody?: string,
 ): void {
-  let errorPayload: Record<string, unknown> = {
+  const guidance = providerErrorGuidance(type);
+  const errorPayload: Record<string, unknown> = {
     type: anthropicErrorType(status),
     message,
   };
-  // For native relays, prefer the provider's own Anthropic error shape.
-  if (upstreamBody !== undefined) {
-    try {
-      const parsed = JSON.parse(upstreamBody) as unknown;
-      if (
-        isRecord(parsed) &&
-        isRecord(parsed.error) &&
-        typeof parsed.error.type === "string" &&
-        typeof parsed.error.message === "string"
-      ) {
-        errorPayload = parsed.error as Record<string, unknown>;
-      }
-    } catch {
-      // keep the normalized payload
-    }
-  }
   sendJson(
     response,
     status,
     {
       type: "error",
       error: errorPayload,
-      providerdock: { normalized_type: type, http_status: status },
+      providerdock: {
+        normalized_type: type,
+        http_status: status,
+        explanation: guidance.explanation,
+        suggested_action: guidance.suggestedAction,
+      },
     },
     headers,
   );
@@ -1064,6 +1970,24 @@ function anthropicErrorType(status: number): string {
   if (status === 429) return "rate_limit_error";
   if (status === 529) return "overloaded_error";
   return "api_error";
+}
+
+function normalizeSessionInstructions(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim();
+  if (normalized.length === 0) return undefined;
+  if (normalized.length > 256 * 1024) {
+    throw new RangeError("sessionInstructions cannot exceed 262144 characters.");
+  }
+  return normalized;
+}
+
+function providerErrorStatus(type: NormalizedErrorType): number {
+  if (type === "INVALID_REQUEST" || type === "UNSUPPORTED_FEATURE") return 400;
+  if (type === "AUTH_ERROR") return 401;
+  if (type === "PERMISSION_ERROR") return 403;
+  if (type === "TIMEOUT") return 504;
+  return 502;
 }
 
 function bridgeAddress(address: AddressInfo): AnthropicBridgeAddress {
@@ -1095,4 +2019,15 @@ function closeListeningServer(server: Server): Promise<void> {
     server.close((error) => (error ? reject(error) : resolve()));
     server.closeAllConnections?.();
   });
+}
+
+function nativeMessageOutcome(payload: Record<string, unknown>): "complete" | "incomplete" {
+  if (payload.role !== "assistant" || !Array.isArray(payload.content) || !payload.content.length ||
+      !["end_turn", "stop_sequence", "tool_use", "max_tokens", "pause_turn", "refusal"].includes(String(payload.stop_reason))) {
+    throw new ProviderRequestError("INCOMPLETE_RESPONSE", "Native Messages response is missing assistant content or a terminal stop_reason.");
+  }
+  if (payload.stop_reason === "tool_use" && !payload.content.some(item => isRecord(item) && item.type === "tool_use")) {
+    throw new ProviderRequestError("PROTOCOL_ERROR", "Native Messages response finished for tools without a tool call.");
+  }
+  return payload.stop_reason === "max_tokens" || payload.stop_reason === "pause_turn" ? "incomplete" : "complete";
 }

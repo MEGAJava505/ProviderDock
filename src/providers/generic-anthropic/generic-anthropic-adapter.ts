@@ -8,6 +8,7 @@ import type { ProviderAdapter } from "../../core/providers/provider-adapter.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
 import { ProviderHttpRequestBuilder } from "../../core/providers/provider-http-request.js";
+import { readSanitizedProviderErrorBody } from "../../core/security/provider-error-redaction.js";
 
 export const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
 
@@ -52,7 +53,10 @@ export class GenericAnthropicAdapter implements ProviderAdapter {
   }
 
   async discoverModels(profile: ProviderProfile): Promise<readonly DiscoveredProviderModel[]> {
-    const { url, headers } = await this.requests.build(profile, profile.modelsEndpoint);
+    const { url, headers, redactionValues } = await this.requests.build(
+      profile,
+      profile.modelsEndpoint,
+    );
     if (!headers.has("anthropic-version")) {
       headers.set("anthropic-version", DEFAULT_ANTHROPIC_VERSION);
     }
@@ -76,10 +80,16 @@ export class GenericAnthropicAdapter implements ProviderAdapter {
     }
 
     if (!response.ok) {
+      const sanitizedDetail = await readSanitizedProviderErrorBody(response, {
+        sensitiveValues: redactionValues,
+      });
       throw new ProviderRequestError(
         normalizeHttpStatus(response.status),
         `Provider model discovery returned HTTP ${response.status}.`,
-        { httpStatus: response.status },
+        {
+          httpStatus: response.status,
+          ...(sanitizedDetail === undefined ? {} : { sanitizedDetail }),
+        },
       );
     }
 

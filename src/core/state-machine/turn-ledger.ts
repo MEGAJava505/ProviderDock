@@ -156,6 +156,16 @@ export class TurnLedger {
             "start a new turn instead of resending the identical request.",
         );
       }
+      // Snapshots written before input tool history was separated from output
+      // activity marked every tool_use/tool_result already present in the
+      // request as replay-unsafe. That made a provider timeout before response
+      // headers impossible to retry after an otherwise normal tool
+      // continuation. No output from a FAILED, non-streaming attempt reached
+      // the client, so this legacy marker can be repaired safely.
+      if (existing.state === "FAILED" && !existing.streamStarted) {
+        existing.toolActivity = false;
+        existing.replayUnsafe = false;
+      }
       if (existing.replayUnsafe || existing.streamStarted || existing.toolActivity) {
         return blocked(
           "UNSAFE_REPLAY",
@@ -180,12 +190,14 @@ export class TurnLedger {
           "Wait for them to finish or start a new runtime session.",
       );
     }
-    const toolActivity = signature.toolCalls.length > 0 || signature.toolResults.length > 0;
     this.turns.set(signature.fingerprint, {
       state: "ACCEPTED",
       streamStarted: false,
-      toolActivity,
-      replayUnsafe: toolActivity,
+      // Tool blocks in the request are conversation history. They were
+      // executed before this upstream attempt and do not make retrying this
+      // attempt unsafe. Only output observed below may set these flags.
+      toolActivity: false,
+      replayUnsafe: false,
       attempt: 1,
       updatedAtMs: this.now(),
     });

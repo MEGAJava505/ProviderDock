@@ -55,7 +55,7 @@ export function mergeModelCatalog(
   for (const model of discoveredModels) {
     models.set(
       model.modelId,
-      createEntry(profile.id, model.modelId, model.displayName, "discovered", "ONLINE"),
+      createEntry(profile.id, model.modelId, model.displayName, "discovered", "UNKNOWN"),
     );
   }
 
@@ -82,4 +82,3 @@ function createEntry(
     claudeCompatibility: "UNKNOWN",
   };
 }
-

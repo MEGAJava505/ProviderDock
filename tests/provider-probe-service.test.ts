@@ -38,7 +38,7 @@ describe("ProviderProbeService", () => {
       source,
       healthStatus,
     }))).toEqual([
-      { modelId: "discovered", source: "discovered", healthStatus: "ONLINE" },
+      { modelId: "discovered", source: "discovered", healthStatus: "UNKNOWN" },
       { modelId: "manual", source: "manual", healthStatus: "UNKNOWN" },
     ]);
   });

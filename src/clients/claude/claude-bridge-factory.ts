@@ -1,17 +1,26 @@
+import type { ModelProtocolResolver } from "../../core/providers/model-protocol.js";
+import type { ModelAccessCheck } from "../../core/providers/model-access.js";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { AnthropicBridgeAddress } from "../../bridge/anthropic/anthropic-bridge-server.js";
 import { AnthropicBridgeServer } from "../../bridge/anthropic/anthropic-bridge-server.js";
+import type { FallbackNotification } from "../../core/fallback/fallback-session-router.js";
+import type { ProviderFallbackConfiguration } from "../../core/fallback/provider-fallback-configuration.js";
 import type { ProviderAdapterRegistry } from "../../core/providers/provider-adapter-registry.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
 import { FileTurnLedgerStore } from "../../core/state-machine/persistent-turn-ledger.js";
+import type { UsageEventSink } from "../../core/usage/usage-event.js";
+import type { ProviderRuntimeHealthSignalSink } from "../../core/health/provider-runtime-health.js";
 
 export interface CreateClaudeBridgeInput {
   readonly profile: ProviderProfile;
   readonly modelId: string;
   readonly clientToken: string;
   readonly sessionId: string;
+  readonly fallback?: ProviderFallbackConfiguration;
+  readonly onFallback?: (notification: FallbackNotification) => void;
+  readonly sessionInstructions?: string;
 }
 
 export interface ManagedClaudeBridge {
@@ -27,9 +36,13 @@ export interface ClaudeBridgeFactory {
 
 export interface AnthropicClaudeBridgeFactoryOptions {
   readonly secretStore: SecretStore;
+  readonly modelAccessCheck?: ModelAccessCheck;
+  readonly protocolResolver?: ModelProtocolResolver;
   readonly adapterRegistry?: ProviderAdapterRegistry;
   readonly fetchImpl?: typeof fetch;
   readonly runtimeRoot?: string;
+  readonly usageSink?: UsageEventSink;
+  readonly healthSignalSink?: ProviderRuntimeHealthSignalSink;
 }
 
 /** Creates one loopback Anthropic Messages bridge for one Claude Code session. */
@@ -52,12 +65,26 @@ export class AnthropicClaudeBridgeFactory implements ClaudeBridgeFactory {
           });
     const server = new AnthropicBridgeServer({
       profile: input.profile,
+      ...(this.options.protocolResolver ? { protocolResolver: this.options.protocolResolver } : {}),
+      ...(this.options.modelAccessCheck ? { modelAccessCheck: this.options.modelAccessCheck } : {}),
       clientToken: input.clientToken,
       secretStore: this.options.secretStore,
       ...(this.options.adapterRegistry === undefined
         ? {}
         : { adapterRegistry: this.options.adapterRegistry }),
       ...(this.options.fetchImpl === undefined ? {} : { fetchImpl: this.options.fetchImpl }),
+      ...(input.fallback === undefined ? {} : { fallback: input.fallback }),
+      ...(input.onFallback === undefined ? {} : { onFallback: input.onFallback }),
+      ...(input.sessionInstructions === undefined
+        ? {}
+        : { sessionInstructions: input.sessionInstructions }),
+      sessionId: input.sessionId,
+      ...(this.options.usageSink === undefined
+        ? {}
+        : { usageSink: this.options.usageSink }),
+      ...(this.options.healthSignalSink === undefined
+        ? {}
+        : { healthSignalSink: this.options.healthSignalSink }),
       ...(turnLedgerStore === undefined ? {} : { turnLedgerStore }),
     });
     if (sessionDirectory === undefined) return server;

@@ -64,6 +64,61 @@ describe("TurnLedger", () => {
     ).toBe("accepted");
   });
 
+  it("allows retry before output when the request contains resolved tool history", () => {
+    const ledger = new TurnLedger();
+    const call = { callId: "call-history", name: "Bash", argumentsHash: "args-hash" };
+    const continuation = signature({
+      fingerprint: "fp-tool-continuation-timeout",
+      toolCalls: [call],
+      toolResults: [{ callId: call.callId, outputHash: "result-hash" }],
+    });
+
+    const first = ledger.admit(continuation);
+    if (first.decision !== "accepted") throw new Error("expected acceptance");
+    ledger.fail(first.token);
+
+    expect(ledger.admit(continuation).decision).toBe("accepted");
+  });
+
+  it("repairs legacy failed records that mistook input tool history for output", () => {
+    const call = { callId: "call-legacy", name: "Read", argumentsHash: "args-hash" };
+    const ledger = new TurnLedger({
+      initialSnapshot: {
+        version: 1,
+        turns: [
+          {
+            fingerprint: "fp-legacy-tool-timeout",
+            state: "FAILED",
+            streamStarted: false,
+            toolActivity: true,
+            replayUnsafe: true,
+            attempt: 1,
+            updatedAtMs: 1,
+          },
+        ],
+        toolCalls: [
+          {
+            callId: call.callId,
+            name: call.name,
+            argumentsHash: call.argumentsHash,
+            resolved: true,
+            resultHash: "result-hash",
+          },
+        ],
+      },
+    });
+
+    expect(
+      ledger.admit(
+        signature({
+          fingerprint: "fp-legacy-tool-timeout",
+          toolCalls: [call],
+          toolResults: [{ callId: call.callId, outputHash: "result-hash" }],
+        }),
+      ).decision,
+    ).toBe("accepted");
+  });
+
   it("detects the recursive tool loop: resolved call presented as pending again", () => {
     const ledger = new TurnLedger();
     const call = { callId: "call-1", name: "write_file", argumentsHash: "hash-a" };

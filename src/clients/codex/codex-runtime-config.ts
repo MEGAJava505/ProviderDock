@@ -14,6 +14,7 @@ export type CodexLaunchRoute = CodexProviderRoute | { readonly kind: "auto" };
 export interface BuildCodexRuntimeConfigInput {
   readonly profile: ProviderProfile;
   readonly modelId: string;
+  readonly projectDirectory: string;
   readonly route: CodexProviderRoute;
   readonly sessionId: string;
 }
@@ -121,7 +122,12 @@ export class CodexRuntimeConfigFactory {
         )}`,
       );
     }
-    lines.push("");
+    lines.push(
+      "",
+      `[projects.${tomlKey(codexProjectDirectory(input.projectDirectory))}]`,
+      'trust_level = "trusted"',
+      "",
+    );
 
     return { profileName, providerName, contents: lines.join("\n"), environment };
   }
@@ -147,6 +153,14 @@ function validateHttpUrl(value: string): string {
 
 function tomlString(value: string): string {
   return JSON.stringify(value);
+}
+
+function tomlKey(value: string): string {
+  return value.includes("'") ? tomlString(value) : `'${value}'`;
+}
+
+function codexProjectDirectory(value: string): string {
+  return process.platform === "win32" ? value.toLowerCase() : value;
 }
 
 function tomlInlineTable(entries: readonly (readonly [string, string])[]): string {

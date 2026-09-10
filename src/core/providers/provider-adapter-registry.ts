@@ -13,14 +13,29 @@ export class ProviderAdapterRegistry {
     return this;
   }
 
+  listAdapterIds(): readonly string[] {
+    return this.adapters.map((adapter) => adapter.id);
+  }
+
   resolve(profile: ProviderProfile): ProviderAdapter {
-    const adapter = this.adapters.find((candidate) => candidate.supports(profile));
+    const adapter = this.find(profile);
     if (!adapter) throw new UnsupportedProviderError(profile.id, profile.apiType);
     return adapter;
   }
 
   prepareProfile(profile: ProviderProfile): ProviderProfile {
-    const adapter = this.adapters.find((candidate) => candidate.supports(profile));
+    const adapter = this.find(profile);
     return adapter?.prepareProfile?.(profile) ?? profile;
+  }
+
+  private find(profile: ProviderProfile): ProviderAdapter | undefined {
+    const explicit = this.adapters.find(
+      (candidate) => candidate.id === profile.adapterId,
+    );
+    if (explicit !== undefined) {
+      return explicit.supports(profile) ? explicit : undefined;
+    }
+    if (profile.adapterId.startsWith("plugin:")) return undefined;
+    return this.adapters.find((candidate) => candidate.supports(profile));
   }
 }

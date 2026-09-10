@@ -14,11 +14,148 @@ import {
   isBridgePortAllowed,
   parseProviderProfile,
   type ProviderProfile,
+  type ProviderRuntimeHealthSignal,
+  type UsageTelemetryEvent,
 } from "../src/index.js";
 
 const encoder = new TextEncoder();
 
 describe("ResponsesBridgeServer", () => {
+  it("records normalized usage and configured cost for a completed response", async () => {
+    const events: UsageTelemetryEvent[] = [];
+    const bridge = new ResponsesBridgeServer({
+      profile: testProfile({
+        modelPricing: {
+          "gpt-x": {
+            currency: "USD",
+            inputPerMillion: 2,
+            outputPerMillion: 10,
+            cacheReadInputPerMillion: 1,
+          },
+        },
+      }),
+      secretStore: new MemorySecretStore(),
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(
+        jsonResponse({
+          id: "resp-usage",
+          object: "response",
+          status: "completed",
+          output: [],
+          usage: {
+            input_tokens: 100,
+            input_tokens_details: { cached_tokens: 20 },
+            output_tokens: 10,
+          },
+        }),
+      ),
+      models: [{ modelId: "gpt-x" }],
+      sessionId: "11111111111111111111111111111111",
+      usageSink: (event) => {
+        events.push(event);
+      },
+    });
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: "Measure usage",
+      });
+      expect(response.status).toBe(200);
+      await response.json();
+      expect(events).toEqual([
+        expect.objectContaining({
+          providerId: "router",
+          modelId: "gpt-x",
+          client: "codex",
+          protocol: "openai-responses",
+          sessionId: "11111111111111111111111111111111",
+          outcome: "completed",
+          usage: {
+            uncachedInputTokens: 80,
+            cacheReadInputTokens: 20,
+            cacheWriteInputTokens: 0,
+            outputTokens: 10,
+            reasoningOutputTokens: 0,
+            webSearchRequests: 0,
+            totalTokens: 110,
+          },
+          cost: { currency: "USD", microunits: 280 },
+        }),
+      ]);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("records real-traffic health even without usage and normalizes HTTP failures", async () => {
+    const signals: ProviderRuntimeHealthSignal[] = [];
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "resp-health",
+          object: "response",
+          status: "completed",
+          output: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response("unauthorized", { status: 401 }),
+      );
+    const bridge = new ResponsesBridgeServer({
+      profile: testProfile(),
+      secretStore: new MemorySecretStore(),
+      fetchImpl: fetchMock,
+      models: [{ modelId: "gpt-x" }],
+      sessionId: "33333333333333333333333333333333",
+      healthSignalSink: (signal) => {
+        signals.push(signal);
+      },
+    });
+    const address = await bridge.start();
+    try {
+      const completed = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: "health success",
+      });
+      expect(completed.status).toBe(200);
+      await completed.json();
+      const failed = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: "health failure",
+      });
+      expect(failed.status).toBe(401);
+      const failedPayload = (await failed.json()) as {
+        providerdock: { suggested_action: string };
+      };
+      expect(failedPayload.providerdock.suggested_action).toMatch(/secret reference/i);
+
+      expect(signals).toEqual([
+        expect.objectContaining({
+          providerId: "router",
+          modelId: "gpt-x",
+          client: "codex",
+          protocol: "openai-responses",
+          sessionId: "33333333333333333333333333333333",
+          requestId: expect.any(String),
+          outcome: "completed",
+          healthStatus: "ONLINE",
+        }),
+        expect.objectContaining({
+          outcome: "failed",
+          healthStatus: "AUTH_ERROR",
+          errorType: "AUTH_ERROR",
+          sessionId: "33333333333333333333333333333333",
+          requestId: expect.any(String),
+          httpStatus: 401,
+          executionPhase: "request-rejected",
+        }),
+      ]);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it("returns 503 and never contacts upstream when ledger persistence fails", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     const bridge = new ResponsesBridgeServer({
@@ -100,8 +237,50 @@ describe("ResponsesBridgeServer", () => {
   it("rejects ports forbidden by Fetch clients", () => {
     expect(isBridgePortAllowed(6000)).toBe(false);
     expect(isBridgePortAllowed(6667)).toBe(false);
+    expect(isBridgePortAllowed(4190)).toBe(false);
+    expect(isBridgePortAllowed(6679)).toBe(false);
     expect(isBridgePortAllowed(10080)).toBe(false);
     expect(isBridgePortAllowed(45678)).toBe(true);
+  });
+
+  it("prepends session prompt-profile instructions before upstream contact", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        model: "gpt-x",
+        instructions:
+          "Profile instructions.\n\nClient turn instructions.",
+      });
+      return jsonResponse({
+        id: "resp-profile",
+        object: "response",
+        status: "completed",
+        output: [],
+      });
+    });
+    const bridge = new ResponsesBridgeServer({
+      profile: testProfile(),
+      secretStore: new MemorySecretStore(),
+      fetchImpl: fetchMock,
+      models: [{ modelId: "gpt-x" }],
+      sessionInstructions: "Profile instructions.",
+    });
+    const address = await bridge.start();
+    try {
+      const response = await fetch(`${address.baseUrl}/responses`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-x",
+          input: "Hello",
+          instructions: "Client turn instructions.",
+          stream: false,
+        }),
+      });
+      expect(response.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await bridge.stop();
+    }
   });
 
   it("binds to loopback and serves health plus OpenAI/Codex model catalogs", async () => {
@@ -236,14 +415,14 @@ describe("ResponsesBridgeServer", () => {
       expect(jsonEvents.find((event) => event.type === "response.completed")).toMatchObject({
         response: { output: [outputItem] },
       });
-      expect(decoded.at(-1)?.data).toBe("[DONE]");
+      expect(jsonEvents.at(-1)?.type).toBe("response.completed");
       expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       await bridge.stop();
     }
   });
 
-  it("synthesizes completion only for fully completed output and fails pending output", async () => {
+  it("fails missing terminal responses even when observed output items finished", async () => {
     const completeSource = [
       encodeJsonEvent({
         type: "response.output_item.done",
@@ -270,9 +449,9 @@ describe("ResponsesBridgeServer", () => {
 
     try {
       const completed = await postStream(address.baseUrl);
-      expect(completed.find((event) => event.type === "response.completed")).toMatchObject({
+      expect(completed.find((event) => event.type === "response.failed")).toMatchObject({
         sequence_number: 4,
-        response: { status: "completed" },
+        response: { status: "failed" },
       });
 
       const failed = await postStream(address.baseUrl, "Work on the pending case");

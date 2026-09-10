@@ -62,6 +62,37 @@ describe("GenericOpenAiAdapter", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("retains only a sanitized upstream error detail", async () => {
+    const adapter = new GenericOpenAiAdapter({
+      secretStore: new MemorySecretStore(),
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              message: "api_key=sk-secret12345 rejected",
+              code: "invalid_api_key",
+              raw: "must-not-be-retained",
+            },
+          }),
+          { status: 401 },
+        ),
+      ),
+    });
+
+    await expect(
+      adapter.discoverModels(
+        parseProviderProfile({
+          id: "router",
+          displayName: "Router",
+          baseUrl: "https://example.test/v1",
+        }),
+      ),
+    ).rejects.toMatchObject({
+      type: "AUTH_ERROR",
+      sanitizedDetail: expect.stringContaining("[REDACTED]"),
+    });
+  });
+
   it("normalizes malformed success payloads as protocol errors", async () => {
     const adapter = new GenericOpenAiAdapter({
       secretStore: new MemorySecretStore(),

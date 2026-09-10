@@ -8,6 +8,8 @@ Chat providers through a managed loopback Anthropic Messages bridge (spec
 
 ```text
 providerdock launch claude --provider ID --model MODEL --project DIRECTORY
+providerdock launch claude --logical-model ID --project DIRECTORY
+providerdock launch claude --prompt-profile ID --project DIRECTORY
 ```
 
 Lifecycle:
@@ -26,6 +28,16 @@ Lifecycle:
    cannot bypass the bridge. The global environment is never mutated.
 3. When Claude Code exits, the bridge stops and the session is cleaned up.
 
+For `--logical-model`, `ANTHROPIC_MODEL` contains the logical ID. The bridge
+selects an enabled priority route, rewrites the request model to that route's
+provider-specific ID, and keeps the successful route sticky for the runtime
+session.
+
+For `--prompt-profile`, the bridge prepends the stored instructions to the
+Anthropic `system` prompt without creating or editing project files. Profile
+Claude flags are applied only to the child process; the profile's physical or
+logical routing preference determines the model exposed in `ANTHROPIC_MODEL`.
+
 ## Bridge modes
 
 The bridge picks its mode from the provider profile `apiType`:
@@ -33,13 +45,37 @@ The bridge picks its mode from the provider profile `apiType`:
 | Provider apiType             | Mode               | Behaviour |
 |------------------------------|--------------------|-----------|
 | `anthropic-messages`         | `native-anthropic` | Verbatim relay. Provider auth is injected from the secret store; `anthropic-version` / `anthropic-beta` headers from Claude Code are preserved (`anthropic-version` defaults to `2023-06-01`). The child's loopback token is never forwarded upstream. |
-| `auto`, `openai-chat-completions` | `openai-chat` | Protocol translation: Anthropic Messages request → OpenAI Chat Completions, then Chat response/SSE → strictly ordered Anthropic stream (`message_start → content_block_* → message_delta → message_stop`). |
+| `openai-chat-completions` | `openai-chat` | Always uses Chat translation, including GoRouter and Claude-named models. |
+| `openai-responses` | `openai-responses` | Translates Anthropic Messages requests, JSON responses and SSE while preserving message roles and tool-call IDs. |
+| `auto` | Native, Chat or Responses | Uses recent successful traffic, fresh diagnostics and provider metadata for the exact model. Definitive 404/405/501 endpoint rejection may select another representable OpenAI protocol before output. The result is cached per provider/model. |
 
-Explicit `openai-responses` profiles are rejected until an
-Anthropic↔Responses translator exists; silently routing them to
-`/chat/completions` would contradict the configured capability.
+An accepted response, timeout, authentication error, rate limit or partial stream never
+triggers another generation attempt. Features that cannot be represented across the
+selected protocols fail explicitly instead of being silently dropped.
 
-Translation details (openai-chat mode):
+## Logical-model fallback
+
+A logical-model bridge may mix native Anthropic routes with OpenAI Chat routes.
+Fallback is attempted only before client-visible output and only when the
+failure boundary is proven safe:
+
+- connection establishment was refused/unreachable before acceptance;
+- the provider explicitly rejected the request (4xx, 501, or 503); or
+- retained `tool_use`/`tool_result` history proves a complete continuation.
+
+Ambiguous transport failures, response-header timeouts, gateway errors such as
+502, partial streams, and unresolved tool history block fallback. Once an
+upstream response is selected, translation or streaming failures never cause a
+second route to receive the turn.
+
+Successful responses identify the selected route with
+`x-providerdock-provider-id`; switches also include
+`x-providerdock-fallback-*` headers. `/health` keeps `provider_id` fixed to the
+managed bridge's primary identity and reports `active_provider_id`,
+`logical_model_id`, the sticky fallback snapshot, and the last notification.
+The launcher prints each switch to stderr.
+
+## Translation details (OpenAI modes)
 
 - `system` (string or blocks) → system message;
 - `tool_use` blocks → `tool_calls`; `tool_result` blocks → `role: "tool"` messages;
@@ -47,10 +83,19 @@ Translation details (openai-chat mode):
 - `finish_reason` → `stop_reason`: `tool_calls→tool_use`, `length→max_tokens`,
   `content_filter→refusal`, `stop→end_turn`;
 - usage: `prompt_tokens→input_tokens`, `completion_tokens→output_tokens`;
-- `reasoning_content` → `thinking` blocks;
+- Responses routes preserve ordered user/assistant history plus function calls and
+  function results instead of flattening assistant state into a new user prompt;
+- Responses terminal snapshots add only text not already emitted as stream deltas;
+- Claude-model profiles in `auto` mode first try the native Messages route so genuine
+  thinking signatures are preserved; a definitively unsupported native route
+  falls back to Chat Completions for that provider/model for the rest of the session;
+- unsigned Chat `reasoning_content` is never forged into an Anthropic thinking
+  block; it is ignored when normal text/tools exist and used as plain text only
+  when it is the provider's sole output;
 - assistant thinking history is preserved as `reasoning_content`; explicit
-  extended-thinking configuration and redacted thinking are rejected until
-  they can be represented without guessing;
+  Anthropic `thinking`/`output_config` controls are omitted on the Chat fallback,
+  while redacted thinking remains rejected because its hidden content cannot
+  be represented;
 - unknown tools, malformed JSON arguments, missing finish reasons, and
   conflicting stream identity are terminal protocol errors;
 - parallel Chat tool calls are buffered until every name, ID, and JSON
@@ -61,7 +106,9 @@ Translation details (openai-chat mode):
 Errors are always returned in the Anthropic error shape
 (`{"type":"error","error":{"type":"authentication_error",...}}`) with the
 normalized ProviderDock type attached in a `providerdock` block. In native
-mode the provider's own well-formed Anthropic error body is passed through.
+mode ProviderDock returns an Anthropic-shaped normalized error with only a
+bounded, redacted diagnostic extracted from the provider body; arbitrary
+provider error fields are never copied to the client.
 
 ## Anti-replay
 

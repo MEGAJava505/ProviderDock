@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  GenericAnthropicAdapter,
   GenericOpenAiAdapter,
   MemorySecretStore,
   ProviderAdapterRegistry,
@@ -11,7 +12,7 @@ function doctorWith(fetchImpl: typeof fetch): ProviderDoctor {
   const secrets = new MemorySecretStore();
   const registry = new ProviderAdapterRegistry().register(
     new GenericOpenAiAdapter({ secretStore: secrets, fetchImpl }),
-  );
+  ).register(new GenericAnthropicAdapter({ secretStore: secrets, fetchImpl }));
   return new ProviderDoctor({ secretStore: secrets, adapterRegistry: registry, fetchImpl });
 }
 
@@ -68,7 +69,11 @@ describe("ProviderDoctor", () => {
       }
       if (Array.isArray(body.tools)) {
         // First tool request returns the call; the continuation has input history.
-        return Array.isArray(body.input) ? json(completedText) : json(toolCallResponse);
+        if (!Array.isArray(body.input)) return json(toolCallResponse);
+        const result = body.input.find((item: { type: string }) => item.type === "function_call_output") as { output: string };
+        return json({ ...completedText, output: [
+          { type: "message", role: "assistant", content: [{ type: "output_text", text: JSON.parse(result.output).receipt }] },
+        ] });
       }
       return json(completedText);
     });
@@ -132,5 +137,110 @@ describe("ProviderDoctor", () => {
     const streaming = report.checks.find((check) => check.name === "streaming");
     expect(streaming).toMatchObject({ status: "FAIL" });
     expect(report.verdict).toBe("FAIL");
+  });
+
+  it("runs native Anthropic inference, streaming, and tool continuation diagnostics", async () => {
+    const anthropicProfile = parseProviderProfile({
+      id: "anthropic",
+      displayName: "Anthropic Test",
+      baseUrl: "https://anthropic.test/v1",
+      apiType: "anthropic-messages",
+      timeoutMs: 2_000,
+    });
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/models")) {
+        return json({ data: [{ id: "claude-x", display_name: "Claude X" }] });
+      }
+      expect(url).toBe("https://anthropic.test/v1/messages");
+      expect(new Headers(init?.headers).get("anthropic-version")).toBe("2023-06-01");
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      if (body.stream === true) {
+        return new Response(
+          [
+            'event: message_start\ndata: {"type":"message_start","message":{"id":"msg-stream","type":"message","role":"assistant","content":[]}}\n\n',
+            'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":1}}\n\n',
+            'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+          ].join(""),
+          { headers: { "content-type": "text/event-stream" } },
+        );
+      }
+      if (Array.isArray(body.tools)) {
+        const messages = Array.isArray(body.messages) ? body.messages : [];
+        const hasToolResult = messages.some(
+          (message) =>
+            typeof message === "object" &&
+            message !== null &&
+            Array.isArray((message as { content?: unknown }).content) &&
+            ((message as { content: unknown[] }).content).some(
+              (block) =>
+                typeof block === "object" &&
+                block !== null &&
+                (block as { type?: unknown }).type === "tool_result",
+            ),
+        );
+        if (hasToolResult) {
+          const result = (messages as { content: { type: string; content: string }[] }[])
+            .flatMap((message) => Array.isArray(message.content) ? message.content : [])
+            .find((block) => block.type === "tool_result");
+          return json({
+            id: "msg-final",
+            type: "message",
+            role: "assistant",
+            model: "claude-x",
+            content: [{ type: "text", text: JSON.parse(result!.content).receipt }],
+            stop_reason: "end_turn",
+            usage: { input_tokens: 10, output_tokens: 2 },
+          });
+        }
+        expect(body.tool_choice).toEqual({
+          type: "tool",
+          name: "providerdock_echo",
+        });
+        return json({
+          id: "msg-tool",
+          type: "message",
+          role: "assistant",
+          model: "claude-x",
+          content: [
+            {
+              type: "tool_use",
+              id: "toolu-1",
+              name: "providerdock_echo",
+              input: { value: "ok" },
+            },
+          ],
+          stop_reason: "tool_use",
+          usage: { input_tokens: 8, output_tokens: 3 },
+        });
+      }
+      return json({
+        id: "msg-inference",
+        type: "message",
+        role: "assistant",
+        model: "claude-x",
+        content: [{ type: "text", text: "OK" }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 4, output_tokens: 1 },
+      });
+    });
+
+    const report = await doctorWith(fetchMock).run(anthropicProfile, { level: 3 });
+
+    expect(report).toMatchObject({
+      providerId: "anthropic",
+      modelId: "claude-x",
+      protocol: "anthropic-messages",
+      level: 3,
+      verdict: "PASS",
+    });
+    expect(report.checkedAt).toMatch(/Z$/);
+    expect(report.checks.map((check) => [check.name, check.status])).toEqual([
+      ["connectivity+models", "PASS"],
+      ["inference", "PASS"],
+      ["streaming", "PASS"],
+      ["tools", "PASS"],
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 });

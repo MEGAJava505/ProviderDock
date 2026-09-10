@@ -82,6 +82,61 @@ describe("translateAnthropicRequestToChat", () => {
       AnthropicTranslationError,
     );
   });
+
+  it("normalizes system and developer instruction turns emitted by coding clients", () => {
+    const { chatRequest } = translateAnthropicRequestToChat({
+      model: "m",
+      max_tokens: 64,
+      messages: [
+        { role: "system", content: "System instruction." },
+        { role: "developer", content: [{ type: "text", text: "Developer instruction." }] },
+        { role: "user", content: "Hi" },
+      ],
+    });
+
+    expect(chatRequest.messages).toEqual([
+      { role: "system", content: "System instruction." },
+      { role: "system", content: "Developer instruction." },
+      { role: "user", content: "Hi" },
+    ]);
+  });
+
+  it("gracefully omits Anthropic thinking controls for generic Chat Completions", () => {
+    const { chatRequest } = translateAnthropicRequestToChat({
+      model: "claude-opus-5-thinking",
+      max_tokens: 16_000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "max" },
+      messages: [
+        { role: "user", content: "Hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "Previous reasoning.", signature: "sig" },
+            { type: "text", text: "Previous answer." },
+          ],
+        },
+        { role: "user", content: "Continue" },
+      ],
+    });
+
+    expect(chatRequest).toMatchObject({
+      model: "claude-opus-5-thinking",
+      max_tokens: 16_000,
+      messages: [
+        { role: "user", content: "Hi" },
+        {
+          role: "assistant",
+          content: "Previous answer.",
+          reasoning_content: "Previous reasoning.",
+        },
+        { role: "user", content: "Continue" },
+      ],
+    });
+    expect(chatRequest).not.toHaveProperty("thinking");
+    expect(chatRequest).not.toHaveProperty("output_config");
+    expect(chatRequest).not.toHaveProperty("reasoning_effort");
+  });
 });
 
 describe("translateChatResponseToAnthropic", () => {
@@ -105,7 +160,11 @@ describe("translateChatResponseToAnthropic", () => {
             },
           },
         ],
-        usage: { prompt_tokens: 7, completion_tokens: 3 },
+        usage: {
+          prompt_tokens: 7,
+          prompt_tokens_details: { cached_tokens: 2 },
+          completion_tokens: 3,
+        },
       },
       { model: "m-1", allowedToolNames: ["lookup"] },
     );
@@ -115,7 +174,11 @@ describe("translateChatResponseToAnthropic", () => {
       role: "assistant",
       model: "provider-m",
       stop_reason: "tool_use",
-      usage: { input_tokens: 7, output_tokens: 3 },
+      usage: {
+        input_tokens: 5,
+        cache_read_input_tokens: 2,
+        output_tokens: 3,
+      },
     });
     const content = translated.content as Array<Record<string, unknown>>;
     expect(content[0]).toEqual({ type: "text", text: "Working on it." });
@@ -177,6 +240,40 @@ describe("translateChatResponseToAnthropic", () => {
       ),
     ).toThrow(/finish reason/i);
   });
+
+  it("never forges unsigned Chat reasoning into an Anthropic thinking block", () => {
+    const reasoningOnly = translateChatResponseToAnthropic(
+      {
+        id: "chat-reasoning-only",
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { role: "assistant", content: null, reasoning_content: "A safe fallback." },
+          },
+        ],
+      },
+      { model: "claude-x" },
+    );
+    expect(reasoningOnly.content).toEqual([{ type: "text", text: "A safe fallback." }]);
+
+    const withAnswer = translateChatResponseToAnthropic(
+      {
+        id: "chat-reasoning-answer",
+        choices: [
+          {
+            finish_reason: "stop",
+            message: {
+              role: "assistant",
+              content: "Final answer.",
+              reasoning_content: "Private scratch work.",
+            },
+          },
+        ],
+      },
+      { model: "claude-x" },
+    );
+    expect(withAnswer.content).toEqual([{ type: "text", text: "Final answer." }]);
+  });
 });
 
 describe("ChatToAnthropicStreamTranslator", () => {
@@ -207,7 +304,11 @@ describe("ChatToAnthropicStreamTranslator", () => {
         choices: [
           { delta: { tool_calls: [{ index: 0, function: { arguments: "1}" } }] }, finish_reason: "tool_calls" },
         ],
-        usage: { prompt_tokens: 5, completion_tokens: 2 },
+        usage: {
+          prompt_tokens: 5,
+          prompt_tokens_details: { cached_tokens: 1 },
+          completion_tokens: 2,
+        },
       }),
       ...translator.finish(),
     ];
@@ -235,7 +336,11 @@ describe("ChatToAnthropicStreamTranslator", () => {
     });
     expect(events[8]!.data).toMatchObject({
       delta: { stop_reason: "tool_use" },
-      usage: { input_tokens: 5, output_tokens: 2 },
+      usage: {
+        input_tokens: 4,
+        cache_read_input_tokens: 1,
+        output_tokens: 2,
+      },
     });
     expect(translator.terminalEventSeen).toBe(true);
     expect(translator.finish()).toEqual([]);
@@ -300,5 +405,30 @@ describe("ChatToAnthropicStreamTranslator", () => {
       },
     ]);
     expect(translator.terminalEventSeen).toBe(true);
+  });
+
+  it("buffers unsigned streamed reasoning and uses text only as a last resort", () => {
+    const translator = new ChatToAnthropicStreamTranslator({ model: "claude-x" });
+    const events = [
+      ...translator.feed({
+        choices: [{ delta: { reasoning_content: "Fallback reasoning." } }],
+      }),
+      ...translator.feed({ choices: [{ delta: {}, finish_reason: "stop" }] }),
+      ...translator.finish(),
+    ];
+
+    expect(events.some((event) =>
+      event.data.type === "content_block_delta" &&
+      (event.data.delta as Record<string, unknown> | undefined)?.type === "thinking_delta"
+    )).toBe(false);
+    expect(events).toContainEqual({
+      event: "content_block_delta",
+      data: {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Fallback reasoning." },
+      },
+    });
+    expect(translator.terminalSucceeded).toBe(true);
   });
 });

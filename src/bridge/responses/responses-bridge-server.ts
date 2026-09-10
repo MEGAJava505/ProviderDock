@@ -1,3 +1,5 @@
+import type { ModelProtocolResolver } from "../../core/providers/model-protocol.js";
+import { assertModelEnabled, ModelDisabledError, type ModelAccessCheck } from "../../core/providers/model-access.js";
 import {
   createServer,
   type IncomingMessage,
@@ -5,8 +7,10 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
+import { randomUUID } from "node:crypto";
 import {
   normalizeHttpStatus,
+  providerErrorGuidance,
   ProviderRequestError,
   type NormalizedErrorType,
 } from "../../core/errors/provider-error.js";
@@ -14,12 +18,29 @@ import type { ProviderAdapterRegistry } from "../../core/providers/provider-adap
 import { ProviderHttpRequestBuilder } from "../../core/providers/provider-http-request.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
+import { readSanitizedProviderErrorBody } from "../../core/security/provider-error-redaction.js";
+import {
+  FallbackSessionRouter,
+  type FallbackFailure,
+  type FallbackFailurePhase,
+  type FallbackNotification,
+} from "../../core/fallback/fallback-session-router.js";
+import {
+  fallbackFailurePhaseForHttpStatus,
+  isConnectionEstablishmentFailure,
+} from "../../core/fallback/fallback-failure-policy.js";
+import {
+  logicalRouteKey,
+  type LogicalModelRoute,
+} from "../../core/fallback/logical-model.js";
+import type { ProviderFallbackConfiguration } from "../../core/fallback/provider-fallback-configuration.js";
 import { encodeSseEvent } from "../sse/sse-decoder.js";
 import {
   createCodexModelCatalog,
   type BridgeModelDefinition,
 } from "./codex-model-catalog.js";
 import { relayResponsesStream } from "./responses-stream-relay.js";
+import { normalizeResponsesResponse } from "../../protocols/openai-responses/response-normalization.js";
 import {
   ResponsesStreamProtocolError,
   isJsonRecord,
@@ -42,6 +63,7 @@ import {
   TurnLedgerViolationError,
   extractResponsesDeliveredToolCalls,
   extractResponsesTurnSignature,
+  type TurnSignature,
   type TurnToken,
 } from "../../core/state-machine/turn-ledger.js";
 import {
@@ -49,22 +71,35 @@ import {
   TurnLedgerPersistenceError,
   type TurnLedgerStore,
 } from "../../core/state-machine/persistent-turn-ledger.js";
+import {
+  TokenUsageAccumulator,
+  createUsageTelemetryEvent,
+  extractOpenAiTokenUsage,
+  type NormalizedTokenUsage,
+  type UsageEventSink,
+  type UsageOutcome,
+  type UsageProtocol,
+} from "../../core/usage/usage-event.js";
+import {
+  createProviderRuntimeHealthSignal,
+  type ProviderRuntimeHealthSignalSink,
+  type ProviderRuntimeOutcome,
+} from "../../core/health/provider-runtime-health.js";
 
 const loopbackHost = "127.0.0.1";
 const defaultBodyLimitBytes = 64 * 1024 * 1024;
-const fetchForbiddenPorts = new Set([
-  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79,
-  87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137,
-  139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
-  540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723,
-  2049, 3659, 4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697,
-  10080,
-]);
+import { isLoopbackPortAllowed } from "../../core/http/loopback-port.js";
 
 export interface ResponsesBridgeServerOptions {
   readonly profile: ProviderProfile;
   readonly secretStore: SecretStore;
+  readonly modelAccessCheck?: ModelAccessCheck;
+  readonly protocolResolver?: ModelProtocolResolver;
   readonly adapterRegistry?: ProviderAdapterRegistry;
+  readonly fallback?: ResponsesBridgeFallbackConfiguration;
+  readonly onFallback?: (notification: FallbackNotification) => void;
+  /** Session-scoped prompt-profile instructions prepended to every turn. */
+  readonly sessionInstructions?: string;
   readonly models?: readonly BridgeModelDefinition[];
   readonly responsesEndpoint?: string;
   readonly chatCompletionsEndpoint?: string;
@@ -75,13 +110,41 @@ export interface ResponsesBridgeServerOptions {
   readonly streamIdleTimeoutMs?: number;
   readonly maxSseEventCharacters?: number;
   readonly turnLedgerStore?: TurnLedgerStore;
+  readonly sessionId?: string;
+  readonly usageSink?: UsageEventSink;
+  readonly healthSignalSink?: ProviderRuntimeHealthSignalSink;
 }
+
+export type ResponsesBridgeFallbackConfiguration = ProviderFallbackConfiguration;
 
 export interface ResponsesBridgeAddress {
   readonly host: typeof loopbackHost;
   readonly port: number;
   readonly url: string;
   readonly baseUrl: string;
+}
+
+interface ResolvedBridgeRoute {
+  readonly route: LogicalModelRoute;
+  readonly profile: ProviderProfile;
+}
+
+interface OpenedUpstream {
+  readonly upstream: Response;
+  readonly redactionValues: readonly string[];
+  readonly canonicalRequest?: CanonicalRequest;
+}
+
+interface RouteSelectionMetadata {
+  readonly route: ResolvedBridgeRoute;
+  readonly notification?: FallbackNotification;
+}
+
+interface SelectedUpstream extends OpenedUpstream, RouteSelectionMetadata {
+  readonly fallbackBlock?: {
+    readonly code: string;
+    readonly message: string;
+  };
 }
 
 export class ResponsesBridgeServer {
@@ -98,13 +161,75 @@ export class ResponsesBridgeServer {
   private readonly maxSseEventCharacters: number;
   private readonly activeUpstreamRequests = new Set<AbortController>();
   private readonly turnLedger: PersistentTurnLedger;
+  private readonly fallbackSession: FallbackSessionRouter | undefined;
+  private readonly fallbackRoutes = new Map<string, ResolvedBridgeRoute>();
+  private readonly autoChatRoutes = new Set<string>();
+  private readonly onFallback: ((notification: FallbackNotification) => void) | undefined;
+  private readonly sessionInstructions: string | undefined;
+  private readonly sessionId: string;
+  private readonly usageSink: UsageEventSink | undefined;
+  private readonly healthSignalSink: ProviderRuntimeHealthSignalSink | undefined;
+  private readonly pendingHealthSignals = new Set<Promise<void>>();
+  private lastFallback: FallbackNotification | undefined;
   private server: Server | undefined;
   private startTask: Promise<ResponsesBridgeAddress> | undefined;
   private stopTask: Promise<void> | undefined;
   private startedAt: number | undefined;
 
+  private readonly modelAccessCheck: ModelAccessCheck | undefined;
+  private readonly protocolResolver: ModelProtocolResolver | undefined;
+  private readonly resolvedProtocols = new Map<string, UsageProtocol>();
+
   constructor(options: ResponsesBridgeServerOptions) {
-    this.profile = options.adapterRegistry?.prepareProfile(options.profile) ?? options.profile;
+    const prepareProfile = (profile: ProviderProfile): ProviderProfile =>
+      options.adapterRegistry?.prepareProfile(profile) ?? profile;
+    const preparedPrimary = prepareProfile(options.profile);
+    if (options.fallback === undefined) {
+    this.modelAccessCheck = options.modelAccessCheck;
+    this.protocolResolver = options.protocolResolver;
+    this.profile = preparedPrimary;
+      this.fallbackSession = undefined;
+    } else {
+      this.fallbackSession = new FallbackSessionRouter(options.fallback.logicalModel);
+      const profiles = new Map<string, ProviderProfile>();
+      for (const rawProfile of options.fallback.profiles) {
+        const profile = prepareProfile(rawProfile);
+        if (profiles.has(profile.id)) {
+          throw new TypeError(`Duplicate fallback provider profile '${profile.id}'.`);
+        }
+        profiles.set(profile.id, profile);
+      }
+      for (const route of this.fallbackSession.routes) {
+        const profile = profiles.get(route.providerId);
+        if (profile === undefined) {
+          throw new TypeError(
+            `Logical model '${this.fallbackSession.group.id}' has no profile for provider '${route.providerId}'.`,
+          );
+        }
+        if (!profile.enabled) {
+          throw new TypeError(
+            `Logical model '${this.fallbackSession.group.id}' route '${logicalRouteKey(route)}' uses a disabled provider.`,
+          );
+        }
+        this.fallbackRoutes.set(logicalRouteKey(route), { route, profile });
+      }
+      const preferred = this.fallbackSession.routes[0];
+      if (preferred === undefined) {
+        throw new TypeError("A fallback bridge requires at least one enabled route.");
+      }
+      const preferredProfile = this.requireFallbackRoute(preferred).profile;
+      if (preparedPrimary.id !== preferredProfile.id) {
+        throw new TypeError(
+          `Fallback bridge primary profile '${preparedPrimary.id}' does not match preferred route provider '${preferredProfile.id}'.`,
+        );
+      }
+      this.profile = preferredProfile;
+    }
+    this.onFallback = options.onFallback;
+    this.sessionInstructions = normalizeSessionInstructions(options.sessionInstructions);
+    this.sessionId = options.sessionId ?? `bridge-${randomUUID()}`;
+    this.usageSink = options.usageSink;
+    this.healthSignalSink = options.healthSignalSink;
     this.requests = new ProviderHttpRequestBuilder(options.secretStore);
     this.models = normalizeModels(
       options.models ?? this.profile.manualModelIds.map((modelId) => ({ modelId })),
@@ -212,7 +337,10 @@ export class ResponsesBridgeServer {
     const server = this.server;
     this.server = undefined;
     this.startedAt = undefined;
-    if (server === undefined) return;
+    if (server === undefined) {
+      await this.flushHealthSignals();
+      return;
+    }
 
     for (const controller of this.activeUpstreamRequests) {
       controller.abort(new Error("ProviderDock Responses bridge is stopping."));
@@ -223,6 +351,7 @@ export class ResponsesBridgeServer {
       server.close((error) => (error ? reject(error) : resolve()));
       server.closeAllConnections?.();
     });
+    await this.flushHealthSignals();
   }
 
   private async handleRequest(
@@ -236,9 +365,22 @@ export class ResponsesBridgeServer {
         this.methodNotAllowed(response, "GET");
         return;
       }
+      const activeProfile = this.activeRouteProfile();
       sendJson(response, 200, {
         status: "ok",
+        // Keep the bridge identity stable for crash recovery even when the
+        // session's sticky logical-model route changes underneath it.
         provider_id: this.profile.id,
+        ...(this.fallbackSession === undefined
+          ? {}
+          : {
+              logical_model_id: this.fallbackSession.group.id,
+              active_provider_id: activeProfile.id,
+              fallback: this.fallbackSession.snapshot(),
+              ...(this.lastFallback === undefined
+                ? {}
+                : { last_fallback: this.lastFallback }),
+            }),
         uptime_ms: this.startedAt === undefined ? 0 : Date.now() - this.startedAt,
         active_requests: this.activeUpstreamRequests.size,
       });
@@ -256,7 +398,7 @@ export class ResponsesBridgeServer {
           id: model.modelId,
           object: "model",
           created: 0,
-          owned_by: this.profile.id,
+          owned_by: this.fallbackSession?.group.id ?? this.profile.id,
         })),
         models: createCodexModelCatalog(this.models),
       });
@@ -294,9 +436,13 @@ export class ResponsesBridgeServer {
 
     let turnToken: TurnToken | undefined;
     let turnOutcome: "complete" | "fail" | "cancel" | "incomplete" = "fail";
+    const usageRequestId = randomUUID();
     try {
-      const body = await readJsonObject(request, this.requestBodyLimitBytes);
-      const admission = await this.turnLedger.admit(extractResponsesTurnSignature(body));
+      const body = this.applySessionInstructions(
+        await readJsonObject(request, this.requestBodyLimitBytes),
+      );
+      const turnSignature = extractResponsesTurnSignature(body);
+      const admission = await this.turnLedger.admit(turnSignature);
       if (admission.decision === "blocked") {
         const headers = new Headers({ "x-providerdock-turn-block": admission.code });
         sendBridgeError(response, 409, "INVALID_REQUEST", admission.message, headers);
@@ -304,150 +450,158 @@ export class ResponsesBridgeServer {
       }
       turnToken = admission.token;
       const wantsStream = body.stream === true;
-      if (
-        !["auto", "openai-responses", "openai-chat-completions"].includes(
-          this.profile.apiType,
-        )
-      ) {
-        throw new BridgeRequestError(
-          400,
-          "UNSUPPORTED_FEATURE",
-          `Bridge cannot translate provider API type '${this.profile.apiType}' yet.`,
-        );
-      }
-      const chatTranslation =
-        this.profile.apiType === "openai-chat-completions"
-          ? translateResponsesRequestToChat(body)
-          : undefined;
-      const upstreamPayload = chatTranslation?.chatRequest ?? body;
-      const endpoint =
-        chatTranslation === undefined ? this.responsesEndpoint : this.chatCompletionsEndpoint;
-      const built = await this.requests.build(this.profile, endpoint, {
-        accept: wantsStream ? "text/event-stream, application/json" : "application/json",
-        contentType: "application/json",
-      });
-
-      let headerTimedOut = false;
-      const headerTimer = setTimeout(() => {
-        headerTimedOut = true;
-        controller.abort(new Error("Upstream response headers timed out."));
-      }, this.profile.timeoutMs);
-      headerTimer.unref?.();
-
-      let upstream: Response;
+      let selectedForHealth: SelectedUpstream | undefined;
       try {
-        upstream = await this.fetchImpl(built.url, {
-          method: "POST",
-          headers: built.headers,
-          body: JSON.stringify(upstreamPayload),
-          signal: controller.signal,
-        });
+        const selected = await this.openUpstream(
+          body,
+          wantsStream,
+          controller,
+          turnSignature,
+          usageRequestId,
+        );
+        selectedForHealth = selected;
+        const { upstream } = selected;
+
+        if (!upstream.ok) {
+          const sanitizedDetail = await readSanitizedProviderErrorBody(upstream, {
+            sensitiveValues: selected.redactionValues,
+          });
+          const normalizedType = normalizeHttpStatus(upstream.status);
+          const headers = this.routeHeaders(
+            safeUpstreamHeaders(upstream, false),
+            selected,
+          );
+          if (selected.fallbackBlock !== undefined) {
+            headers.set("x-providerdock-fallback-block", selected.fallbackBlock.code);
+          }
+          sendBridgeError(
+            response,
+            upstream.status,
+            normalizedType,
+            `Provider '${selected.route.profile.displayName}' returned HTTP ${upstream.status}.${sanitizedDetail === undefined ? "" : ` ${sanitizedDetail}`}`,
+            headers,
+          );
+          return;
+        }
+
+        const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
+        const isEventStream = contentType.includes("text/event-stream");
+        if (selected.canonicalRequest !== undefined) {
+          turnOutcome = await this.handleChatUpstream(
+            response,
+            upstream,
+            wantsStream,
+            isEventStream,
+            selected.canonicalRequest,
+            controller,
+            turnToken,
+            selected,
+            usageRequestId,
+          );
+          return;
+        }
+        if (wantsStream && isEventStream) {
+          if (upstream.body === null) {
+            throw new BridgeRequestError(
+              502,
+              "STREAM_ERROR",
+              "Provider returned an empty streaming response body.",
+            );
+          }
+          response.writeHead(
+            200,
+            headersToNode(
+              this.routeHeaders(safeUpstreamHeaders(upstream, true), selected),
+            ),
+          );
+          response.flushHeaders();
+          await this.turnLedger.markStreamStarted(turnToken);
+          const usage = new TokenUsageAccumulator();
+          const relay = await relayResponsesStream({
+            response,
+            body: upstream.body,
+            abortUpstream: (reason) => controller.abort(reason),
+            heartbeatIntervalMs: this.heartbeatIntervalMs,
+            idleTimeoutMs: this.streamIdleTimeoutMs,
+            maxEventCharacters: this.maxSseEventCharacters,
+            beforeForwardEvent: async (event) => {
+              usage.observe(extractOpenAiTokenUsage(event));
+              try {
+                await this.recordDeliveredResponsesCalls(admission.token, event);
+              } catch (error) {
+                throw new ResponsesStreamProtocolError(
+                  error instanceof Error ? error.message : "Tool-call replay was blocked.",
+                  { cause: error },
+                );
+              }
+            },
+          });
+          if (!response.destroyed && !response.writableEnded) response.end();
+          turnOutcome =
+            !relay.protocolFailure && relay.terminalEventType === "response.completed"
+              ? "complete"
+              : "incomplete";
+          await this.recordUsage(
+            selected,
+            usageRequestId,
+            "openai-responses",
+            usage.snapshot(),
+            turnOutcome === "complete" ? "completed" : "incomplete",
+          );
+          return;
+        }
+
+        if (!wantsStream && isEventStream) {
+          await upstream.body?.cancel().catch(() => undefined);
+          throw new BridgeRequestError(
+            502,
+            "PROTOCOL_ERROR",
+            "Provider returned SSE for a non-streaming Responses request.",
+          );
+        }
+
+        const payload = normalizeResponsesResponse(
+          await readUpstreamJson(upstream, this.responseBodyLimitBytes),
+        );
+        await this.recordDeliveredResponsesCalls(turnToken, payload);
+        if (wantsStream) {
+          this.sendJsonAsEventStream(response, upstream, payload, selected);
+        } else {
+          sendJson(
+            response,
+            200,
+            payload,
+            this.routeHeaders(safeUpstreamHeaders(upstream, false), selected),
+          );
+        }
+        turnOutcome =
+          payload.status === "failed" || payload.status === "incomplete"
+            ? "incomplete"
+            : "complete";
+        await this.recordUsage(
+          selected,
+          usageRequestId,
+          "openai-responses",
+          extractOpenAiTokenUsage(payload),
+          turnOutcome === "complete" ? "completed" : "incomplete",
+        );
       } catch (error) {
-        if (response.destroyed || (controller.signal.aborted && !headerTimedOut)) {
+        if (error instanceof BridgeRequestCancelledError) {
           turnOutcome = "cancel";
           return;
         }
-        if (headerTimedOut) {
-          throw new BridgeRequestError(504, "TIMEOUT", "Provider response headers timed out.");
-        }
-        throw new BridgeRequestError(502, "NETWORK_ERROR", "Provider request failed.", {
-          cause: error,
-        });
-      } finally {
-        clearTimeout(headerTimer);
-      }
-
-      if (!upstream.ok) {
-        await upstream.body?.cancel().catch(() => undefined);
-        const normalizedType = normalizeHttpStatus(upstream.status);
-        sendBridgeError(
-          response,
-          upstream.status,
-          normalizedType,
-          `Provider '${this.profile.displayName}' returned HTTP ${upstream.status}.`,
-          safeUpstreamHeaders(upstream, false),
-        );
-        return;
-      }
-
-      const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
-      const isEventStream = contentType.includes("text/event-stream");
-      if (chatTranslation !== undefined) {
-        turnOutcome = await this.handleChatUpstream(
-          response,
-          upstream,
-          wantsStream,
-          isEventStream,
-          chatTranslation.canonical,
-          controller,
-          turnToken,
-        );
-        return;
-      }
-      if (wantsStream && isEventStream) {
-        if (upstream.body === null) {
-          throw new BridgeRequestError(
-            502,
-            "STREAM_ERROR",
-            "Provider returned an empty streaming response body.",
+        const failure = runtimeFailureFromError(error);
+        if (selectedForHealth !== undefined && failure !== undefined) {
+          await this.recordRuntimeHealth(
+            selectedForHealth.route,
+            responsesProtocolForRoute(selectedForHealth.route),
+            "failed",
+            usageRequestId,
+            failure,
           );
         }
-        response.writeHead(200, headersToNode(safeUpstreamHeaders(upstream, true)));
-        response.flushHeaders();
-        await this.turnLedger.markStreamStarted(turnToken);
-        const relay = await relayResponsesStream({
-          response,
-          body: upstream.body,
-          abortUpstream: (reason) => controller.abort(reason),
-          heartbeatIntervalMs: this.heartbeatIntervalMs,
-          idleTimeoutMs: this.streamIdleTimeoutMs,
-          maxEventCharacters: this.maxSseEventCharacters,
-          beforeForwardEvent: async (event) => {
-            try {
-              await this.recordDeliveredResponsesCalls(admission.token, event);
-            } catch (error) {
-              throw new ResponsesStreamProtocolError(
-                error instanceof Error ? error.message : "Tool-call replay was blocked.",
-                { cause: error },
-              );
-            }
-          },
-        });
-        if (!response.destroyed && !response.writableEnded) response.end();
-        turnOutcome =
-          !relay.protocolFailure && relay.terminalEventType === "response.completed"
-            ? "complete"
-            : "incomplete";
-        return;
+        throw error;
       }
-
-      if (!wantsStream && isEventStream) {
-        await upstream.body?.cancel().catch(() => undefined);
-        throw new BridgeRequestError(
-          502,
-          "PROTOCOL_ERROR",
-          "Provider returned SSE for a non-streaming Responses request.",
-        );
-      }
-
-      const payload = await readUpstreamJson(upstream, this.responseBodyLimitBytes);
-      if (!isJsonRecord(payload) || !Array.isArray(payload.output)) {
-        throw new BridgeRequestError(
-          502,
-          "PROTOCOL_ERROR",
-          "Provider returned an invalid non-streaming Responses payload.",
-        );
-      }
-      await this.recordDeliveredResponsesCalls(turnToken, payload);
-      if (wantsStream) {
-        this.sendJsonAsEventStream(response, upstream, payload);
-      } else {
-        sendJson(response, 200, payload, safeUpstreamHeaders(upstream, false));
-      }
-      turnOutcome =
-        payload.status === "failed" || payload.status === "incomplete"
-          ? "incomplete"
-          : "complete";
     } catch (error) {
       if (response.destroyed) return;
       if (response.headersSent) {
@@ -469,10 +623,364 @@ export class ResponsesBridgeServer {
     }
   }
 
+  private async openUpstream(
+    body: Readonly<Record<string, unknown>>,
+    wantsStream: boolean,
+    controller: AbortController,
+    signature: TurnSignature,
+    requestId: string,
+  ): Promise<SelectedUpstream> {
+    if (this.fallbackSession === undefined) {
+      const route: ResolvedBridgeRoute = {
+        profile: this.profile,
+        route: {
+          providerId: this.profile.id,
+          modelId:
+            typeof body.model === "string"
+              ? body.model
+              : (this.models[0]?.modelId ?? "unknown"),
+          priority: 0,
+          enabled: true,
+        },
+      };
+      try {
+        const opened = await this.fetchRoute(body, wantsStream, controller, route);
+        if (!opened.upstream.ok) {
+          const errorType = normalizeHttpStatus(opened.upstream.status);
+          await this.recordRuntimeHealth(
+            route,
+            responsesProtocolForRoute(route),
+            "failed",
+            requestId,
+            {
+              errorType,
+              phase: fallbackFailurePhaseForHttpStatus(opened.upstream.status),
+              message: `Provider '${route.profile.displayName}' returned HTTP ${opened.upstream.status}.`,
+              httpStatus: opened.upstream.status,
+            },
+          );
+        }
+        return { ...opened, route };
+      } catch (error) {
+        const failure = fallbackFailureFromError(error);
+        if (failure !== undefined) {
+          await this.recordRuntimeHealth(
+            route,
+            responsesProtocolForRoute(route),
+            "failed",
+            requestId,
+            failure,
+          );
+        }
+        if (error instanceof UpstreamAttemptError) {
+          throw new BridgeRequestError(
+            providerErrorStatus(error.type),
+            error.type,
+            error.message,
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+    }
+
+    if (body.model !== this.fallbackSession.group.id) {
+      throw new BridgeRequestError(
+        400,
+        "INVALID_REQUEST",
+        `Fallback bridge exposes logical model '${this.fallbackSession.group.id}', not '${String(body.model)}'.`,
+      );
+    }
+
+    const toolResultIds = new Set(signature.toolResults.map((result) => result.callId));
+    const hasToolActivity = signature.toolCalls.length > 0 || signature.toolResults.length > 0;
+    const hasUnresolvedCall = signature.toolCalls.some(
+      (call) => !toolResultIds.has(call.callId),
+    );
+    const turn = this.fallbackSession.beginTurn({
+      sideEffectsPossible: hasToolActivity,
+      continuationState: !hasToolActivity
+        ? "none"
+        : !hasUnresolvedCall && signature.toolResults.length > 0
+          ? "complete"
+          : "ambiguous",
+    });
+    let selection = turn.start();
+    if (selection.decision === "blocked") {
+      throw new BridgeRequestError(
+        503,
+        "PROVIDER_UNAVAILABLE",
+        selection.message,
+        { headers: fallbackBlockHeaders(selection.code) },
+      );
+    }
+
+    let latestNotification = this.publishFallback(selection.notification);
+    while (selection.decision === "selected") {
+      const attempt = selection.attempt;
+      const route = this.requireFallbackRoute(attempt.route);
+      try {
+        const opened = await this.fetchRoute(body, wantsStream, controller, route);
+        if (opened.upstream.ok) {
+          turn.reportSuccess(attempt);
+          return {
+            ...opened,
+            route,
+            ...(latestNotification === undefined
+              ? {}
+              : { notification: latestNotification }),
+          };
+        }
+
+        const errorType = normalizeHttpStatus(opened.upstream.status);
+        const failure: FallbackFailure & { readonly httpStatus: number } = {
+          errorType,
+          phase: fallbackFailurePhaseForHttpStatus(opened.upstream.status),
+          message: `Provider '${route.profile.displayName}' returned HTTP ${opened.upstream.status}.`,
+          httpStatus: opened.upstream.status,
+        };
+        await this.recordRuntimeHealth(
+          route,
+          responsesProtocolForRoute(route),
+          "failed",
+          requestId,
+          failure,
+        );
+        const failed = turn.reportFailure(attempt, failure);
+        if (failed.decision === "selected") {
+          await opened.upstream.body?.cancel().catch(() => undefined);
+          latestNotification =
+            this.publishFallback(failed.notification) ?? latestNotification;
+          selection = failed;
+          continue;
+        }
+        return {
+          ...opened,
+          route,
+          ...(latestNotification === undefined
+            ? {}
+            : { notification: latestNotification }),
+          fallbackBlock: { code: failed.code, message: failed.message },
+        };
+      } catch (error) {
+        if (error instanceof BridgeRequestCancelledError) throw error;
+        const failure = fallbackFailureFromError(error);
+        if (failure === undefined) throw error;
+        await this.recordRuntimeHealth(
+          route,
+          responsesProtocolForRoute(route),
+          "failed",
+          requestId,
+          failure,
+        );
+        const failed = turn.reportFailure(attempt, failure);
+        if (failed.decision === "selected") {
+          latestNotification =
+            this.publishFallback(failed.notification) ?? latestNotification;
+          selection = failed;
+          continue;
+        }
+
+        const headers = this.routeHeaders(new Headers(), {
+          route,
+          ...(latestNotification === undefined
+            ? {}
+            : { notification: latestNotification }),
+        });
+        headers.set("x-providerdock-fallback-block", failed.code);
+        throw new BridgeRequestError(
+          providerErrorStatus(failure.errorType),
+          failure.errorType,
+          failure.message ?? `Provider '${route.profile.displayName}' request failed.`,
+          { cause: error, headers },
+        );
+      }
+    }
+
+    throw new BridgeRequestError(
+      503,
+      "PROVIDER_UNAVAILABLE",
+      "No fallback route could be selected.",
+    );
+  }
+
+  private applySessionInstructions(
+    body: Readonly<Record<string, unknown>>,
+  ): Readonly<Record<string, unknown>> {
+    if (this.sessionInstructions === undefined) return body;
+    const existing = body.instructions;
+    if (existing !== undefined && existing !== null && typeof existing !== "string") {
+      throw new BridgeRequestError(
+        400,
+        "INVALID_REQUEST",
+        "Responses instructions must be a string when a prompt profile is active.",
+      );
+    }
+    return {
+      ...body,
+      instructions:
+        typeof existing === "string" && existing.trim().length > 0
+          ? `${this.sessionInstructions}\n\n${existing}`
+          : this.sessionInstructions,
+    };
+  }
+
+  private async fetchRoute(
+    body: Readonly<Record<string, unknown>>,
+    wantsStream: boolean,
+    controller: AbortController,
+    route: ResolvedBridgeRoute,
+  ): Promise<OpenedUpstream> {
+    const automatic = route.profile.apiType === "auto";
+    if (route.profile.apiType === "auto" && this.protocolResolver && !this.resolvedProtocols.has(logicalRouteKey(route.route))) {
+      const modelId = this.fallbackSession ? route.route.modelId : typeof body.model === "string" ? body.model : route.route.modelId;
+      const protocol = await this.protocolResolver(route.profile, modelId, "codex");
+      if (protocol) this.resolvedProtocols.set(logicalRouteKey(route.route), protocol);
+    }
+    const known = route.profile.apiType === "auto" ? this.resolvedProtocols.get(logicalRouteKey(route.route)) : undefined;
+    if (known) route = { ...route, profile: { ...route.profile, apiType: known } };
+
+    if (
+      !["auto", "openai-responses", "openai-chat-completions"].includes(
+        route.profile.apiType,
+      )
+    ) {
+      throw new BridgeRequestError(
+        400,
+        "UNSUPPORTED_FEATURE",
+        `Bridge cannot translate provider API type '${route.profile.apiType}' yet.`,
+      );
+    }
+
+    const routedBody =
+      this.fallbackSession === undefined ? body : { ...body, model: route.route.modelId };
+    const chatTranslation =
+      route.profile.apiType === "openai-chat-completions" ||
+      (route.profile.apiType === "auto" && this.autoChatRoutes.has(logicalRouteKey(route.route)))
+        ? translateResponsesRequestToChat(routedBody)
+        : undefined;
+    const upstreamPayload = chatTranslation?.chatRequest ?? routedBody;
+    const endpoint =
+      chatTranslation === undefined ? this.responsesEndpoint : this.chatCompletionsEndpoint;
+    const requestedModel = typeof routedBody.model === "string" ? String(routedBody.model) : route.route.modelId;
+    if (this.modelAccessCheck) await this.modelAccessCheck(route.profile.id, requestedModel);
+    else assertModelEnabled(route.profile, requestedModel);
+    const built = await this.requests.build(route.profile, endpoint, {
+      accept: wantsStream ? "text/event-stream, application/json" : "application/json",
+      contentType: "application/json",
+    });
+
+    let headerTimedOut = false;
+    const headerTimer = setTimeout(() => {
+      headerTimedOut = true;
+      controller.abort(new Error("Upstream response headers timed out."));
+    }, route.profile.timeoutMs);
+    headerTimer.unref?.();
+    try {
+      this.resolvedProtocols.set(logicalRouteKey(route.route), chatTranslation === undefined ? "openai-responses" : "openai-chat-completions");
+      const upstream = await this.fetchImpl(built.url, {
+        method: "POST",
+        headers: built.headers,
+        body: JSON.stringify(upstreamPayload),
+        signal: controller.signal,
+      });
+      // Only a definitive endpoint rejection permits trying another protocol.
+      // Never replay an accepted response, a timeout, or a partial stream.
+      if (automatic && [404, 405, 501].includes(upstream.status)) {
+        await upstream.body?.cancel().catch(() => undefined);
+        clearTimeout(headerTimer);
+        const alternate = chatTranslation === undefined ? "openai-chat-completions" : "openai-responses";
+        const chat = await this.fetchRoute(body, wantsStream, controller, {
+          ...route, profile: { ...route.profile, apiType: alternate },
+        });
+        if (chat.upstream.ok) {
+          if (alternate === "openai-chat-completions") this.autoChatRoutes.add(logicalRouteKey(route.route));
+          else this.autoChatRoutes.delete(logicalRouteKey(route.route));
+          this.resolvedProtocols.set(logicalRouteKey(route.route), alternate);
+        }
+        return chat;
+      }
+      return {
+        upstream,
+        redactionValues: built.redactionValues,
+        ...(chatTranslation === undefined
+          ? {}
+          : { canonicalRequest: chatTranslation.canonical }),
+      };
+    } catch (error) {
+      if (error instanceof ProviderRequestError || error instanceof UpstreamAttemptError) throw error;
+      if (controller.signal.aborted && !headerTimedOut) {
+        throw new BridgeRequestCancelledError();
+      }
+      if (headerTimedOut) {
+        throw new UpstreamAttemptError(
+          "TIMEOUT",
+          "unknown",
+          "Provider response headers timed out; execution state is unknown.",
+          { cause: error },
+        );
+      }
+      throw new UpstreamAttemptError(
+        "NETWORK_ERROR",
+        isConnectionEstablishmentFailure(error) ? "connection-failed" : "unknown",
+        isConnectionEstablishmentFailure(error)
+          ? "Provider connection failed before the request was accepted."
+          : "Provider connection failed with an unknown execution state.",
+        { cause: error },
+      );
+    } finally {
+      clearTimeout(headerTimer);
+    }
+  }
+
+  private requireFallbackRoute(route: LogicalModelRoute): ResolvedBridgeRoute {
+    const resolved = this.fallbackRoutes.get(logicalRouteKey(route));
+    if (resolved === undefined) {
+      throw new TypeError(`Fallback route '${logicalRouteKey(route)}' is not configured.`);
+    }
+    return resolved;
+  }
+
+  private activeRouteProfile(): ProviderProfile {
+    const sticky = this.fallbackSession?.stickyRoute();
+    return sticky === undefined ? this.profile : this.requireFallbackRoute(sticky).profile;
+  }
+
+  private publishFallback(
+    notification: FallbackNotification | undefined,
+  ): FallbackNotification | undefined {
+    if (notification === undefined) return undefined;
+    this.lastFallback = notification;
+    try {
+      this.onFallback?.(notification);
+    } catch {
+      // Observability callbacks must never change routing or replay behavior.
+    }
+    return notification;
+  }
+
+  private routeHeaders(headers: Headers, selected: RouteSelectionMetadata): Headers {
+    const result = new Headers(headers);
+    result.set("x-providerdock-provider-id", selected.route.profile.id);
+    if (this.fallbackSession !== undefined) {
+      result.set("x-providerdock-logical-model", this.fallbackSession.group.id);
+    }
+    if (selected.notification !== undefined) {
+      result.set("x-providerdock-fallback", "true");
+      result.set("x-providerdock-fallback-from", selected.notification.from.providerId);
+      result.set("x-providerdock-fallback-to", selected.notification.to.providerId);
+      if (selected.notification.errorType !== undefined) {
+        result.set("x-providerdock-fallback-reason", selected.notification.errorType);
+      }
+    }
+    return result;
+  }
+
   private sendJsonAsEventStream(
     response: ServerResponse,
     upstream: Response,
     payload: unknown,
+    selected: SelectedUpstream,
   ): void {
     if (!isJsonRecord(payload) || !Array.isArray(payload.output)) {
       throw new BridgeRequestError(
@@ -493,7 +1001,7 @@ export class ResponsesBridgeServer {
       object: "response",
       status: type === "response.completed" ? "completed" : status,
     };
-    const headers = safeUpstreamHeaders(upstream, true);
+    const headers = this.routeHeaders(safeUpstreamHeaders(upstream, true), selected);
     headers.set("x-providerdock-normalization", "json-to-sse");
     response.writeHead(200, headersToNode(headers));
     response.write(
@@ -514,6 +1022,8 @@ export class ResponsesBridgeServer {
     canonicalRequest: CanonicalRequest,
     controller: AbortController,
     turnToken: TurnToken,
+    selected: SelectedUpstream,
+    usageRequestId: string,
   ): Promise<"complete" | "incomplete"> {
     if (wantsStream && isEventStream) {
       if (upstream.body === null) {
@@ -525,10 +1035,16 @@ export class ResponsesBridgeServer {
       }
       response.writeHead(
         200,
-        headersToNode(safeUpstreamHeaders(upstream, true, "chat-completions")),
+        headersToNode(
+          this.routeHeaders(
+            safeUpstreamHeaders(upstream, true, "chat-completions"),
+            selected,
+          ),
+        ),
       );
       response.flushHeaders();
       await this.turnLedger.markStreamStarted(turnToken);
+      const usage = new TokenUsageAccumulator();
       const relay = await relayChatCompletionsStream({
         response,
         body: upstream.body,
@@ -538,6 +1054,7 @@ export class ResponsesBridgeServer {
         idleTimeoutMs: this.streamIdleTimeoutMs,
         maxEventCharacters: this.maxSseEventCharacters,
         beforeForwardEvent: async (event) => {
+          usage.observe(extractOpenAiTokenUsage(event));
           try {
             await this.recordDeliveredResponsesCalls(turnToken, event);
           } catch (error) {
@@ -550,9 +1067,18 @@ export class ResponsesBridgeServer {
         },
       });
       if (!response.destroyed && !response.writableEnded) response.end();
-      return !relay.protocolFailure && relay.terminalEventType === "response.completed"
+      const outcome =
+        !relay.protocolFailure && relay.terminalEventType === "response.completed"
         ? "complete"
         : "incomplete";
+      await this.recordUsage(
+        selected,
+        usageRequestId,
+        "openai-chat-completions",
+        usage.snapshot(),
+        outcome === "complete" ? "completed" : "incomplete",
+      );
+      return outcome;
     }
     if (!wantsStream && isEventStream) {
       await upstream.body?.cancel().catch(() => undefined);
@@ -567,16 +1093,29 @@ export class ResponsesBridgeServer {
     if (wantsStream) {
       const translator = new ChatToResponsesStreamTranslator({ request: canonicalRequest });
       const events = [...translator.feed(payload), ...translator.finish()];
+      const usage = new TokenUsageAccumulator();
+      for (const event of events) usage.observe(extractOpenAiTokenUsage(event));
       for (const event of events) await this.recordDeliveredResponsesCalls(turnToken, event);
-      const headers = safeUpstreamHeaders(upstream, true, "chat-completions");
+      const headers = this.routeHeaders(
+        safeUpstreamHeaders(upstream, true, "chat-completions"),
+        selected,
+      );
       headers.set("x-providerdock-normalization", "chat-json-to-responses-sse");
       response.writeHead(200, headersToNode(headers));
       response.flushHeaders();
       await writeTranslatedEvents(response, events);
       response.end(encodeSseEvent({ data: "[DONE]", comments: [] }));
-      return translator.terminalEventType === "response.completed"
+      const outcome = translator.terminalEventType === "response.completed"
         ? "complete"
         : "incomplete";
+      await this.recordUsage(
+        selected,
+        usageRequestId,
+        "openai-chat-completions",
+        usage.snapshot(),
+        outcome === "complete" ? "completed" : "incomplete",
+      );
+      return outcome;
     }
 
     const translated = translateChatResponseToResponses(payload, { request: canonicalRequest });
@@ -585,11 +1124,108 @@ export class ResponsesBridgeServer {
       response,
       200,
       translated.response,
-      safeUpstreamHeaders(upstream, false, "chat-completions"),
+      this.routeHeaders(
+        safeUpstreamHeaders(upstream, false, "chat-completions"),
+        selected,
+      ),
     );
-    return translated.terminalEventType === "response.completed"
+    const outcome = translated.terminalEventType === "response.completed"
       ? "complete"
       : "incomplete";
+    await this.recordUsage(
+      selected,
+      usageRequestId,
+      "openai-chat-completions",
+      extractOpenAiTokenUsage(translated.response),
+      outcome === "complete" ? "completed" : "incomplete",
+    );
+    return outcome;
+  }
+
+  private async recordUsage(
+    selected: SelectedUpstream,
+    requestId: string,
+    protocol: UsageProtocol,
+    usage: NormalizedTokenUsage | undefined,
+    outcome: UsageOutcome,
+  ): Promise<void> {
+    await this.recordRuntimeHealth(
+      selected.route,
+      protocol,
+      outcome,
+      requestId,
+    );
+    if (this.usageSink === undefined || usage === undefined) return;
+    try {
+      await this.usageSink(
+        createUsageTelemetryEvent({
+          profile: selected.route.profile,
+          modelId: selected.route.route.modelId,
+          ...(this.fallbackSession === undefined
+            ? {}
+            : { logicalModelId: this.fallbackSession.group.id }),
+          client: "codex",
+          protocol,
+          sessionId: this.sessionId,
+          requestId,
+          outcome,
+          usage,
+        }),
+      );
+    } catch {
+      // Local telemetry must never change response or replay semantics.
+    }
+  }
+
+  private recordRuntimeHealth(
+    route: ResolvedBridgeRoute,
+    protocol: UsageProtocol,
+    outcome: ProviderRuntimeOutcome,
+    requestId: string,
+    failure: (FallbackFailure & { readonly httpStatus?: number }) | undefined = undefined,
+  ): void {
+    if (this.healthSignalSink === undefined) return;
+    protocol = this.resolvedProtocols.get(logicalRouteKey(route.route)) ?? protocol;
+    try {
+      const task = Promise.resolve(this.healthSignalSink(
+        createProviderRuntimeHealthSignal({
+          providerId: route.profile.id,
+          modelId: route.route.modelId,
+          client: "codex",
+          protocol,
+          sessionId: this.sessionId,
+          requestId,
+          ...(this.fallbackSession === undefined
+            ? {}
+            : { logicalModelId: this.fallbackSession.group.id }),
+          outcome,
+          ...(failure?.errorType === undefined
+            ? {}
+            : { errorType: failure.errorType }),
+          ...(failure?.httpStatus === undefined
+            ? {}
+            : { httpStatus: failure.httpStatus }),
+          ...(failure?.phase === undefined
+            ? {}
+            : { executionPhase: failure.phase }),
+          ...(failure?.message === undefined
+            ? {}
+            : { errorMessage: failure.message }),
+        }),
+      ))
+        .catch(() => undefined)
+        .finally(() => {
+          this.pendingHealthSignals.delete(task);
+        });
+      this.pendingHealthSignals.add(task);
+    } catch {
+      // Health observability must never change response or replay semantics.
+    }
+  }
+
+  private async flushHealthSignals(): Promise<void> {
+    if (this.pendingHealthSignals.size === 0) return;
+    await Promise.allSettled([...this.pendingHealthSignals]);
   }
 
   private async recordDeliveredResponsesCalls(
@@ -637,7 +1273,7 @@ export class ResponsesBridgeServer {
       return;
     }
     if (error instanceof BridgeRequestError) {
-      sendBridgeError(response, error.status, error.type, error.message);
+      sendBridgeError(response, error.status, error.type, error.message, error.headers);
       return;
     }
     if (error instanceof ResponsesToChatTranslationError) {
@@ -681,15 +1317,80 @@ export class ResponsesBridgeServer {
 }
 
 class BridgeRequestError extends Error {
+  readonly headers: Headers;
+
   constructor(
     readonly status: number,
     readonly type: NormalizedErrorType,
     message: string,
-    options: ErrorOptions = {},
+    options: ErrorOptions & { readonly headers?: Headers } = {},
   ) {
     super(message, options);
     this.name = "BridgeRequestError";
+    this.headers = options.headers ?? new Headers();
   }
+}
+
+class BridgeRequestCancelledError extends Error {
+  constructor() {
+    super("Bridge client cancelled the request.");
+    this.name = "BridgeRequestCancelledError";
+  }
+}
+
+class UpstreamAttemptError extends Error {
+  constructor(
+    readonly type: NormalizedErrorType,
+    readonly phase: FallbackFailurePhase,
+    message: string,
+    options: ErrorOptions = {},
+  ) {
+    super(message, options);
+    this.name = "UpstreamAttemptError";
+  }
+}
+
+function fallbackFailureFromError(error: unknown): FallbackFailure | undefined {
+  if (error instanceof ModelDisabledError) return undefined;
+  if (error instanceof UpstreamAttemptError) {
+    return { errorType: error.type, phase: error.phase, message: error.message };
+  }
+  if (error instanceof ProviderRequestError) {
+    return {
+      errorType: error.type,
+      phase: "request-rejected",
+      message: error.message,
+    };
+  }
+  return undefined;
+}
+
+function runtimeFailureFromError(error: unknown): FallbackFailure | undefined {
+  if (error instanceof ModelDisabledError) return undefined;
+  if (error instanceof BridgeRequestError) {
+    return { errorType: error.type, phase: "unknown", message: error.message };
+  }
+  if (error instanceof ProviderRequestError) {
+    return { errorType: error.type, phase: "unknown", message: error.message };
+  }
+  if (error instanceof ResponsesStreamProtocolError) {
+    return {
+      errorType: "STREAM_ERROR",
+      phase: "unknown",
+      message: error.message,
+    };
+  }
+  return undefined;
+}
+
+function responsesProtocolForRoute(route: ResolvedBridgeRoute): UsageProtocol {
+  return route.profile.apiType === "openai-chat-completions"
+    ? "openai-chat-completions"
+    : "openai-responses";
+}
+
+function fallbackBlockHeaders(code: string): Headers {
+  return new Headers({ "x-providerdock-fallback-block": code });
 }
 
 async function readJsonObject(
@@ -827,6 +1528,7 @@ function sendBridgeError(
   message: string,
   headers: Headers = new Headers(),
 ): void {
+  const guidance = providerErrorGuidance(type);
   sendJson(
     response,
     status,
@@ -839,6 +1541,8 @@ function sendBridgeError(
       providerdock: {
         normalized_type: type,
         http_status: status,
+        explanation: guidance.explanation,
+        suggested_action: guidance.suggestedAction,
       },
     },
     headers,
@@ -875,7 +1579,18 @@ function nonNegativeLimit(value: number | undefined, fallback: number, name: str
   return resolved;
 }
 
+function normalizeSessionInstructions(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim();
+  if (normalized.length === 0) return undefined;
+  if (normalized.length > 256 * 1024) {
+    throw new RangeError("sessionInstructions cannot exceed 262144 characters.");
+  }
+  return normalized;
+}
+
 function providerErrorStatus(type: NormalizedErrorType): number {
+  if (type === "INVALID_REQUEST") return 400;
   if (type === "AUTH_ERROR") return 401;
   if (type === "PERMISSION_ERROR") return 403;
   if (type === "TIMEOUT") return 504;
@@ -893,7 +1608,7 @@ function bridgeAddress(address: AddressInfo): ResponsesBridgeAddress {
 }
 
 export function isBridgePortAllowed(port: number): boolean {
-  return Number.isInteger(port) && port >= 1 && port <= 65_535 && !fetchForbiddenPorts.has(port);
+  return isLoopbackPortAllowed(port);
 }
 
 function listenOnRandomPort(server: Server): Promise<void> {

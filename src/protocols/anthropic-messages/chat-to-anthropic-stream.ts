@@ -17,7 +17,7 @@ export interface ChatToAnthropicStreamOptions {
   readonly allowedToolNames?: readonly string[];
 }
 
-type OpenBlockKind = "thinking" | "text";
+type OpenBlockKind = "text";
 
 interface OpenBlock {
   readonly kind: OpenBlockKind;
@@ -53,6 +53,7 @@ export class ChatToAnthropicStreamTranslator {
   private nextBlockIndex = 0;
   private openBlock: OpenBlock | undefined;
   private hasContent = false;
+  private reasoningFallback = "";
   private readonly tools = new Map<number, ToolStreamState>();
   private completedTools: readonly CompletedAnthropicToolUse[] = [];
 
@@ -66,6 +67,10 @@ export class ChatToAnthropicStreamTranslator {
 
   get terminalEventSeen(): boolean {
     return this.terminal;
+  }
+
+  get generationFinished(): boolean {
+    return this.finishReason != null;
   }
 
   get terminalSucceeded(): boolean {
@@ -97,6 +102,7 @@ export class ChatToAnthropicStreamTranslator {
 
     const choice = payload.choices[0];
     if (!isRecord(choice)) throw protocolError("Chat stream choice must be an object.");
+    const previouslyFinished = this.finishReason != null;
     if (choice.finish_reason !== undefined && choice.finish_reason !== null) {
       if (
         this.finishReason !== undefined &&
@@ -112,18 +118,22 @@ export class ChatToAnthropicStreamTranslator {
       : isRecord(choice.message)
         ? choice.message
         : {};
+    if (previouslyFinished && Object.values(delta).some((value) =>
+      value != null && value !== "" && !(Array.isArray(value) && value.length === 0))) {
+      throw protocolError("Chat stream sent more content after finish_reason.");
+    }
     if (delta.role !== undefined && delta.role !== "assistant") {
       throw protocolError("Chat stream delta role must be assistant.");
     }
 
     const reasoning = firstString(delta.reasoning_content, delta.reasoning);
     if (reasoning !== undefined && reasoning !== "") {
-      this.ensureBlock(events, "thinking");
-      events.push(blockDelta(this.openBlock!.index, {
-        type: "thinking_delta",
-        thinking: reasoning,
-      }));
-      this.hasContent = true;
+      // Chat Completions reasoning has no Anthropic cryptographic signature.
+      // Buffer it instead of emitting an invalid unsigned thinking block. If
+      // the provider returns no text or tool call at all, finish() exposes the
+      // buffered value as ordinary text so Claude Code still receives a valid
+      // terminal response.
+      this.reasoningFallback += reasoning;
     }
     const text = parseTextDelta(delta.content);
     if (text !== "") {
@@ -167,6 +177,22 @@ export class ChatToAnthropicStreamTranslator {
       if (stopReason !== "tool_use" && toolUses.length > 0) {
         throw protocolError("Chat stream returned tool calls with a non-tool finish reason.");
       }
+      const events: AnthropicStreamEvent[] = [];
+      if (
+        !this.hasContent &&
+        toolUses.length === 0 &&
+        this.reasoningFallback !== ""
+      ) {
+        this.ensureStarted(events);
+        this.ensureBlock(events, "text");
+        events.push(
+          blockDelta(this.openBlock!.index, {
+            type: "text_delta",
+            text: this.reasoningFallback,
+          }),
+        );
+        this.hasContent = true;
+      }
       if (!this.hasContent && toolUses.length === 0) {
         throw new AnthropicTranslationError(
           "INCOMPLETE_RESPONSE",
@@ -174,7 +200,6 @@ export class ChatToAnthropicStreamTranslator {
         );
       }
 
-      const events: AnthropicStreamEvent[] = [];
       this.ensureStarted(events);
       this.closeOpenBlock(events);
       for (const toolUse of toolUses) this.emitToolUse(events, toolUse);
@@ -356,10 +381,7 @@ export class ChatToAnthropicStreamTranslator {
       data: {
         type: "content_block_start",
         index,
-        content_block:
-          kind === "thinking"
-            ? { type: "thinking", thinking: "", signature: "" }
-            : { type: "text", text: "" },
+        content_block: { type: "text", text: "" },
       },
     });
   }

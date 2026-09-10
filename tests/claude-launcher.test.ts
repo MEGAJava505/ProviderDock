@@ -8,10 +8,12 @@ import {
   ClaudeRuntimeConfigurationError,
   buildClaudeChildEnvironment,
   MemorySecretStore,
+  parseLogicalModelGroup,
   parseProviderProfile,
   type ClaudeBridgeFactory,
   type ClaudeProcessRunner,
   type ClaudeProcessStartRequest,
+  type FallbackNotification,
 } from "../src/index.js";
 
 describe("buildClaudeChildEnvironment", () => {
@@ -126,6 +128,118 @@ describe("ClaudeLauncher", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("runs a logical model through the real managed bridge and safely falls back", async () => {
+    const root = await mkdtemp(join(tmpdir(), "providerdock-claude-fallback-runtime-"));
+    const runtimeRoot = join(root, "runtime");
+    const primary = testProfile({
+      id: "primary",
+      displayName: "Primary",
+      baseUrl: "https://primary.test/v1",
+    });
+    const secondary = parseProviderProfile({
+      id: "secondary",
+      displayName: "Secondary",
+      baseUrl: "https://secondary.test/v1",
+      apiType: "openai-chat-completions",
+      timeoutMs: 1_000,
+    });
+    const fetchMock = vi.fn<typeof fetch>(async (url, init) => {
+      if (String(url).startsWith("https://primary.test/")) {
+        throw new TypeError("fetch failed", {
+          cause: Object.assign(new Error("connect refused"), { code: "ECONNREFUSED" }),
+        });
+      }
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      expect(body.model).toBe("secondary-model");
+      expect(body.messages).toEqual([
+        { role: "system", content: "Profile instructions." },
+        { role: "user", content: "Hi" },
+      ]);
+      return new Response(
+        JSON.stringify({
+          id: "chat-fallback",
+          model: "secondary-model",
+          choices: [
+            {
+              finish_reason: "stop",
+              message: { role: "assistant", content: "fallback worked" },
+            },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1 },
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    });
+    const notifications: FallbackNotification[] = [];
+    const processes: ClaudeProcessRunner = {
+      start: async (request) => ({
+        pid: 44,
+        wait: async () => {
+          expect(request.environment.ANTHROPIC_MODEL).toBe("logical-claude");
+          const response = await fetch(
+            `${request.environment.ANTHROPIC_BASE_URL}/v1/messages`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                authorization: `Bearer ${request.environment.ANTHROPIC_AUTH_TOKEN}`,
+              },
+              body: JSON.stringify({
+                model: request.environment.ANTHROPIC_MODEL,
+                max_tokens: 16,
+                messages: [{ role: "user", content: "Hi" }],
+              }),
+            },
+          );
+          expect(response.status).toBe(200);
+          expect(response.headers.get("x-providerdock-provider-id")).toBe("secondary");
+          expect(await response.json()).toMatchObject({
+            model: "secondary-model",
+            content: [{ type: "text", text: "fallback worked" }],
+          });
+          return { exitCode: 0, signal: null };
+        },
+      }),
+    };
+    const launcher = new ClaudeLauncher(
+      new AnthropicClaudeBridgeFactory({
+        secretStore: new MemorySecretStore(),
+        fetchImpl: fetchMock,
+        runtimeRoot,
+      }),
+      processes,
+    );
+
+    await launcher.launch({
+      profile: primary,
+      modelId: "logical-claude",
+      projectDirectory: root,
+      parentEnvironment: {},
+      fallback: {
+        logicalModel: parseLogicalModelGroup({
+          id: "logical-claude",
+          routes: [
+            { providerId: "primary", modelId: "primary-model", priority: 100 },
+            { providerId: "secondary", modelId: "secondary-model", priority: 90 },
+          ],
+        }),
+        profiles: [primary, secondary],
+      },
+      sessionInstructions: "Profile instructions.",
+      onFallback: (notification) => notifications.push(notification),
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(notifications).toEqual([
+      expect.objectContaining({
+        from: expect.objectContaining({ providerId: "primary" }),
+        to: expect.objectContaining({ providerId: "secondary" }),
+        phase: "connection-failed",
+      }),
+    ]);
+    expect(await readdir(runtimeRoot)).toEqual([]);
+  });
+
   it("starts the bridge, spawns claude with child-only env, then stops the bridge", async () => {
     const order: string[] = [];
     const bridge = {
@@ -159,10 +273,14 @@ describe("ClaudeLauncher", () => {
       modelId: "claude-x",
       projectDirectory: "/tmp/project",
       parentEnvironment: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "real" },
+      onStarted: (client) => {
+        expect(client).toBe("claude-code");
+        order.push("claude-ready");
+      },
     });
 
     expect(exit).toEqual({ exitCode: 0, signal: null });
-    expect(order).toEqual(["bridge-start", "claude-start", "bridge-stop"]);
+    expect(order).toEqual(["bridge-start", "claude-start", "claude-ready", "bridge-stop"]);
     expect(startRequest?.executable).toBe("claude");
     expect(startRequest?.cwd).toBe("/tmp/project");
     expect(startRequest?.environment.ANTHROPIC_BASE_URL).toBe("http://127.0.0.1:45678");

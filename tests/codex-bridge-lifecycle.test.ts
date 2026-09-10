@@ -7,9 +7,11 @@ import {
   CodexRuntimeSessionManager,
   MemorySecretStore,
   ResponsesCodexBridgeFactory,
+  parseLogicalModelGroup,
   parseProviderProfile,
   type CodexProcessRunner,
   type CodexProcessStartRequest,
+  type FallbackNotification,
 } from "../src/index.js";
 
 const sessionId = "22222222222222222222222222222222";
@@ -57,6 +59,8 @@ describe("managed Codex bridge lifecycle", () => {
       projectDirectory,
       route: { kind: "auto" },
       parentEnvironment: { PATH: "test-path" },
+      sessionInstructions: "Profile instructions.",
+      defaultReasoningLevel: "xhigh",
     });
 
     expect(exit).toEqual({ exitCode: 0, signal: null });
@@ -72,10 +76,14 @@ describe("managed Codex bridge lifecycle", () => {
     });
     expect(runner.configContents).not.toContain("upstream-secret");
     expect(Object.values(runner.request?.environment ?? {})).not.toContain("upstream-secret");
-    const [upstreamUrl] = upstreamFetch.mock.calls[0] ?? [];
+    const [upstreamUrl, upstreamInit] = upstreamFetch.mock.calls[0] ?? [];
     expect(String(upstreamUrl)).toBe(
       "https://upstream.test/v1/responses?key=upstream-secret",
     );
+    expect(JSON.parse(String(upstreamInit?.body))).toMatchObject({
+      model: "model-x",
+      instructions: "Profile instructions.",
+    });
     expect(upstreamFetch).toHaveBeenCalledTimes(1);
     await expect(fetch(`${runner.bridgeBaseUrl}/health`)).rejects.toThrow();
     await expect(access(join(runtimeRoot, sessionId))).rejects.toThrow();
@@ -154,6 +162,126 @@ describe("managed Codex bridge lifecycle", () => {
     });
     await expect(fetch(`${runner.bridgeBaseUrl}/health`)).rejects.toThrow();
   });
+
+  it("runs a logical model through the real managed bridge and keeps fallback observable", async () => {
+    const root = await mkdtemp(join(tmpdir(), "provider-dock-fallback-lifecycle-"));
+    const codexHome = join(root, "codex-home");
+    const runtimeRoot = join(root, "runtime");
+    const projectDirectory = join(root, "project");
+    await Promise.all([mkdir(codexHome), mkdir(projectDirectory)]);
+    const secrets = new MemorySecretStore();
+    const primary = parseProviderProfile({
+      id: "primary",
+      displayName: "Primary",
+      baseUrl: "https://primary.test/v1",
+      apiType: "openai-responses",
+    });
+    const secondary = parseProviderProfile({
+      id: "secondary",
+      displayName: "Secondary",
+      baseUrl: "https://secondary.test/v1",
+      apiType: "openai-chat-completions",
+    });
+    const notifications: FallbackNotification[] = [];
+    const upstreamFetch = vi.fn<typeof fetch>(async (url, init) => {
+      if (String(url).startsWith(primary.baseUrl)) {
+        throw new TypeError("fetch failed", {
+          cause: Object.assign(new Error("connection refused"), {
+            code: "ECONNREFUSED",
+          }),
+        });
+      }
+      expect(String(url)).toBe("https://secondary.test/v1/chat/completions");
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        model: "secondary-model",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+      return new Response(
+        JSON.stringify({
+          id: "chat-fallback",
+          model: "secondary-model",
+          choices: [
+            {
+              finish_reason: "stop",
+              message: { role: "assistant", content: "Fallback route works." },
+            },
+          ],
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    });
+    const runner = new BridgeUsingCodexRunner(runtimeRoot);
+    const launcher = new CodexLauncher(
+      new CodexRuntimeSessionManager({
+        codexHome,
+        runtimeRoot,
+        secrets,
+        randomId: () => sessionId,
+        isProcessAlive: () => false,
+      }),
+      runner,
+      new ResponsesCodexBridgeFactory({
+        secretStore: secrets,
+        fetchImpl: upstreamFetch,
+        runtimeRoot,
+      }),
+    );
+
+    await launcher.launch({
+      profile: primary,
+      modelId: "logical-x",
+      projectDirectory,
+      route: { kind: "auto" },
+      fallback: {
+        logicalModel: parseLogicalModelGroup({
+          id: "logical-x",
+          routes: [
+            { providerId: "primary", modelId: "primary-model", priority: 100 },
+            { providerId: "secondary", modelId: "secondary-model", priority: 90 },
+          ],
+        }),
+        profiles: [primary, secondary],
+      },
+      onFallback: (notification) => notifications.push(notification),
+    });
+
+    expect(runner.selectedModel).toBe("logical-x");
+    expect(runner.providerResponse).toMatchObject({
+      status: "completed",
+      output: [
+        {
+          type: "message",
+          content: [{ type: "output_text", text: "Fallback route works." }],
+        },
+      ],
+    });
+    expect(runner.health).toMatchObject({
+      provider_id: "primary",
+      active_provider_id: "secondary",
+      logical_model_id: "logical-x",
+      fallback: { stickyRouteKey: "secondary:secondary-model", fallbackCount: 1 },
+    });
+    expect(runner.manifest).toMatchObject({
+      providerId: "primary",
+      modelId: "logical-x",
+      route: { kind: "bridge", ownership: "managed", state: "ACTIVE" },
+    });
+    expect(notifications).toEqual([
+      expect.objectContaining({
+        from: expect.objectContaining({
+          providerId: "primary",
+          modelId: "primary-model",
+        }),
+        to: expect.objectContaining({
+          providerId: "secondary",
+          modelId: "secondary-model",
+        }),
+        phase: "connection-failed",
+      }),
+    ]);
+    expect(upstreamFetch).toHaveBeenCalledTimes(2);
+    await expect(fetch(`${runner.bridgeBaseUrl}/health`)).rejects.toThrow();
+  });
 });
 
 class BridgeUsingCodexRunner implements CodexProcessRunner {
@@ -186,15 +314,15 @@ class BridgeUsingCodexRunner implements CodexProcessRunner {
     return {
       pid: 9876,
       wait: async () => {
-        this.health = (await (
-          await fetch(`${this.bridgeBaseUrl.replace(/\/v1$/, "")}/health`)
-        ).json()) as Record<string, unknown>;
         this.providerResponse = (await (
           await fetch(`${this.bridgeBaseUrl}/responses`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ model: this.selectedModel, input: "Hello", stream: false }),
           })
+        ).json()) as Record<string, unknown>;
+        this.health = (await (
+          await fetch(`${this.bridgeBaseUrl.replace(/\/v1$/, "")}/health`)
         ).json()) as Record<string, unknown>;
         this.ledger = JSON.parse(
           await readFile(join(this.runtimeRoot, sessionId, "turn-ledger.json"), "utf8"),

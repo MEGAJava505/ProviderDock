@@ -26,6 +26,7 @@ describe("CodexRuntimeConfigFactory", () => {
     const built = await factory.build({
       profile,
       modelId: 'model-"x"',
+      projectDirectory: "C:\\Projects\\Example",
       route: { kind: "direct" },
       sessionId,
     });
@@ -35,6 +36,12 @@ describe("CodexRuntimeConfigFactory", () => {
     expect(built.contents).toContain("request_max_retries = 0");
     expect(built.contents).toContain("stream_max_retries = 0");
     expect(built.contents).toContain('model = "model-\\\"x\\\""');
+    expect(built.contents).toContain(
+      process.platform === "win32"
+        ? "[projects.'c:\\projects\\example']"
+        : "[projects.'C:\\Projects\\Example']",
+    );
+    expect(built.contents).toContain('trust_level = "trusted"');
     expect(built.contents).not.toContain("actual-api-secret");
     expect(built.contents).not.toContain("header-secret");
     expect(Object.values(built.environment)).toEqual(
@@ -57,6 +64,7 @@ describe("CodexRuntimeConfigFactory", () => {
     const built = await factory.build({
       profile,
       modelId: "model-x",
+      projectDirectory: "C:\\Projects\\Example",
       route: { kind: "bridge", baseUrl: "http://127.0.0.1:43123/v1/" },
       sessionId,
     });
@@ -75,7 +83,7 @@ describe("CodexRuntimeConfigFactory", () => {
       apiType: "openai-chat-completions",
     });
     await expect(
-      factory.build({ profile: chatProfile, modelId: "model", route: { kind: "direct" }, sessionId }),
+      factory.build({ profile: chatProfile, modelId: "model", projectDirectory: "C:\\Projects\\Example", route: { kind: "direct" }, sessionId }),
     ).rejects.toBeInstanceOf(CodexRuntimeConfigurationError);
 
     const queryProfile = parseProviderProfile({
@@ -86,7 +94,7 @@ describe("CodexRuntimeConfigFactory", () => {
       auth: { kind: "query", parameterName: "token", secretRef: "KEY" },
     });
     await expect(
-      factory.build({ profile: queryProfile, modelId: "model", route: { kind: "direct" }, sessionId }),
+      factory.build({ profile: queryProfile, modelId: "model", projectDirectory: "C:\\Projects\\Example", route: { kind: "direct" }, sessionId }),
     ).rejects.toThrow(/secret query parameter/);
   });
 });

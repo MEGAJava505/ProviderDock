@@ -1,7 +1,10 @@
-import { spawn } from "node:child_process";
+import { assertModelEnabled } from "../../core/providers/model-access.js";
 import { randomBytes } from "node:crypto";
+import type { FallbackNotification } from "../../core/fallback/fallback-session-router.js";
+import type { ProviderFallbackConfiguration } from "../../core/fallback/provider-fallback-configuration.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { ClaudeBridgeFactory, ManagedClaudeBridge } from "./claude-bridge-factory.js";
+import { spawnAgentTerminalProcess } from "../agent-terminal-process.js";
 
 export class ClaudeRuntimeConfigurationError extends Error {
   constructor(message: string) {
@@ -33,26 +36,12 @@ export interface ClaudeProcessRunner {
 
 export class NodeClaudeProcessRunner implements ClaudeProcessRunner {
   async start(request: ClaudeProcessStartRequest): Promise<RunningClaudeProcess> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(request.executable, [...request.args], {
-        cwd: request.cwd,
-        env: request.environment,
-        shell: false,
-        stdio: "inherit",
-      });
-      const exit = new Promise<ClaudeProcessExit>((resolveExit) => {
-        child.once("exit", (exitCode, signal) => resolveExit({ exitCode, signal }));
-      });
-      child.once("error", reject);
-      child.once("spawn", () => {
-        const pid = child.pid;
-        if (!pid) {
-          reject(new ClaudeRuntimeConfigurationError("Claude process started without a PID."));
-          return;
-        }
-        resolve({ pid, wait: () => exit });
-      });
+    const terminal = spawnAgentTerminalProcess(request);
+    const exit = new Promise<ClaudeProcessExit>((resolveExit) => {
+      terminal.child.once("exit", (exitCode, signal) => resolveExit({ exitCode, signal }));
     });
+    const pid = await terminal.ready();
+    return { pid, wait: () => exit };
   }
 }
 
@@ -65,6 +54,10 @@ export interface LaunchClaudeInput {
   readonly parentEnvironment?: NodeJS.ProcessEnv;
   /** Extra Anthropic headers to expose via ANTHROPIC_CUSTOM_HEADERS. */
   readonly customHeaders?: Readonly<Record<string, string>>;
+  readonly fallback?: ProviderFallbackConfiguration;
+  readonly onFallback?: (notification: FallbackNotification) => void;
+  readonly onStarted?: (client: "claude-code") => void;
+  readonly sessionInstructions?: string;
 }
 
 /**
@@ -105,6 +98,19 @@ export class ClaudeLauncher {
     if (input.modelId.trim().length === 0) {
       throw new ClaudeRuntimeConfigurationError("A model id is required to launch Claude Code.");
     }
+    if (!input.fallback) assertModelEnabled(input.profile, input.modelId);
+    for (const route of input.fallback?.logicalModel.routes ?? []) {
+      const profile = input.fallback?.profiles.find(item => item.id === route.providerId);
+      if (route.enabled && profile) assertModelEnabled(profile, route.modelId);
+    }
+    const disabledFallbackProfile = input.fallback?.profiles.find(
+      (profile) => !profile.enabled,
+    );
+    if (disabledFallbackProfile !== undefined) {
+      throw new ClaudeRuntimeConfigurationError(
+        `Fallback provider '${disabledFallbackProfile.id}' is disabled and cannot be launched.`,
+      );
+    }
 
     let bridge: ManagedClaudeBridge | undefined;
     try {
@@ -115,6 +121,11 @@ export class ClaudeLauncher {
         modelId: input.modelId,
         clientToken: sessionToken,
         sessionId,
+        ...(input.fallback === undefined ? {} : { fallback: input.fallback }),
+        ...(input.onFallback === undefined ? {} : { onFallback: input.onFallback }),
+        ...(input.sessionInstructions === undefined
+          ? {}
+          : { sessionInstructions: input.sessionInstructions }),
       });
       const address = await bridge.start();
       const environment = buildClaudeChildEnvironment({
@@ -131,6 +142,7 @@ export class ClaudeLauncher {
         cwd: input.projectDirectory,
         environment,
       });
+      input.onStarted?.("claude-code");
       const exit = await processHandle.wait();
       await disposeClaudeBridge(bridge);
       bridge = undefined;
@@ -165,7 +177,6 @@ export function buildClaudeChildEnvironment(
   for (const variable of managedAnthropicVariables) {
     delete environment[variable];
   }
-
   environment["ANTHROPIC_BASE_URL"] = input.bridgeBaseUrl;
   environment["ANTHROPIC_AUTH_TOKEN"] =
     input.sessionToken ?? `providerdock-${randomBytes(16).toString("hex")}`;

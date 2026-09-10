@@ -1,13 +1,16 @@
+import { randomUUID } from "node:crypto";
 import {
   normalizeHttpStatus,
   ProviderRequestError,
   type NormalizedErrorType,
 } from "../core/errors/provider-error.js";
+import { readSanitizedProviderErrorBody } from "../core/security/provider-error-redaction.js";
 import type { ProviderAdapterRegistry } from "../core/providers/provider-adapter-registry.js";
 import { ProviderHttpRequestBuilder } from "../core/providers/provider-http-request.js";
 import type { ProviderProfile } from "../core/providers/provider-profile.js";
 import type { SecretStore } from "../core/security/secret-store.js";
 import { SseDecoder } from "../bridge/sse/sse-decoder.js";
+import { ResponsesStreamState } from "../bridge/responses/responses-stream-state.js";
 
 /**
  * Provider / Model Doctor (spec sections 8, 32).
@@ -22,7 +25,10 @@ export type DoctorLevel = 0 | 1 | 2 | 3;
 
 export type DoctorCheckStatus = "PASS" | "DEGRADED" | "FAIL" | "SKIPPED";
 
-export type DoctorProtocol = "openai-responses" | "openai-chat-completions";
+export type DoctorProtocol =
+  | "openai-responses"
+  | "openai-chat-completions"
+  | "anthropic-messages";
 
 export interface DoctorCheck {
   readonly name: string;
@@ -37,6 +43,7 @@ export interface DoctorReport {
   readonly modelId?: string;
   readonly protocol?: DoctorProtocol;
   readonly level: DoctorLevel;
+  readonly checkedAt: string;
   readonly checks: readonly DoctorCheck[];
   readonly verdict: DoctorCheckStatus;
 }
@@ -51,22 +58,26 @@ export interface ProviderDoctorOptions {
   readonly adapterRegistry: ProviderAdapterRegistry;
   readonly fetchImpl?: typeof fetch;
   readonly monotonicNow?: () => number;
+  readonly now?: () => Date;
 }
 
 const minimalPrompt = "Reply exactly: OK";
 const syntheticToolName = "providerdock_echo";
+const syntheticToolPrompt = `Call ${syntheticToolName} exactly once with value "ok". After receiving its result, reply with only its receipt string and do not call tools again.`;
 
 export class ProviderDoctor {
   private readonly requests: ProviderHttpRequestBuilder;
   private readonly registry: ProviderAdapterRegistry;
   private readonly fetchImpl: typeof fetch;
   private readonly monotonicNow: () => number;
+  private readonly now: () => Date;
 
   constructor(options: ProviderDoctorOptions) {
     this.requests = new ProviderHttpRequestBuilder(options.secretStore);
     this.registry = options.adapterRegistry;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.monotonicNow = options.monotonicNow ?? (() => performance.now());
+    this.now = options.now ?? (() => new Date());
   }
 
   async run(profile: ProviderProfile, options: RunDoctorOptions = {}): Promise<DoctorReport> {
@@ -80,7 +91,7 @@ export class ProviderDoctor {
     const discovery = await this.checkDiscovery(prepared);
     checks.push(discovery.check);
     if (modelId === undefined) {
-      modelId = prepared.manualModelIds[0] ?? discovery.firstModelId;
+      modelId = prepared.manualModelIds.find(id => !prepared.disabledModelIds.includes(id)) ?? discovery.firstModelId;
     }
 
     if (level >= 1) {
@@ -90,6 +101,8 @@ export class ProviderDoctor {
         checks.push(
           skipped("inference", "Skipped: no model available. Pass --model explicitly."),
         );
+      } else if (prepared.disabledModelIds.includes(modelId) || !prepared.enabled) {
+        checks.push(skipped("inference", "Skipped: model is disabled in provider settings."));
       } else {
         const inference = await this.checkInference(prepared, modelId);
         checks.push(inference.check);
@@ -118,6 +131,7 @@ export class ProviderDoctor {
       ...(modelId === undefined ? {} : { modelId }),
       ...(protocol === undefined ? {} : { protocol }),
       level,
+      checkedAt: this.now().toISOString(),
       checks,
       verdict: verdictOf(checks),
     };
@@ -139,7 +153,7 @@ export class ProviderDoctor {
             ? `${models.length} model(s) discovered`
             : "Endpoint reachable but the model list is empty.",
       };
-      const firstModelId = models[0]?.modelId;
+      const firstModelId = models.find(model => !profile.disabledModelIds.includes(model.modelId))?.modelId;
       return firstModelId === undefined ? { check } : { check, firstModelId };
     } catch (error) {
       return { check: this.failedCheck("connectivity+models", startedAt, error) };
@@ -216,7 +230,7 @@ export class ProviderDoctor {
         };
       }
       const observed = await observeSseStream(response.body, protocol, profile.timeoutMs);
-      const status: DoctorCheckStatus = observed.terminalSeen
+      const status: DoctorCheckStatus = observed.terminalSucceeded
         ? observed.duplicates > 0
           ? "DEGRADED"
           : "PASS"
@@ -225,7 +239,9 @@ export class ProviderDoctor {
         name: "streaming",
         status,
         latencyMs: this.elapsed(startedAt),
-        details: observed.terminalSeen
+        details: observed.terminalSeen && !observed.terminalSucceeded
+          ? "Provider ended the stream with a failure or incomplete response."
+          : observed.terminalSeen
           ? `${observed.eventCount} event(s); terminal event received` +
             (observed.duplicates > 0 ? `; ${observed.duplicates} duplicate event(s)` : "")
           : "Stream closed without a terminal event.",
@@ -248,29 +264,42 @@ export class ProviderDoctor {
         toolCallBody(protocol, modelId),
       );
       const call = extractToolCall(protocol, payload);
-      if (call === undefined) {
+      if (call === undefined || countToolCalls(protocol, payload) !== 1 ||
+        call.name !== syntheticToolName || call.callId.trim() === "" ||
+        !hasFinishSignal(protocol, payload)) {
         return {
           name: "tools",
           status: "DEGRADED",
           latencyMs: this.elapsed(startedAt),
-          details: "Model did not produce a tool call for a forced synthetic tool.",
+          details: "Model did not produce exactly one completed call to the expected diagnostic tool.",
         };
       }
+      let args: unknown;
+      try { args = JSON.parse(call.arguments); } catch { args = undefined; }
+      if (!isRecord(args) || args.value !== "ok") {
+        throw new ProviderRequestError("PROTOCOL_ERROR", "Diagnostic tool arguments were invalid.");
+      }
 
+      // Generated after the first response; the model can learn it only from the result.
+      const receipt = `receipt-${randomUUID()}`;
       const { payload: continuation } = await this.postJson(
         profile,
         protocol,
-        toolContinuationBody(protocol, modelId, call),
+        toolContinuationBody(protocol, modelId, call, payload, receipt),
       );
       const finalText = extractOutputText(protocol, continuation);
+      const repeated = countToolCalls(protocol, continuation) > 0;
+      const passed = !repeated && finalText?.trim() === receipt && hasFinishSignal(protocol, continuation);
       return {
         name: "tools",
-        status: finalText === undefined || finalText.trim() === "" ? "DEGRADED" : "PASS",
+        status: passed ? "PASS" : "FAIL",
         latencyMs: this.elapsed(startedAt),
         details:
-          finalText === undefined || finalText.trim() === ""
-            ? "Tool call round-trip succeeded but the continuation had no text output."
-            : `Tool call '${call.callId}' resolved and the model produced a final answer.`,
+          repeated
+            ? "Model repeated a tool call after receiving its result. The repeated call was not executed."
+            : passed
+              ? "Tool history verified: the model returned the result receipt without another tool call."
+              : "Tool continuation did not return the result receipt in a successful final answer.",
       };
     } catch (error) {
       return this.failedCheck("tools", startedAt, error);
@@ -283,11 +312,22 @@ export class ProviderDoctor {
     body: Record<string, unknown>,
     streaming = false,
   ): Promise<{ response: Response; payload: unknown }> {
-    const endpoint = protocol === "openai-responses" ? "responses" : "chat/completions";
+    const endpoint =
+      protocol === "openai-responses"
+        ? "responses"
+        : protocol === "anthropic-messages"
+          ? "messages"
+          : "chat/completions";
     const built = await this.requests.build(profile, endpoint, {
       accept: streaming ? "text/event-stream, application/json" : "application/json",
       contentType: "application/json",
     });
+    if (
+      protocol === "anthropic-messages" &&
+      !built.headers.has("anthropic-version")
+    ) {
+      built.headers.set("anthropic-version", "2023-06-01");
+    }
 
     let response: Response;
     try {
@@ -305,11 +345,16 @@ export class ProviderDoctor {
     }
 
     if (!response.ok) {
-      await response.body?.cancel().catch(() => undefined);
+      const sanitizedDetail = await readSanitizedProviderErrorBody(response, {
+        sensitiveValues: built.redactionValues,
+      });
       throw new ProviderRequestError(
         normalizeHttpStatus(response.status),
         `Provider returned HTTP ${response.status}.`,
-        { httpStatus: response.status },
+        {
+          httpStatus: response.status,
+          ...(sanitizedDetail === undefined ? {} : { sanitizedDetail }),
+        },
       );
     }
     if (streaming) return { response, payload: undefined };
@@ -331,7 +376,10 @@ export class ProviderDoctor {
       name,
       status: "FAIL",
       latencyMs: this.elapsed(startedAt),
-      details: normalized.message,
+      details:
+        normalized.sanitizedDetail === undefined
+          ? normalized.message
+          : `${normalized.message} ${normalized.sanitizedDetail}`,
       errorType: normalized.type,
     };
   }
@@ -348,6 +396,7 @@ interface ExtractedToolCall {
 }
 
 function protocolCandidates(profile: ProviderProfile): readonly DoctorProtocol[] {
+  if (profile.apiType === "anthropic-messages") return ["anthropic-messages"];
   if (profile.apiType === "openai-responses") return ["openai-responses"];
   if (profile.apiType === "openai-chat-completions") return ["openai-chat-completions"];
   return ["openai-responses", "openai-chat-completions"];
@@ -363,6 +412,14 @@ function inferenceBody(
       model: modelId,
       input: minimalPrompt,
       max_output_tokens: 16,
+      stream,
+    };
+  }
+  if (protocol === "anthropic-messages") {
+    return {
+      model: modelId,
+      messages: [{ role: "user", content: minimalPrompt }],
+      max_tokens: 16,
       stream,
     };
   }
@@ -383,7 +440,7 @@ const syntheticToolSchema = {
 } as const;
 
 function toolCallBody(protocol: DoctorProtocol, modelId: string): Record<string, unknown> {
-  const prompt = `Call the ${syntheticToolName} tool with value "ok".`;
+  const prompt = syntheticToolPrompt;
   if (protocol === "openai-responses") {
     return {
       model: modelId,
@@ -398,6 +455,22 @@ function toolCallBody(protocol: DoctorProtocol, modelId: string): Record<string,
         },
       ],
       tool_choice: "required",
+      stream: false,
+    };
+  }
+  if (protocol === "anthropic-messages") {
+    return {
+      model: modelId,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 128,
+      tools: [
+        {
+          name: syntheticToolName,
+          description: "Echoes the provided value. Safe diagnostic tool without side effects.",
+          input_schema: syntheticToolSchema,
+        },
+      ],
+      tool_choice: { type: "tool", name: syntheticToolName },
       stream: false,
     };
   }
@@ -424,26 +497,26 @@ function toolContinuationBody(
   protocol: DoctorProtocol,
   modelId: string,
   call: ExtractedToolCall,
+  firstPayload: unknown,
+  receipt: string,
 ): Record<string, unknown> {
-  const prompt = `Call the ${syntheticToolName} tool with value "ok".`;
+  const prompt = syntheticToolPrompt;
+  const first = isRecord(firstPayload) ? firstPayload : {};
+  const result = JSON.stringify({ echoed: "ok", receipt });
   if (protocol === "openai-responses") {
     return {
       model: modelId,
       input: [
         { type: "message", role: "user", content: prompt },
-        {
-          type: "function_call",
-          call_id: call.callId,
-          name: call.name,
-          arguments: call.arguments,
-        },
+        ...(Array.isArray(first.output) ? first.output : []),
         {
           type: "function_call_output",
           call_id: call.callId,
-          output: JSON.stringify({ echoed: "ok" }),
+          output: result,
         },
       ],
       max_output_tokens: 128,
+      tool_choice: "auto",
       tools: [
         {
           type: "function",
@@ -455,24 +528,47 @@ function toolContinuationBody(
       stream: false,
     };
   }
+  if (protocol === "anthropic-messages") {
+    return {
+      model: modelId,
+      messages: [
+        { role: "user", content: prompt },
+        {
+          role: "assistant",
+          content: first.content,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: call.callId,
+              content: result,
+            },
+          ],
+        },
+      ],
+      max_tokens: 128,
+      tool_choice: { type: "auto" },
+      tools: [
+        {
+          name: syntheticToolName,
+          description: "Echoes the provided value. Safe diagnostic tool without side effects.",
+          input_schema: syntheticToolSchema,
+        },
+      ],
+      stream: false,
+    };
+  }
   return {
     model: modelId,
     messages: [
       { role: "user", content: prompt },
-      {
-        role: "assistant",
-        content: null,
-        tool_calls: [
-          {
-            id: call.callId,
-            type: "function",
-            function: { name: call.name, arguments: call.arguments },
-          },
-        ],
-      },
-      { role: "tool", tool_call_id: call.callId, content: JSON.stringify({ echoed: "ok" }) },
+      (first.choices as { message: unknown }[])[0]?.message,
+      { role: "tool", tool_call_id: call.callId, content: result },
     ],
     max_tokens: 128,
+    tool_choice: "auto",
     tools: [
       {
         type: "function",
@@ -491,6 +587,10 @@ function analyzeInferencePayload(
   protocol: DoctorProtocol,
   payload: unknown,
 ): { status: DoctorCheckStatus; details: string } {
+  if (isRecord(payload) && (payload.error != null ||
+      (protocol === "openai-responses" && ["failed", "incomplete"].includes(String(payload.status))))) {
+    return { status: "FAIL", details: "Provider returned an unsuccessful response." };
+  }
   const text = extractOutputText(protocol, payload);
   if (text === undefined) {
     return { status: "FAIL", details: "Response contained no text output." };
@@ -508,9 +608,29 @@ function analyzeInferencePayload(
 
 function hasFinishSignal(protocol: DoctorProtocol, payload: unknown): boolean {
   if (!isRecord(payload)) return false;
-  if (protocol === "openai-responses") return typeof payload.status === "string";
+  if (payload.error != null) return false;
+  if (protocol === "openai-responses") return payload.status === "completed";
+  if (protocol === "anthropic-messages") {
+    return ["end_turn", "tool_use", "stop_sequence"].includes(String(payload.stop_reason));
+  }
   const choice = Array.isArray(payload.choices) ? payload.choices[0] : undefined;
-  return isRecord(choice) && typeof choice.finish_reason === "string";
+  return isRecord(choice) && ["stop", "tool_calls", "function_call"].includes(String(choice.finish_reason));
+}
+
+function countToolCalls(protocol: DoctorProtocol, payload: unknown): number {
+  if (!isRecord(payload)) return 0;
+  if (protocol === "openai-responses") {
+    return Array.isArray(payload.output) ? payload.output.filter((item) =>
+      isRecord(item) && typeof item.type === "string" && item.type.endsWith("_call")).length : 0;
+  }
+  if (protocol === "anthropic-messages") {
+    return Array.isArray(payload.content) ? payload.content.filter((item) =>
+      isRecord(item) && typeof item.type === "string" && item.type.endsWith("tool_use")).length : 0;
+  }
+  const choice = Array.isArray(payload.choices) ? payload.choices[0] : undefined;
+  if (!isRecord(choice) || !isRecord(choice.message)) return 0;
+  if (choice.message.function_call != null) return 1;
+  return Array.isArray(choice.message.tool_calls) ? choice.message.tool_calls.length : 0;
 }
 
 function extractOutputText(protocol: DoctorProtocol, payload: unknown): string | undefined {
@@ -531,6 +651,15 @@ function extractOutputText(protocol: DoctorProtocol, payload: unknown): string |
     }
     return parts.length > 0 ? parts.join("") : undefined;
   }
+  if (protocol === "anthropic-messages") {
+    if (!Array.isArray(payload.content)) return undefined;
+    const parts = payload.content.flatMap((block) =>
+      isRecord(block) && block.type === "text" && typeof block.text === "string"
+        ? [block.text]
+        : [],
+    );
+    return parts.length > 0 ? parts.join("") : undefined;
+  }
   const choice = Array.isArray(payload.choices) ? payload.choices[0] : undefined;
   if (!isRecord(choice) || !isRecord(choice.message)) return undefined;
   return typeof choice.message.content === "string" ? choice.message.content : undefined;
@@ -547,6 +676,26 @@ function extractToolCall(protocol: DoctorProtocol, payload: unknown): ExtractedT
         callId: item.call_id,
         name: item.name,
         arguments: typeof item.arguments === "string" ? item.arguments : "{}",
+      };
+    }
+    return undefined;
+  }
+  if (protocol === "anthropic-messages") {
+    if (!Array.isArray(payload.content)) return undefined;
+    for (const block of payload.content) {
+      if (
+        !isRecord(block) ||
+        block.type !== "tool_use" ||
+        typeof block.id !== "string" ||
+        typeof block.name !== "string" ||
+        !isRecord(block.input)
+      ) {
+        continue;
+      }
+      return {
+        callId: block.id,
+        name: block.name,
+        arguments: JSON.stringify(block.input),
       };
     }
     return undefined;
@@ -574,6 +723,7 @@ interface SseObservation {
   readonly eventCount: number;
   readonly duplicates: number;
   readonly terminalSeen: boolean;
+  readonly terminalSucceeded: boolean;
 }
 
 async function observeSseStream(
@@ -587,60 +737,85 @@ async function observeSseStream(
   let eventCount = 0;
   let duplicates = 0;
   let terminalSeen = false;
+  let terminalSucceeded = false;
+  let anthropicStopReason: unknown;
+  const responses = new ResponsesStreamState();
   const deadline = Date.now() + timeoutMs;
+
+  const observe = (event: { data?: string; id?: string }): boolean => {
+    if (event.data === undefined) return false;
+    if (event.data === "[DONE]") return true;
+    let payload: unknown;
+    try { payload = JSON.parse(event.data); } catch {
+      throw new ProviderRequestError("PROTOCOL_ERROR", "Doctor received malformed SSE JSON.");
+    }
+    if (!isRecord(payload)) throw new ProviderRequestError("PROTOCOL_ERROR", "Invalid SSE payload.");
+    eventCount += 1;
+    // Equal text deltas without an event identity may be legitimate repetition.
+    const identity = event.id ?? (typeof payload.sequence_number === "number" ? String(payload.sequence_number) : undefined);
+    if (identity !== undefined) {
+      const key = `${identity}:${event.data}`;
+      if (seen.has(key)) { duplicates += 1; return false; }
+      seen.add(key);
+    }
+    if (payload.type === "error" || payload.error != null) {
+      terminalSeen = true;
+      terminalSucceeded = false;
+      return true;
+    }
+    if (protocol === "openai-responses") {
+      responses.observe(payload, event.id);
+      terminalSeen = responses.terminalEventSeen;
+      terminalSucceeded = responses.terminalEventType === "response.completed";
+      return terminalSeen;
+    }
+    if (protocol === "anthropic-messages") {
+      if (payload.type === "message_delta" && isRecord(payload.delta)) {
+        anthropicStopReason = payload.delta.stop_reason ?? anthropicStopReason;
+      }
+      if (payload.type === "message_stop") {
+        terminalSeen = true;
+        terminalSucceeded = ["end_turn", "tool_use", "stop_sequence"].includes(String(anthropicStopReason));
+        return true;
+      }
+      return false;
+    }
+    const choice = Array.isArray(payload.choices) ? payload.choices[0] : undefined;
+    if (isRecord(choice) && choice.finish_reason != null) {
+      terminalSeen = true;
+      terminalSucceeded = ["stop", "tool_calls", "function_call"].includes(String(choice.finish_reason));
+    }
+    return false;
+  };
 
   try {
     while (Date.now() < deadline) {
-      const chunk = await Promise.race([
-        reader.read(),
-        new Promise<never>((_, reject) => {
-          const timer = setTimeout(
-            () => reject(new ProviderRequestError("TIMEOUT", "Stream read timed out.")),
-            Math.max(1, deadline - Date.now()),
-          );
-          timer.unref?.();
-        }),
-      ]);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new ProviderRequestError("TIMEOUT", "Stream read timed out.")),
+              Math.max(1, deadline - Date.now()),
+            );
+            timer.unref?.();
+          }),
+        ]);
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
+      for (const event of chunk.done ? decoder.finish() : decoder.push(chunk.value)) {
+        if (observe(event)) return { eventCount, duplicates, terminalSeen, terminalSucceeded };
+      }
       if (chunk.done) break;
-      for (const event of decoder.push(chunk.value)) {
-        if (event.data === undefined) continue;
-        if (event.data === "[DONE]") {
-          return { eventCount, duplicates, terminalSeen };
-        }
-        eventCount += 1;
-        if (seen.has(event.data)) duplicates += 1;
-        else seen.add(event.data);
-        if (isTerminalStreamEvent(protocol, event.data)) terminalSeen = true;
-      }
-      if (terminalSeen && protocol === "openai-chat-completions") {
-        // Chat streams may only close with [DONE]; keep reading briefly, but
-        // a finish_reason already proves terminal semantics.
-      }
     }
   } finally {
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
-  return { eventCount, duplicates, terminalSeen };
-}
-
-function isTerminalStreamEvent(protocol: DoctorProtocol, data: string): boolean {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(data);
-  } catch {
-    return false;
-  }
-  if (!isRecord(parsed)) return false;
-  if (protocol === "openai-responses") {
-    return (
-      parsed.type === "response.completed" ||
-      parsed.type === "response.failed" ||
-      parsed.type === "response.incomplete"
-    );
-  }
-  const choice = Array.isArray(parsed.choices) ? parsed.choices[0] : undefined;
-  return isRecord(choice) && typeof choice.finish_reason === "string";
+  return { eventCount, duplicates, terminalSeen, terminalSucceeded };
 }
 
 function skipped(name: string, details: string): DoctorCheck {

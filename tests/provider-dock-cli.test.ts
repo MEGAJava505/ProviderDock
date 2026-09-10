@@ -1,6 +1,10 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   GenericOpenAiAdapter,
+  MemoryProviderHealthRepository,
   MemoryProviderProfileRepository,
   MemorySecretStore,
   ProviderAdapterRegistry,
@@ -88,8 +92,11 @@ describe("ProviderDock management CLI", () => {
   });
 
   it("probes models and reports normalized health", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ data: [{ id: "gpt-x" }] }), { status: 200 }),
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ data: [{ id: "gpt-x" }] }), {
+          status: 200,
+        }),
     );
     const application = createApplication(fetchMock);
     await application.setProvider({
@@ -103,8 +110,28 @@ describe("ProviderDock management CLI", () => {
     expect(result.code).toBe(0);
     expect(JSON.parse(result.stdout[0] ?? "{}")).toMatchObject({
       health: { providerId: "router", status: "ONLINE", discoveredModelCount: 1 },
-      models: [{ internalId: "router:gpt-x", healthStatus: "ONLINE" }],
+      models: [{ internalId: "router:gpt-x", healthStatus: "UNKNOWN" }],
     });
+
+    await runCli(application, ["probe", "router"]);
+    const dashboard = await runCli(application, ["health", "show", "router", "--json"]);
+    expect(JSON.parse(dashboard.stdout[0] ?? "{}")).toMatchObject({
+      providerId: "router",
+      latest: {
+        health: { status: "ONLINE" },
+        models: [{ internalId: "router:gpt-x" }],
+      },
+      history: [{ status: "ONLINE" }, { status: "ONLINE" }],
+    });
+    const listed = await runCli(application, ["health", "list"]);
+    expect(listed.stdout.join("\n")).toContain("router");
+    const history = await runCli(application, ["health", "history", "router"]);
+    expect(history.stdout.join("\n")).toContain("ONLINE");
+
+    await application.removeProvider("router");
+    expect((await runCli(application, ["health", "list"])).stdout).toEqual([
+      "No persisted health snapshots.",
+    ]);
   });
 
   it("returns exit code 2 for an unhealthy probe", async () => {
@@ -120,6 +147,65 @@ describe("ProviderDock management CLI", () => {
     const result = await runCli(application, ["probe", "router"]);
     expect(result.code).toBe(2);
     expect(result.stdout.join("\n")).toContain("Status: AUTH_ERROR");
+    expect(result.stdout.join("\n")).toContain(
+      "The provider endpoint is reachable, but authentication was rejected.",
+    );
+    expect(result.stdout.join("\n")).toContain("Suggested action:");
+  });
+
+  it("renders persisted capability diagnostics even before the first probe", async () => {
+    const health = new MemoryProviderHealthRepository();
+    const application = new ProviderDockApplication(
+      new MemoryProviderProfileRepository(),
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    await health.recordDiagnostics({
+      providerId: "router",
+      modelId: "gpt-x",
+      checkedAt: "2026-08-30T10:00:00.000Z",
+      doctorLevel: 3,
+      verdict: "PASS",
+      protocol: "openai-responses",
+      capabilities: {
+        text: "SUPPORTED",
+        streaming: "SUPPORTED",
+        tools: "SUPPORTED",
+        parallel_tools: "UNKNOWN",
+        reasoning: "UNKNOWN",
+        images: "UNKNOWN",
+        web_search: "UNKNOWN",
+        long_context: "UNKNOWN",
+        usage: "UNKNOWN",
+        cancellation: "UNKNOWN",
+        model_discovery: "SUPPORTED",
+      },
+      codexCompatibility: "NATIVE",
+      claudeCompatibility: "INCOMPATIBLE",
+    });
+
+    const listed = await runCli(application, ["health", "list"]);
+    expect(listed.stdout.join("\n")).toContain("NO_PROBE");
+    expect(listed.stdout.join("\n")).toContain("router");
+
+    const shown = await runCli(application, ["health", "show", "router"]);
+    expect(shown.stdout.join("\n")).toContain("Capability diagnostics:");
+    expect(shown.stdout.join("\n")).toContain("gpt-x");
+    expect(shown.stdout.join("\n")).toContain("openai-responses");
+    expect(shown.stdout.join("\n")).toContain("NATIVE");
+
+    const history = await runCli(application, ["health", "history", "router"]);
+    expect(history.stdout).toEqual([
+      "No persisted probe history for provider 'router'.",
+    ]);
   });
 
   it("imports a secret from the environment without printing it", async () => {
@@ -221,6 +307,143 @@ describe("ProviderDock management CLI", () => {
     ]);
     expect(unknown).toMatchObject({ code: 1 });
     expect(unknown.stderr.join("\n")).toContain("Provider 'missing' is not configured");
+  });
+
+  it("manages prompt profiles from a multiline instructions file with reference integrity", async () => {
+    const application = createApplication();
+    for (const id of ["primary", "direct"]) {
+      await application.setProvider({
+        id,
+        displayName: id,
+        baseUrl: `https://${id}.example.test/v1`,
+      });
+    }
+    await application.setLogicalModel({
+      id: "gpt-x",
+      routes: [{ providerId: "primary", modelId: "gpt-x", priority: 100 }],
+    });
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-prompt-cli-"));
+    const instructionsFile = join(directory, "instructions.md");
+    await writeFile(
+      instructionsFile,
+      "Work practically.\nInspect existing implementation first.\n",
+      "utf8",
+    );
+
+    const saved = await runCli(application, [
+      "prompt-profiles",
+      "set",
+      "--id",
+      "practical",
+      "--name",
+      "Practical Coding",
+      "--description",
+      "Default implementation profile",
+      "--instructions-file",
+      instructionsFile,
+      "--provider",
+      "direct",
+      "--logical-model",
+      "gpt-x",
+      "--client",
+      "codex",
+      "--reasoning",
+      "xhigh",
+      "--fallback",
+      "logical-model",
+      "--codex-flag=--no-alt-screen",
+    ]);
+    expect(saved).toMatchObject({
+      code: 0,
+      stdout: ["Saved prompt profile 'practical'."],
+    });
+
+    const shown = await runCli(application, [
+      "prompt-profiles",
+      "show",
+      "practical",
+    ]);
+    expect(JSON.parse(shown.stdout[0] ?? "{}")).toMatchObject({
+      id: "practical",
+      instructions:
+        "Work practically.\nInspect existing implementation first.",
+      preferredProviderId: "direct",
+      preferredLogicalModelId: "gpt-x",
+      preferredClient: "codex",
+      reasoningLevel: "xhigh",
+      fallbackPolicy: "logical-model",
+      clientFlags: { codex: ["--no-alt-screen"] },
+    });
+    expect(
+      (await runCli(application, ["providers", "remove", "direct"])).stderr.join(
+        "\n",
+      ),
+    ).toContain("preferred by prompt profile 'practical'");
+    expect(
+      (
+        await runCli(application, [
+          "logical-models",
+          "remove",
+          "gpt-x",
+        ])
+      ).stderr.join("\n"),
+    ).toContain("preferred by prompt profile 'practical'");
+
+    const projectDirectory = join(directory, "project");
+    expect(
+      await runCli(application, [
+        "project-profiles",
+        "set",
+        "--project",
+        projectDirectory,
+        "--prompt-profile",
+        "practical",
+      ]),
+    ).toMatchObject({
+      code: 0,
+      stdout: [`Saved project profile '${projectDirectory}'.`],
+    });
+    const projectProfile = await runCli(application, [
+      "project-profiles",
+      "show",
+      "--project",
+      projectDirectory,
+    ]);
+    expect(JSON.parse(projectProfile.stdout[0] ?? "{}")).toMatchObject({
+      projectDirectory,
+      promptProfileId: "practical",
+    });
+    expect(
+      (
+        await runCli(application, [
+          "prompt-profiles",
+          "remove",
+          "practical",
+        ])
+      ).stderr.join("\n"),
+    ).toContain("assigned to project");
+    expect(
+      await runCli(application, [
+        "project-profiles",
+        "remove",
+        "--project",
+        projectDirectory,
+      ]),
+    ).toMatchObject({
+      code: 0,
+      stdout: [`Removed project profile '${projectDirectory}'.`],
+    });
+
+    expect(
+      await runCli(application, [
+        "prompt-profiles",
+        "remove",
+        "practical",
+      ]),
+    ).toMatchObject({
+      code: 0,
+      stdout: ["Removed prompt profile 'practical'."],
+    });
   });
 });
 
