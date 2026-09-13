@@ -243,4 +243,90 @@ describe("ProviderDoctor", () => {
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(5);
   });
+
+  it.each([
+    ["openai-responses", "anthropic-messages", "/v1/responses"],
+    ["anthropic-messages", "openai-responses", "/v1/messages"],
+  ] as const)("forces %s instead of the configured %s protocol", async (
+    forcedProtocol,
+    configuredApiType,
+    expectedPath,
+  ) => {
+    const forcedProfile = parseProviderProfile({
+      id: `forced-${forcedProtocol}`,
+      displayName: "Forced protocol",
+      baseUrl: "https://forced.test/v1",
+      apiType: configuredApiType,
+      timeoutMs: 2_000,
+    });
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/v1/models") return json({ data: [{ id: "model-x" }] });
+      expect(path).toBe(expectedPath);
+      return forcedProtocol === "openai-responses"
+        ? json({
+            id: "resp",
+            status: "completed",
+            output: [{
+              type: "message",
+              role: "assistant",
+              content: [{ type: "output_text", text: "OK" }],
+            }],
+            usage: { input_tokens: 1, output_tokens: 1 },
+          })
+        : json({
+            id: "msg",
+            type: "message",
+            role: "assistant",
+            content: [{ type: "text", text: "OK" }],
+            stop_reason: "end_turn",
+            usage: { input_tokens: 1, output_tokens: 1 },
+          });
+    });
+
+    const report = await doctorWith(fetchMock).run(forcedProfile, {
+      level: 1,
+      protocol: forcedProtocol,
+    });
+
+    expect(report).toMatchObject({ protocol: forcedProtocol, verdict: "PASS" });
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname))
+      .toEqual(["/v1/models", expectedPath]);
+  });
+
+  it("does not fall back after a forced protocol is rejected", async () => {
+    const autoProfile = parseProviderProfile({
+      id: "forced-failure",
+      displayName: "Forced failure",
+      baseUrl: "https://forced.test/v1",
+      apiType: "auto",
+      timeoutMs: 2_000,
+    });
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/v1/models") return json({ data: [{ id: "model-x" }] });
+      if (path === "/v1/responses") {
+        return new Response(JSON.stringify({ error: { message: "unsupported endpoint" } }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fallback request to ${path}`);
+    });
+
+    const report = await doctorWith(fetchMock).run(autoProfile, {
+      level: 1,
+      protocol: "openai-responses",
+    });
+
+    expect(report.protocol).toBeUndefined();
+    expect(report.verdict).toBe("FAIL");
+    expect(report.checks.at(-1)).toMatchObject({
+      name: "inference",
+      status: "FAIL",
+      errorType: "INVALID_REQUEST",
+    });
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname))
+      .toEqual(["/v1/models", "/v1/responses"]);
+  });
 });

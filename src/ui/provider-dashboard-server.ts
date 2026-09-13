@@ -8,11 +8,16 @@ import {
 import type { AddressInfo } from "node:net";
 import { z } from "zod";
 import type { ProviderDockApplication } from "../application/provider-dock-application.js";
-import { agentApprovalLevels, defaultAgentApprovalLevel } from "../clients/agent-approval.js";
+import { agentApprovalLevels, type AgentApprovalLevel } from "../clients/agent-approval.js";
 import type { FallbackNotification } from "../core/fallback/fallback-session-router.js";
 import { providerErrorGuidance } from "../core/errors/provider-error.js";
 import type { ProviderHealthRecord } from "../core/health/provider-health-repository.js";
-import { portalAdapterIdForSite, portalConnectionSchema } from "../core/portals/portal-types.js";
+import { PortalRepositoryCorruptionError } from "../core/portals/portal-repository.js";
+import {
+  portalAdapterIdForSite,
+  portalConnectionSchema,
+  type PortalRecord,
+} from "../core/portals/portal-types.js";
 import {
   providerDashboardCss,
   providerDashboardHtml,
@@ -34,6 +39,7 @@ export type ProviderDashboardApplication = Pick<
   | "setProvider"
   | "setProviderModelEnabled"
   | "listProviderPortals"
+  | "providerPortalStatus"
   | "listPortalAdapters"
   | "setProviderPortal"
   | "refreshProviderPortal"
@@ -59,6 +65,9 @@ export type ProviderDashboardApplication = Pick<
   | "removePromptProfile"
   | "setProjectProfile"
   | "removeProjectProfile"
+  | "listAgentSessions"
+  | "deleteAgentSession"
+  | "resolveApprovalLevel"
   | "launchCodex"
   | "launchCodexLogicalModel"
   | "launchCodexPromptProfile"
@@ -134,7 +143,7 @@ const projectProfileWriteRequestSchema = projectProfileDeleteRequestSchema.exten
 const launchRequestSchema = z
   .object({
     client: z.enum(["auto", "codex", "claude-code"]).default("auto"),
-    approvalLevel: z.enum(agentApprovalLevels).default(defaultAgentApprovalLevel),
+    approvalLevel: z.enum(agentApprovalLevels).optional(),
     projectDirectory: z.string().trim().min(1).max(4_096),
     providerId: z
       .string()
@@ -152,9 +161,27 @@ const launchRequestSchema = z
       .trim()
       .regex(/^[a-z0-9][a-z0-9_-]*$/)
       .optional(),
+    resumeSessionId: z
+      .string()
+      .regex(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      )
+      .optional(),
   })
   .strict()
   .superRefine((request, context) => {
+    if (
+      request.resumeSessionId !== undefined &&
+      (request.client === "auto" ||
+        request.providerId === undefined ||
+        request.modelId === undefined)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Resume requires an explicit client plus provider and model selectors.",
+      });
+    }
     if ((request.providerId === undefined) !== (request.modelId === undefined)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -182,6 +209,7 @@ export interface ProviderDashboardLaunchRecord {
   readonly id: string;
   readonly status: ProviderDashboardLaunchStatus;
   readonly request: ProviderDashboardLaunchRequest;
+  readonly resolvedApprovalLevel: AgentApprovalLevel;
   readonly startedAt: string;
   readonly finishedAt?: string;
   readonly resolvedClient?: "codex" | "claude-code";
@@ -194,6 +222,7 @@ interface MutableLaunchRecord {
   id: string;
   status: ProviderDashboardLaunchStatus;
   request: ProviderDashboardLaunchRequest;
+  resolvedApprovalLevel: AgentApprovalLevel;
   startedAt: string;
   finishedAt?: string;
   resolvedClient?: "codex" | "claude-code";
@@ -425,6 +454,30 @@ export class ProviderDashboardServer {
       sendJson(response, 200, { launches: this.listLaunches() });
       return;
     }
+    if (request.method === "GET" && path === "/api/agent-sessions") {
+      sendJson(response, 200, {
+        sessions: await this.application.listAgentSessions(),
+      });
+      return;
+    }
+    const agentSessionResource =
+      /^\/api\/agent-sessions\/(codex|claude-code)\/([^/]+)$/.exec(path);
+    if (agentSessionResource !== null && request.method === "DELETE") {
+      const providerId = requestUrl.searchParams.get("providerId") ?? undefined;
+      if (providerId !== undefined && !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(providerId)) {
+        throw new DashboardRequestError(400, "INVALID_PROVIDER", "Provider id is invalid.");
+      }
+      const removed = await this.application.deleteAgentSession(
+        agentSessionResource[1] as "codex" | "claude-code",
+        decodePathSegment(agentSessionResource[2] ?? ""),
+        providerId,
+      );
+      if (!removed) {
+        throw new DashboardRequestError(404, "SESSION_NOT_FOUND", "Agent session was not found.");
+      }
+      sendJson(response, 200, { removed: true });
+      return;
+    }
     if (request.method === "POST" && path === "/api/directories/pick") {
       const projectDirectory = await this.pickDirectory();
       sendJson(response, 200, {
@@ -481,7 +534,7 @@ export class ProviderDashboardServer {
       return;
     }
     if (request.method === "POST" && path === "/api/launches") {
-      const launch = this.startLaunch(
+      const launch = await this.startLaunch(
         launchRequestSchema.parse(
           await readJsonBody(request, this.requestBodyLimitBytes),
         ),
@@ -742,9 +795,10 @@ export class ProviderDashboardServer {
       this.application.listProjectProfiles(),
       this.application.summarizeUsage(),
       this.createSecretVaultSnapshot(),
-      this.application.listProviderPortals(),
+      this.listProviderPortalsForSnapshot(),
       this.application.listUsage(),
     ]);
+    const portalStatus = this.application.providerPortalStatus();
     return {
       version: 1,
       generatedAt: this.now().toISOString(),
@@ -759,8 +813,23 @@ export class ProviderDashboardServer {
       usageEvents,
       secretVault,
       portals,
+      portalStatus: {
+        state: portalStatus.state,
+        ...(portalStatus.message === undefined
+          ? {}
+          : { message: portalStatus.message }),
+      },
       portalAdapters: this.application.listPortalAdapters(),
     };
+  }
+
+  private async listProviderPortalsForSnapshot(): Promise<readonly PortalRecord[]> {
+    try {
+      return await this.application.listProviderPortals();
+    } catch (error) {
+      if (error instanceof PortalRepositoryCorruptionError) return [];
+      throw error;
+    }
   }
 
   private async createSecretVaultSnapshot(): Promise<{
@@ -790,14 +859,19 @@ export class ProviderDashboardServer {
     }
   }
 
-  private startLaunch(
+  private async startLaunch(
     request: ProviderDashboardLaunchRequest,
-  ): ProviderDashboardLaunchRecord {
+  ): Promise<ProviderDashboardLaunchRecord> {
     this.pruneLaunches();
+    const resolvedApprovalLevel = await this.application.resolveApprovalLevel(
+      request.projectDirectory,
+      request.approvalLevel,
+    );
     const launch: MutableLaunchRecord = {
       id: randomUUID(),
       status: "STARTING",
       request,
+      resolvedApprovalLevel,
       startedAt: this.now().toISOString(),
       fallbacks: [],
     };
@@ -809,7 +883,7 @@ export class ProviderDashboardServer {
       launch.status = "RUNNING";
       launch.resolvedClient = client;
     };
-    void this.performLaunch(request, onFallback, onStarted).then(
+    void this.performLaunch(request, resolvedApprovalLevel, onFallback, onStarted).then(
       ({ client, exitCode, signal }) => {
         launch.status = "EXITED";
         launch.resolvedClient = client;
@@ -830,6 +904,7 @@ export class ProviderDashboardServer {
 
   private async performLaunch(
     request: ProviderDashboardLaunchRequest,
+    resolvedApprovalLevel: AgentApprovalLevel,
     onFallback: (notification: FallbackNotification) => void,
     onStarted: (client: "codex" | "claude-code") => void,
   ): Promise<{
@@ -839,7 +914,10 @@ export class ProviderDashboardServer {
   }> {
     const shared = {
       projectDirectory: request.projectDirectory,
-      approvalLevel: request.approvalLevel,
+      approvalLevel: resolvedApprovalLevel,
+      ...(request.resumeSessionId === undefined
+        ? {}
+        : { resumeSessionId: request.resumeSessionId }),
       onFallback,
       onStarted,
     };
@@ -978,6 +1056,7 @@ function copyLaunchRecord(
     id: launch.id,
     status: launch.status,
     request: launch.request,
+    resolvedApprovalLevel: launch.resolvedApprovalLevel,
     startedAt: launch.startedAt,
     ...(launch.finishedAt === undefined ? {} : { finishedAt: launch.finishedAt }),
     ...(launch.resolvedClient === undefined

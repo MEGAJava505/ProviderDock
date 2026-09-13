@@ -275,6 +275,104 @@ describe("Chat Completions bridge", () => {
       await bridge.stop();
     }
   });
+
+  it("tags translated Chat reasoning in JSON and SSE Responses output", async () => {
+    const expectedScope = JSON.stringify([
+      "chat-router",
+      "https://chat.test/v1",
+      "openai-chat-completions",
+      null,
+    ]);
+    const jsonBridge = chatBridge(
+      vi.fn<typeof fetch>().mockResolvedValue(
+        chatJsonResponse({
+          id: "chat-reasoning-json",
+          model: "chat-model",
+          choices: [{
+            finish_reason: "stop",
+            message: {
+              role: "assistant",
+              reasoning_content: "Reasoned",
+              providerdock_encrypted_reasoning: "opaque",
+              content: "Done",
+            },
+          }],
+        }),
+      ),
+      new MemorySecretStore({ CHAT_KEY: "secret" }),
+    );
+    const jsonAddress = await jsonBridge.start();
+    try {
+      const response = await postResponses(jsonAddress.baseUrl, {
+        model: "chat-model",
+        input: "Hello",
+      });
+      const payload = await response.json() as {
+        output: Array<Record<string, unknown>>;
+      };
+      expect(payload.output.find((item) => item.type === "reasoning")).toMatchObject({
+        providerdock_resource_scope: expectedScope,
+      });
+    } finally {
+      await jsonBridge.stop();
+    }
+
+    const streamBridge = chatBridge(
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response([
+          chatSse({
+            id: "chat-reasoning-stream",
+            model: "chat-model",
+            choices: [{
+              index: 0,
+              delta: { role: "assistant", reasoning_content: "Reasoned" },
+            }],
+          }),
+          chatSse({
+            id: "chat-reasoning-stream",
+            model: "chat-model",
+            choices: [{
+              index: 0,
+              delta: { content: "Done" },
+              finish_reason: "stop",
+            }],
+          }),
+          encodeSseEvent({ data: "[DONE]", comments: [] }),
+        ].join(""),
+        { headers: { "content-type": "text/event-stream" } },
+      )),
+      new MemorySecretStore({ CHAT_KEY: "secret" }),
+      { heartbeatIntervalMs: 0 },
+    );
+    const streamAddress = await streamBridge.start();
+    try {
+      const response = await postResponses(streamAddress.baseUrl, {
+        model: "chat-model",
+        input: "Hello",
+        stream: true,
+      });
+      const events = decodeEvents(await response.text())
+        .filter((event) => event.data !== undefined && event.data !== "[DONE]")
+        .map((event) => JSON.parse(event.data ?? "null") as Record<string, unknown>);
+      expect(events.find((event) =>
+        event.type === "response.output_item.added" &&
+        (event.item as Record<string, unknown> | undefined)?.type === "reasoning",
+      )).toMatchObject({
+        item: { providerdock_resource_scope: expectedScope },
+      });
+      const completed = events.find((event) => event.type === "response.completed");
+      expect(
+        (completed?.response as Record<string, unknown> | undefined)?.output,
+      ).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: "reasoning",
+          providerdock_resource_scope: expectedScope,
+        }),
+      ]));
+    } finally {
+      await streamBridge.stop();
+    }
+  });
 });
 
 function chatBridge(

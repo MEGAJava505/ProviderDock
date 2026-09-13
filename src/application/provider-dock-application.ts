@@ -1,4 +1,7 @@
-import { assertModelEnabled } from "../core/providers/model-access.js";
+import {
+  assertModelAvailable,
+  assertModelEnabled,
+} from "../core/providers/model-access.js";
 import { automaticClient } from "../core/providers/automatic-client.js";
 import { portalConnectionSchema, PortalConfigurationError } from "../core/portals/portal-types.js";
 import type { ProviderPortalService } from "../core/portals/provider-portal-service.js";
@@ -17,6 +20,7 @@ import {
   orderedLogicalRoutes,
   parseLogicalModelGroup,
   type LogicalModelGroup,
+  type LogicalModelRoute,
 } from "../core/fallback/logical-model.js";
 import type { FallbackNotification } from "../core/fallback/fallback-session-router.js";
 import {
@@ -54,7 +58,10 @@ import type {
   LaunchCodexInput,
 } from "../clients/codex/codex-launcher.js";
 import { CodexRuntimeConfigurationError } from "../clients/codex/codex-runtime-config.js";
-import type { AgentApprovalLevel } from "../clients/agent-approval.js";
+import { defaultAgentApprovalLevel, type AgentApprovalLevel } from "../clients/agent-approval.js";
+import type {
+  AgentApprovalPreferenceRepository,
+} from "../clients/agent-approval-preference.js";
 import type { CodexRecoveryOutcome } from "../clients/codex/codex-runtime-session.js";
 import {
   ClaudeRuntimeConfigurationError,
@@ -69,6 +76,7 @@ import type {
 } from "../diagnostics/provider-doctor.js";
 import { doctorReportToCapabilitySnapshot } from "../diagnostics/doctor-capability-snapshot.js";
 import type { ClientCompatibilityStatus } from "../core/providers/model-catalog.js";
+import type { BridgeModelDefinition } from "../bridge/responses/codex-model-catalog.js";
 import {
   MemoryUsageRepository,
   type UsageFilter,
@@ -76,10 +84,20 @@ import {
   type UsageSummaryRow,
 } from "../core/usage/usage-repository.js";
 import type { UsageTelemetryEvent } from "../core/usage/usage-event.js";
+import {
+  AgentSessionHistory,
+  type AgentClient,
+  type AgentSessionResumeBlockReason,
+} from "../clients/agent-session-history.js";
 import type {
   LoadedProviderPlugin,
   ProviderPluginDescriptor,
 } from "../core/plugins/provider-plugin-sdk.js";
+
+type LogicalRouteWithProfile = {
+  readonly route: LogicalModelRoute;
+  readonly profile: ProviderProfile;
+};
 
 export class ProviderNotFoundError extends Error {
   constructor(readonly providerId: string) {
@@ -221,6 +239,18 @@ export class ProfileBundleImportError extends Error {
 
 export type ResolvedLaunchClient = "codex" | "claude-code";
 
+export interface AgentSessionSummary {
+  readonly id: string;
+  readonly client: AgentClient;
+  readonly providerId: string;
+  readonly projectDirectory?: string;
+  readonly modelId?: string;
+  readonly title: string;
+  readonly updatedAt: string;
+  readonly resumable: boolean;
+  readonly resumeBlockedReason?: AgentSessionResumeBlockReason;
+}
+
 export interface AutomaticLaunchOptions {
   readonly projectDirectory: string;
   readonly approvalLevel?: AgentApprovalLevel;
@@ -280,7 +310,17 @@ export class ProviderDockApplication {
     private readonly probePolicy: ProviderProbePolicy =
       new ProviderProbePolicy(),
     private readonly portals?: ProviderPortalService,
-  ) {}
+    private readonly agentSessions?: AgentSessionHistory,
+    private readonly approvalPreferences?: AgentApprovalPreferenceRepository,
+  ) {
+    // Keep provider model catalogs current without requiring a manual probe.
+    // The timer is intentionally unref'ed so it never keeps short-lived CLI/tests alive.
+    const refreshMs = 60_000;
+    const timer = setInterval(() => {
+      void this.probeDueProviders().catch(() => undefined);
+    }, refreshMs);
+    timer.unref?.();
+  }
 
   listProviderPlugins(): readonly ProviderPluginDescriptor[] {
     return this.providerPlugins.map((plugin) => ({
@@ -321,6 +361,7 @@ export class ProviderDockApplication {
   }
 
   async listProviderPortals() { return this.portals?.list() ?? []; }
+  providerPortalStatus() { return this.portals?.status() ?? { state: "healthy" as const }; }
   listPortalAdapters() { return this.portals?.listAdapters() ?? []; }
   async setProviderPortal(input: unknown) {
     const connection = portalConnectionSchema.parse(input);
@@ -663,6 +704,25 @@ export class ProviderDockApplication {
     return this.usageRecords.summarize(filter);
   }
 
+  async listAgentSessions(): Promise<readonly AgentSessionSummary[]> {
+    if (this.agentSessions === undefined) {
+      throw new Error("Agent session history is not configured.");
+    }
+    const records = await this.agentSessions.list();
+    return records.map(({ path: _path, ...summary }) => summary);
+  }
+
+  async deleteAgentSession(
+    client: AgentClient,
+    id: string,
+    providerId?: string,
+  ): Promise<boolean> {
+    if (this.agentSessions === undefined) {
+      throw new Error("Agent session history is not configured.");
+    }
+    return this.agentSessions.delete({ client, id, ...(providerId === undefined ? {} : { providerId }) });
+  }
+
   async diagnoseProvider(id: string, options: RunDoctorOptions = {}): Promise<DoctorReport> {
     if (!this.doctor) throw new Error("The provider doctor is not configured.");
     const report = await this.doctor.run(await this.getProvider(id), options);
@@ -688,14 +748,46 @@ export class ProviderDockApplication {
     return removed;
   }
 
+  async resolveApprovalLevel(
+    projectDirectory: string,
+    requested?: AgentApprovalLevel,
+  ): Promise<AgentApprovalLevel> {
+    if (requested !== undefined) {
+      if (this.approvalPreferences !== undefined) {
+        await this.approvalPreferences.upsert({
+          projectDirectory,
+          approvalLevel: requested,
+        });
+      }
+      return requested;
+    }
+
+    if (this.approvalPreferences === undefined) return defaultAgentApprovalLevel;
+    try {
+      const stored = await this.approvalPreferences.get(projectDirectory);
+      return stored?.approvalLevel ?? defaultAgentApprovalLevel;
+    } catch {
+      return defaultAgentApprovalLevel;
+    }
+  }
   async launchCodex(
     input: Omit<LaunchCodexInput, "profile"> & { readonly providerId: string },
   ): Promise<CodexProcessExit> {
     const { providerId, ...launchInput } = input;
-    assertModelEnabled(await this.getProvider(providerId), input.modelId);
+    const profile = await this.getProvider(providerId);
+    assertModelEnabled(profile, input.modelId);
+    const modelCatalog = await this.modelCatalogFor(profile);
+    if (modelCatalog.authoritative) {
+      assertModelAvailable(
+        profile,
+        input.modelId,
+        modelCatalog.models.map((model) => model.modelId),
+      );
+    }
     return this.requireCodexLauncher().launch({
       ...launchInput,
-      profile: await this.getProvider(providerId),
+      profile,
+      modelCatalog: modelCatalog.models,
     });
   }
 
@@ -713,10 +805,15 @@ export class ProviderDockApplication {
         profile: await this.getProvider(route.providerId),
       })),
     );
-    const active = resolved.filter(({ profile, route }) => profile.enabled && !profile.disabledModelIds.includes(route.modelId));
+    const active = await this.filterAuthoritativelyUnavailableLogicalRoutes(
+      resolved.filter(
+        ({ profile, route }) =>
+          profile.enabled && !profile.disabledModelIds.includes(route.modelId),
+      ),
+    );
     if (active.length === 0) {
       throw new CodexRuntimeConfigurationError(
-        `Logical model '${logicalModelId}' has no enabled provider routes.`,
+        `Logical model '${logicalModelId}' has no enabled provider routes with an available model.`,
       );
     }
 
@@ -826,11 +923,101 @@ export class ProviderDockApplication {
     input: Omit<LaunchClaudeInput, "profile"> & { readonly providerId: string },
   ): Promise<ClaudeProcessExit> {
     const { providerId, ...launchInput } = input;
-    assertModelEnabled(await this.getProvider(providerId), input.modelId);
+    const profile = await this.getProvider(providerId);
+    assertModelEnabled(profile, input.modelId);
+    const modelCatalog = await this.modelCatalogFor(profile);
+    if (modelCatalog.authoritative) {
+      assertModelAvailable(
+        profile,
+        input.modelId,
+        modelCatalog.models.map((model) => model.modelId),
+      );
+    }
     return this.requireClaudeLauncher().launch({
       ...launchInput,
-      profile: await this.getProvider(providerId),
+      profile,
+      modelCatalog: modelCatalog.models,
     });
+  }
+
+  private async modelCatalogFor(profile: ProviderProfile): Promise<{
+    readonly models: readonly BridgeModelDefinition[];
+    readonly authoritative: boolean;
+  }> {
+    let record = await this.healthRecords.get(profile.id);
+    if (record?.latest === undefined) {
+      try {
+        const probed = await this.probes.probe(profile);
+        record = await this.healthRecords.record(probed);
+      } catch {
+        // Launch remains possible with manual models when discovery is unavailable.
+      }
+    }
+    const latestIsAuthoritative =
+      record?.latest !== undefined &&
+      record.latest.health.errorType === undefined &&
+      record.latest.health.discoveredModelCount > 0 &&
+      ["ONLINE", "DEGRADED"].includes(record.latest.health.status);
+    const discovered = (record?.latest?.models ?? []).filter(
+      (model) => !latestIsAuthoritative || model.source === "discovered",
+    );
+    const byId = new Map<string, BridgeModelDefinition>();
+    if (!latestIsAuthoritative) {
+      for (const model of profile.manualModelIds) byId.set(model, { modelId: model });
+    }
+    for (const model of discovered) {
+      if (profile.disabledModelIds.includes(model.modelId)) continue;
+      byId.set(model.modelId, {
+        modelId: model.modelId,
+        displayName: model.displayName,
+        reasoning: model.reasoning,
+        ...(model.supportedReasoningLevels === undefined
+          ? {}
+          : { supportedReasoningLevels: model.supportedReasoningLevels }),
+      });
+    }
+    if (!latestIsAuthoritative) {
+      for (const modelId of record?.knownModelIds ?? []) {
+        if (profile.disabledModelIds.includes(modelId)) continue;
+        byId.set(modelId, { modelId });
+      }
+    }
+    return {
+      models: [...byId.values()],
+      authoritative: latestIsAuthoritative,
+    };
+  }
+
+  private async filterAuthoritativelyUnavailableLogicalRoutes(
+    routes: readonly LogicalRouteWithProfile[],
+  ): Promise<readonly LogicalRouteWithProfile[]> {
+    const catalogPromises = new Map<
+      string,
+      Promise<{
+        readonly models: readonly BridgeModelDefinition[];
+        readonly authoritative: boolean;
+      }>
+    >();
+    const available = await Promise.all(
+      routes.map(async (candidate) => {
+        let catalogPromise = catalogPromises.get(candidate.profile.id);
+        if (catalogPromise === undefined) {
+          catalogPromise = this.modelCatalogFor(candidate.profile);
+          catalogPromises.set(candidate.profile.id, catalogPromise);
+        }
+        const catalog = await catalogPromise;
+        if (
+          !catalog.authoritative ||
+          catalog.models.some((model) => model.modelId === candidate.route.modelId)
+        ) {
+          return candidate;
+        }
+        return undefined;
+      }),
+    );
+    return available.filter(
+      (candidate): candidate is LogicalRouteWithProfile => candidate !== undefined,
+    );
   }
 
   async launchClaudeLogicalModel(
@@ -847,10 +1034,15 @@ export class ProviderDockApplication {
         profile: await this.getProvider(route.providerId),
       })),
     );
-    const active = resolved.filter(({ profile, route }) => profile.enabled && !profile.disabledModelIds.includes(route.modelId));
+    const active = await this.filterAuthoritativelyUnavailableLogicalRoutes(
+      resolved.filter(
+        ({ profile, route }) =>
+          profile.enabled && !profile.disabledModelIds.includes(route.modelId),
+      ),
+    );
     if (active.length === 0) {
       throw new ClaudeRuntimeConfigurationError(
-        `Logical model '${logicalModelId}' has no enabled provider routes.`,
+        `Logical model '${logicalModelId}' has no enabled provider routes with an available model.`,
       );
     }
 
@@ -1059,6 +1251,12 @@ export class ProviderDockApplication {
     return this.secretVault;
   }
 
+  private requireApprovalPreferences(): AgentApprovalPreferenceRepository {
+    if (!this.approvalPreferences) {
+      throw new Error("Agent approval preferences are not configured.");
+    }
+    return this.approvalPreferences;
+  }
   private requireCodexLauncher(): CodexLauncher {
     if (!this.codexLauncher) {
       throw new Error("The Codex runtime launcher is not configured.");

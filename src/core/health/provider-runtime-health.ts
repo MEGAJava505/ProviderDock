@@ -15,6 +15,7 @@ export interface ProviderRuntimeHealthSignal {
   readonly providerId: string;
   readonly modelId: string;
   readonly observedAt: string;
+  readonly durationMs?: number;
   readonly client: UsageClient;
   readonly protocol: UsageProtocol;
   readonly sessionId?: string;
@@ -46,15 +47,21 @@ export interface CreateProviderRuntimeHealthSignalInput {
   readonly executionPhase?: FallbackFailurePhase;
   readonly errorMessage?: string;
   readonly observedAt?: Date;
+  readonly durationMs?: number;
 }
 
 export function createProviderRuntimeHealthSignal(
   input: CreateProviderRuntimeHealthSignalInput,
 ): ProviderRuntimeHealthSignal {
+  if (input.durationMs !== undefined &&
+      (!Number.isSafeInteger(input.durationMs) || input.durationMs < 0)) {
+    throw new TypeError("durationMs must be a non-negative safe integer.");
+  }
   return {
     providerId: input.providerId,
     modelId: input.modelId,
     observedAt: (input.observedAt ?? new Date()).toISOString(),
+    ...(input.durationMs === undefined ? {} : { durationMs: input.durationMs }),
     client: input.client,
     protocol: input.protocol,
     ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
@@ -91,6 +98,7 @@ export function runtimeHealthStatus(
     case "UNSUPPORTED_FEATURE":
       return "INCOMPATIBLE";
     case "INVALID_REQUEST":
+    case "RESOURCE_SCOPE_MISMATCH":
     case "MODEL_NOT_FOUND":
     case "PROTOCOL_ERROR":
     case "STREAM_ERROR":

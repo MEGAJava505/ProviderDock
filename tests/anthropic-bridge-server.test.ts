@@ -812,6 +812,7 @@ describe("AnthropicBridgeServer", () => {
       const replay = await postJson(`${address.url}/v1/messages`, request);
       expect(replay.status).toBe(409);
       expect(replay.headers.get("x-providerdock-turn-block")).toBe("UNSAFE_REPLAY");
+      expect(replay.headers.get("x-should-retry")).toBe("false");
       expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       await bridge.stop();
@@ -887,6 +888,69 @@ describe("AnthropicBridgeServer", () => {
       expect(payload.error.message).toContain("[REDACTED]");
       expect(JSON.stringify(payload)).not.toContain("real-secret");
       expect(JSON.stringify(payload)).not.toContain("do-not-copy");
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("preserves an upstream HTTP 500 as an Anthropic api_error without leaking overload details", async () => {
+    const rawMessage =
+      "We're currently experiencing high demand, which may cause temporary errors. api_key=anthropic-secret";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: rawMessage } }), {
+        status: 500,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": "5",
+          "x-request-id": "anthropic-request-500",
+        },
+      }),
+    );
+    const signals: ProviderRuntimeHealthSignal[] = [];
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "anthropic-secret" }),
+      fetchImpl: fetchMock,
+      sessionId: "66666666666666666666666666666666",
+      healthSignalSink: (signal) => {
+        signals.push(signal);
+      },
+    });
+    const address = await bridge.start();
+    try {
+      const response = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "overload" }],
+      });
+      const payload = await response.json() as {
+        type: string;
+        error: { type: string; message: string };
+        providerdock: { normalized_type: string; http_status: number };
+      };
+      expect(response.status).toBe(500);
+      expect(payload).toMatchObject({
+        type: "error",
+        error: { type: "api_error" },
+        providerdock: {
+          normalized_type: "PROVIDER_UNAVAILABLE",
+          http_status: 500,
+        },
+      });
+      expect(payload.error.message).toContain("high demand");
+      expect(payload.error.message).not.toContain("anthropic-secret");
+      expect(response.headers.get("retry-after")).toBe("5");
+      expect(response.headers.get("x-request-id")).toBe("anthropic-request-500");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(signals).toEqual([
+        expect.objectContaining({
+          outcome: "failed",
+          healthStatus: "OFFLINE",
+          errorType: "PROVIDER_UNAVAILABLE",
+          httpStatus: 500,
+          executionPhase: "unknown",
+        }),
+      ]);
     } finally {
       await bridge.stop();
     }

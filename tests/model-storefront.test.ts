@@ -10,7 +10,7 @@ const now = new Date("2026-09-07T12:00:00Z");
 const profile = parseProviderProfile({ id: "one", displayName: "One", baseUrl: "https://one.invalid/v1", manualModelIds: ["shared"],
   modelPricing: { shared: { currency: "USD", inputPerMillion: 1.25, outputPerMillion: 5 } } });
 const probe = { providerId: "one", status: "ONLINE" as const, checkedAt: now.toISOString(), latencyMs: 12, discoveredModelCount: 1, appliedFixes: [] };
-const record: ProviderHealthRecord = { providerId: "one", history: [], diagnostics: [], runtimeSignals: [],
+const record: ProviderHealthRecord = { providerId: "one", history: [], diagnostics: [], runtimeSignals: [], surfaceChecks: [],
   latest: { health: probe, models: mergeModelCatalog(profile, [{ modelId: "shared", displayName: "Shared", raw: {} }]) } };
 const signal = (observedAt: string, failed = false) => createProviderRuntimeHealthSignal({ providerId: "one", modelId: "shared",
   client: "codex", protocol: "openai-responses", observedAt: new Date(observedAt), outcome: failed ? "failed" : "completed",

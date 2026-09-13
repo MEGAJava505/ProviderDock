@@ -130,6 +130,7 @@ function healthStatusForError(type: NormalizedErrorType): ModelHealthStatus {
     case "UNSUPPORTED_FEATURE":
       return "INCOMPATIBLE";
     case "INVALID_REQUEST":
+    case "RESOURCE_SCOPE_MISMATCH":
     case "MODEL_NOT_FOUND":
     case "PROTOCOL_ERROR":
     case "STREAM_ERROR":

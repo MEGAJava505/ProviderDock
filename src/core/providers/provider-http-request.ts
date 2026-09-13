@@ -1,4 +1,5 @@
 import { ProviderRequestError } from "../errors/provider-error.js";
+import { SecretProtectionError } from "../security/dpapi-secret-vault.js";
 import type { SecretStore } from "../security/secret-store.js";
 import type { ProviderProfile } from "./provider-profile.js";
 
@@ -73,7 +74,19 @@ export class ProviderHttpRequestBuilder {
   }
 
   private async requireSecret(reference: string): Promise<string> {
-    const secret = await this.secrets.get(reference);
+    let secret: string | undefined;
+    try {
+      secret = await this.secrets.get(reference);
+    } catch (error) {
+      if (error instanceof SecretProtectionError) {
+        throw new ProviderRequestError(
+          "AUTH_ERROR",
+          "Provider credential could not be loaded from the local secret vault.",
+          { cause: error },
+        );
+      }
+      throw error;
+    }
     if (!secret) {
       throw new ProviderRequestError(
         "AUTH_ERROR",

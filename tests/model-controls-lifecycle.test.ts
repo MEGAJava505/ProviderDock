@@ -7,7 +7,7 @@ import { AnthropicBridgeServer, ResponsesBridgeServer, MemorySecretStore, Memory
   FileProviderHealthRepository, MemoryProviderHealthRepository, mergeModelCatalog,
   type CodexLauncher, type ClaudeLauncher, type ProviderProbeResult, type ProviderRuntimeHealthSignal } from "../src/index.js";
 import { assertModelEnabled } from "../src/core/providers/model-access.js";
-import { buildModelStorefront } from "../src/ui/model-storefront.js";
+import { buildModelStorefront, publicPortalSourceUrl } from "../src/ui/model-storefront.js";
 import { portalRecordSchema } from "../src/core/portals/portal-types.js";
 
 const profile = parseProviderProfile({ id: "one", displayName: "One", baseUrl: "https://one.invalid/v1", manualModelIds: ["old", "live"],
@@ -19,7 +19,7 @@ const probe = (at: string, ids: string[], error?: boolean): ProviderProbeResult 
 });
 
 describe("model lifecycle", () => {
-  it("retains removed models for 48 hours across restarts, without restarting the clock, and rediscovers them", async () => {
+  it("retains removed models for 24 hours across restarts, without restarting the clock, and rediscovers them", async () => {
     const directory = await mkdtemp(join(tmpdir(), "model-presence-"));
     const path = join(directory, "health.json");
     let records = new FileProviderHealthRepository(path);
@@ -27,9 +27,15 @@ describe("model lifecycle", () => {
     await records.record(probe("2026-09-08T10:00:00Z", ["live"]));
     records = new FileProviderHealthRepository(path);
     await records.record(probe("2026-09-09T10:00:00Z", ["live"]));
-    expect(buildModelStorefront([profile], await records.list(), new Date("2026-09-10T09:59:59Z")))
-      .toContainEqual(expect.objectContaining({ modelId: "old", lifecycle: "removed", status: "OFFLINE", removedAt: "2026-09-08T10:00:00Z" }));
-    expect(buildModelStorefront([profile], await records.list(), new Date("2026-09-10T10:00:00Z")).map(row => row.modelId)).toEqual(["live"]);
+    expect(buildModelStorefront([profile], await records.list(), new Date("2026-09-09T09:59:59Z")))
+      .toContainEqual(expect.objectContaining({
+        modelId: "old",
+        lifecycle: "removed",
+        status: "OFFLINE",
+        removedAt: "2026-09-08T10:00:00Z",
+        removalExpiresAt: "2026-09-09T10:00:00.000Z",
+      }));
+    expect(buildModelStorefront([profile], await records.list(), new Date("2026-09-09T10:00:00Z")).map(row => row.modelId)).toEqual(["live"]);
     await records.record(probe("2026-09-11T10:00:00Z", ["old", "live"]));
     expect(buildModelStorefront([profile], await records.list(), new Date("2026-09-11T10:00:00Z")))
       .toContainEqual(expect.objectContaining({ modelId: "old", lifecycle: "available", removedAt: null }));
@@ -58,6 +64,20 @@ describe("model lifecycle", () => {
     expect(rows).toContainEqual(expect.objectContaining({ modelId: "old", lifecycle: "site-hidden", locallyDisabled: true, enabled: false, status: "DISABLED" }));
     const stale = buildModelStorefront([profile], await records.list(), new Date("2026-09-08T11:00:01Z"), [portal]);
     expect(stale.some(row => row.lifecycle === "site-hidden")).toBe(false);
+  });
+  it("projects only the configured public portal origin into browser links", () => {
+    expect(publicPortalSourceUrl("https://one.invalid", "https://one.invalid/api/pricing"))
+      .toBe("https://one.invalid");
+    expect(publicPortalSourceUrl("https://one.invalid", "https://one.invalid/api/pricing?token=secret"))
+      .toBeNull();
+    expect(publicPortalSourceUrl("https://one.invalid", "javascript:alert(1)"))
+      .toBeNull();
+    expect(publicPortalSourceUrl("https://one.invalid", "https://user:pass@one.invalid/api/pricing"))
+      .toBeNull();
+    expect(publicPortalSourceUrl("http://127.0.0.1:1234", "http://127.0.0.1:1234/private-capability/api"))
+      .toBeNull();
+    expect(publicPortalSourceUrl("https://one.invalid", "https://other.invalid/api/pricing"))
+      .toBeNull();
   });
 });
 

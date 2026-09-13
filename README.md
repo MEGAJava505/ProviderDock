@@ -47,6 +47,9 @@ Phase 6 advanced features. The current core provides:
 - managed Codex logical-model launch with bridge-level, route-specific protocol
   translation, safe pre-output fallback, sticky route selection, response diagnostics,
   and user-visible CLI fallback notifications;
+- managed Codex Anthropic Messages compatibility through a private, token-protected
+  `codex-shim` child process per active Anthropic provider, while keeping the
+  Responses bridge's TurnLedger, fallback, usage, and health checks outside the shim;
 - managed Claude logical-model launch with native-Anthropic/Chat route selection,
   the same fail-closed continuation barriers, sticky routing, health/response
   diagnostics, and CLI fallback notifications;
@@ -254,11 +257,111 @@ Profile instructions are injected by the private session bridge; ProviderDock
 does not write `AGENTS.md`, `CLAUDE.md`, the user's Codex config, or global
 environment variables.
 
-Direct Codex routes currently require a Responses-compatible provider. Query-authenticated
+### Reasoning capabilities and model metadata
+
+ProviderDock resolves reasoning metadata by **exact model ID**. The dated official
+overlay (`2026-09-11`) is authoritative for the Codex picker; provider-advertised
+metadata is used only when no exact official entry exists. A gateway's advertised
+subset may still be narrower than the model-owner catalog, so the selected upstream
+route remains the final compatibility boundary.
+
+The capability layer has four explicit states:
+
+- `effort` — the exact supported values, optional default, and provenance are retained;
+- `thinking-mode` — the model exposes a thinking mode rather than an effort enum;
+- `unsupported` — effort control is known not to be supported;
+- `unknown` — no proven values are available.
+
+Unknown models are shown as `unknown`; ProviderDock never invents a global
+`low/medium/high` list. The current Codex overlay includes
+`gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`,
+`gpt-daybreak-blue-latest`, `gpt-daybreak-red-latest`, `gpt-5.5`, `gpt-5.4`,
+and `codex-auto-review`, with the exact defaults and levels from the snapshot.
+The exact Anthropic entries are model-aware as well. `glm-5.3` is represented as
+forced thinking mode, not as `low/high/max`. An explicit user override is the only
+way to supersede an exact official entry.
+
+### Launch approval persistence
+
+The default launch approval remains `ask`. When `--approval` (or the dashboard
+control) is explicitly selected, ProviderDock stores that choice per normalized
+project directory in:
+
+```text
+~/.provider-switcher/launch/preferences.json
+```
+
+An omitted approval resolves to the stored project preference, or to `ask` when no
+preference exists or the preference file is invalid. The dashboard launch history
+records and displays the actual `resolvedApprovalLevel` used by the child process;
+the CLI resolves the same value before dispatching the launch. `full-auto` is never
+enabled implicitly.
+
+### Provider-owned Responses state
+
+Responses reasoning items and encrypted provider-owned state are tagged with the
+creating provider/base-URL/protocol scope. On a later request, nested encrypted
+reasoning must carry the exact matching scope. Foreign or untagged state is rejected
+locally with `RESOURCE_SCOPE_MISMATCH` before any upstream request or fallback replay.
+Only ProviderDock's local scope tag is removed before forwarding; encrypted content and
+provider-specific extensions are preserved. Ownership errors returned by an upstream
+are normalized to the same non-retryable error, so the bridge never silently deletes
+or replays provider-owned reasoning across routes.
+
+### Managed Anthropic Messages in Codex
+
+Codex continues to speak the OpenAI Responses protocol. For an explicitly supported
+Anthropic Messages route, ProviderDock starts a private Python `codex-shim` child for
+that provider and puts it behind the normal managed Responses bridge:
+
+```text
+Codex CLI
+  -> managed Responses bridge
+     -> TurnLedger, safe fallback, telemetry, and health state
+     -> token-protected codex-shim on a random loopback port
+        -> Anthropic Messages
+```
+
+This is not the fixed `127.0.0.1:8317` daemon. Each shim is session-scoped, binds a
+random loopback port, accepts only its health and Responses endpoints, requires a
+generated ProviderDock token, and exits when ProviderDock disappears. The outer
+Responses bridge remains the safety boundary, so Anthropic routes participate in the
+same logical-model fallback policy without independent retries.
+
+A reviewed Python 3.11+ installation and a reviewed build of
+[`sybil-solutions/codex-shim`](https://github.com/sybil-solutions/codex-shim) are
+required. The dependency is not vendored or cloned automatically. Configuration
+overrides are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
+
+A supported Anthropic profile must use `anthropic-messages`, adapter `auto` or
+`generic-anthropic`, header authentication through `x-api-key`, and no secret headers,
+query authentication, or credentials embedded in the base URL. For example:
+
+```powershell
+node dist/cli.js providers set `
+  --id justworker-anthropic `
+  --name "JustWorker Anthropic" `
+  --base-url https://api.justwoker.icu/v1 `
+  --api-type anthropic-messages `
+  --adapter generic-anthropic `
+  --auth-kind header `
+  --auth-name x-api-key `
+  --secret-ref JUSTWORKER_ANTHROPIC_API_KEY `
+  --manual-model gpt-5.6-luna `
+  --manual-model gpt-5.6-sol
+```
+
+The API key is resolved from the secret store, placed only in a randomly named
+environment variable for the shim child, and referenced by `api_key_env` in an
+ephemeral settings file. It is never written to the Codex profile, runtime manifest,
+or settings JSON.
+
+Direct Codex routes still require a Responses-compatible provider. Query-authenticated
 Responses providers and AgentRouter are relayed automatically by a per-session bridge.
-Chat Completions providers are translated automatically through the canonical protocol.
-An already-running external compatibility bridge can be selected explicitly through
-`--bridge-url`.
+Chat Completions providers are translated automatically through the canonical protocol,
+and supported Anthropic Messages providers use the managed shim route above. An
+already-running external compatibility bridge can be selected explicitly through
+`--bridge-url`; ProviderDock never attaches to a global fixed-port shim daemon.
 Bridge behavior is documented in [`docs/responses-bridge.md`](./docs/responses-bridge.md).
 Claude Code runtime and Anthropic bridge behavior are documented in
 [`docs/claude-code.md`](./docs/claude-code.md).

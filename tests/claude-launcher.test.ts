@@ -365,6 +365,48 @@ describe("ClaudeLauncher", () => {
     expect(startRequest?.environment.ANTHROPIC_AUTH_TOKEN).toBe(createInput?.clientToken);
   });
 
+  it("passes a validated resume session id to Claude Code", async () => {
+    const bridge = { start: vi.fn(async () => ({ host: "127.0.0.1" as const, port: 1, url: "http://127.0.0.1:1" })), stop: vi.fn(async () => undefined) };
+    const bridges: ClaudeBridgeFactory = { create: () => bridge };
+    let startedRequest: ClaudeProcessStartRequest | undefined;
+    const processes: ClaudeProcessRunner = {
+      start: async (request) => {
+        startedRequest = request;
+        return { pid: 45, wait: async () => ({ exitCode: 0, signal: null }) };
+      },
+    };
+    const launcher = new ClaudeLauncher(
+      bridges,
+      processes,
+      createSessionHomes(await mkdtemp(join(tmpdir(), "providerdock-claude-session-home-"))),
+    );
+
+    await expect(
+      launcher.launch({
+        profile: testProfile(),
+        modelId: "claude-x",
+        projectDirectory: "/tmp/project",
+        resumeSessionId: "not-a-session-id",
+      }),
+    ).rejects.toThrow("resume session id");
+    expect(startedRequest).toBeUndefined();
+
+    await launcher.launch({
+      profile: testProfile(),
+      modelId: "claude-x",
+      projectDirectory: "/tmp/project",
+      resumeSessionId: "8fbf0290-d6ae-44a9-85e2-fc36e0915743",
+      additionalArgs: ["--verbose"],
+    });
+    expect(startedRequest?.args).toEqual([
+      "--permission-mode",
+      "manual",
+      "--resume",
+      "8fbf0290-d6ae-44a9-85e2-fc36e0915743",
+      "--verbose",
+    ]);
+  });
+
   it("stops the bridge when the launch fails and rejects disabled providers", async () => {
     const bridge = { start: vi.fn(async () => ({ host: "127.0.0.1" as const, port: 1, url: "http://127.0.0.1:1" })), stop: vi.fn(async () => undefined) };
     const bridges: ClaudeBridgeFactory = { create: () => bridge };

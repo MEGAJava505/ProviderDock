@@ -1,7 +1,7 @@
 import type { ProviderHealthRecord } from "./provider-health-repository.js";
 import type { ProviderProbeResult } from "./provider-probe-service.js";
 
-export const removedModelRetentionMs = 48 * 60 * 60 * 1000;
+export const removedModelRetentionMs = 24 * 60 * 60 * 1000;
 
 /** A failed catalog fetch is not evidence that all the provider's models disappeared. */
 export function updateModelRemovals(previous: ProviderHealthRecord | undefined, result: ProviderProbeResult): Record<string, string> {

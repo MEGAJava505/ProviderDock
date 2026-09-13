@@ -22,7 +22,7 @@ describe("automatic CLI and recorded protocol selection",()=>{
   });
   it("uses recent successful per-model protocols, not another model or failed attempts",()=>{
     const now=new Date();const signals=[createProviderRuntimeHealthSignal({providerId:"demo",modelId:model,client:"claude-code",protocol:"openai-responses",outcome:"completed",observedAt:now}),createProviderRuntimeHealthSignal({providerId:"demo",modelId:"different",client:"claude-code",protocol:"anthropic-messages",outcome:"completed",observedAt:now})];
-    const record={providerId:"demo",history:[],diagnostics:[],runtimeSignals:signals};
+    const record={providerId:"demo",history:[],diagnostics:[],runtimeSignals:signals,surfaceChecks:[]};
     expect(knownModelProtocol(record,undefined,model,"claude-code",now)).toBe("openai-responses");
     expect(knownModelProtocol(record,undefined,model,"claude-code",new Date(now.valueOf()+86400001))).toBeUndefined();
     expect(knownModelProtocol(record,undefined,"different","codex",now)).toBeUndefined();

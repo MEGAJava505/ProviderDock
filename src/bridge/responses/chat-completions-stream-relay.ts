@@ -17,6 +17,9 @@ export interface RelayChatCompletionsStreamOptions {
   readonly maxEventCharacters?: number;
   /** Bounded wait for trailing usage after finish_reason, even if [DONE] is missing. */
   readonly completionDrainTimeoutMs?: number;
+  readonly transformForwardEvent?: (
+    event: ResponsesStreamEventRecord,
+  ) => ResponsesStreamEventRecord | Promise<ResponsesStreamEventRecord>;
   readonly beforeForwardEvent?: (
     event: ResponsesStreamEventRecord,
   ) => void | Promise<void>;
@@ -70,6 +73,7 @@ export async function relayChatCompletionsStream(
             options.response,
             seenEventIds,
             options.beforeForwardEvent,
+            options.transformForwardEvent,
           );
           if (outcome === "done") {
             sawDoneMarker = true;
@@ -87,6 +91,7 @@ export async function relayChatCompletionsStream(
           options.response,
           seenEventIds,
           options.beforeForwardEvent,
+          options.transformForwardEvent,
         );
         if (translator.generationFinished && completionTimer === undefined) {
           completionTimer = setTimeout(() => {
@@ -128,6 +133,7 @@ export async function relayChatCompletionsStream(
     options.response,
     terminalEvents,
     options.beforeForwardEvent,
+    options.transformForwardEvent,
   );
   if (sawDoneMarker) {
     await writeResponseChunk(
@@ -148,14 +154,21 @@ export async function writeTranslatedEvents(
   beforeForwardEvent?: (
     event: ResponsesStreamEventRecord,
   ) => void | Promise<void>,
+  transformForwardEvent?: (
+    event: ResponsesStreamEventRecord,
+  ) => ResponsesStreamEventRecord | Promise<ResponsesStreamEventRecord>,
 ): Promise<void> {
   for (const event of events) {
-    await beforeForwardEvent?.(event);
+    const transformed =
+      await transformForwardEvent?.(event) ?? event;
+    await beforeForwardEvent?.(transformed);
     await writeResponseChunk(
       response,
       encodeSseEvent({
-        event: typeof event.type === "string" ? event.type : "response.failed",
-        data: JSON.stringify(event),
+        event: typeof transformed.type === "string"
+          ? transformed.type
+          : "response.failed",
+        data: JSON.stringify(transformed),
         comments: [],
       }),
     );
@@ -170,6 +183,9 @@ async function processChatEvent(
   beforeForwardEvent?: (
     event: ResponsesStreamEventRecord,
   ) => void | Promise<void>,
+  transformForwardEvent?: (
+    event: ResponsesStreamEventRecord,
+  ) => ResponsesStreamEventRecord | Promise<ResponsesStreamEventRecord>,
 ): Promise<"continue" | "done"> {
   if (event.data === "[DONE]") return "done";
   if (event.data === undefined) {
@@ -200,7 +216,12 @@ async function processChatEvent(
       { cause: error },
     );
   }
-  await writeTranslatedEvents(response, translator.feed(payload), beforeForwardEvent);
+  await writeTranslatedEvents(
+    response,
+    translator.feed(payload),
+    beforeForwardEvent,
+    transformForwardEvent,
+  );
   return "continue";
 }
 

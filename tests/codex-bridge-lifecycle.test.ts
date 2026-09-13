@@ -335,3 +335,43 @@ class BridgeUsingCodexRunner implements CodexProcessRunner {
     };
   }
 }
+
+describe("managed Codex bridge model metadata", () => {
+  it("advertises provider-supported reasoning levels", async () => {
+    const factory = new ResponsesCodexBridgeFactory({
+      secretStore: new MemorySecretStore(),
+      fetchImpl: vi.fn<typeof fetch>(),
+    });
+    const input = {
+      profile: parseProviderProfile({
+        id: "agentrouter",
+        displayName: "AgentRouter",
+        baseUrl: "https://agentrouter.org/v1",
+        apiType: "openai-responses",
+      }),
+      modelId: "glm-5.3",
+      sessionId,
+      defaultReasoningLevel: "high",
+      modelCatalog: [
+        { modelId: "glm-5.3", supportedReasoningLevels: ["low", "high", "max"] },
+      ],
+    } as Parameters<ResponsesCodexBridgeFactory["create"]>[0];
+    const bridge = factory.create(input);
+    const address = await bridge.start();
+
+    try {
+      const response = await fetch(`${address.url}/v1/models`);
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        models: Array<Record<string, unknown>>;
+      };
+      expect(body.models[0]).toMatchObject({
+        slug: "glm-5.3",
+        supported_reasoning_levels: [],
+      });
+      expect(body.models[0]).not.toHaveProperty("default_reasoning_level");
+    } finally {
+      await bridge.stop();
+    }
+  });
+});

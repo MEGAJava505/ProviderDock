@@ -8,6 +8,7 @@ export const normalizedErrorTypes = [
   "TIMEOUT",
   "NETWORK_ERROR",
   "INVALID_REQUEST",
+  "RESOURCE_SCOPE_MISMATCH",
   "UNSUPPORTED_FEATURE",
   "PROTOCOL_ERROR",
   "STREAM_ERROR",
@@ -71,6 +72,11 @@ export function providerErrorGuidance(
       return {
         explanation: "The request or provider configuration was rejected as invalid.",
         suggestedAction: "Review the provider API type and request settings, then run Provider Doctor.",
+      };
+    case "RESOURCE_SCOPE_MISMATCH":
+      return {
+        explanation: "Provider-owned reasoning state was created by a different upstream resource.",
+        suggestedAction: "Start a new conversation on the selected route or return to the route that created the reasoning state.",
       };
     case "UNSUPPORTED_FEATURE":
       return {
@@ -145,4 +151,24 @@ export function normalizeHttpStatus(status: number): NormalizedErrorType {
   if (status === 429) return "RATE_LIMIT";
   if (status >= 500) return "PROVIDER_UNAVAILABLE";
   return "INVALID_REQUEST";
+}
+
+export function providerErrorFromUpstream(
+  status: number,
+  body: { readonly message?: string },
+): ProviderRequestError {
+  const message = typeof body.message === "string" ? body.message : "";
+  const lower = message.toLowerCase();
+  const isResourceMismatch =
+    lower.includes("different azure openai resource") ||
+    lower.includes("use the same resource that created the item") ||
+    (lower.includes("encrypted content") && lower.includes("could not be verified"));
+  const type = isResourceMismatch ? "RESOURCE_SCOPE_MISMATCH" : normalizeHttpStatus(status);
+  return new ProviderRequestError(
+    type,
+    `Provider returned HTTP ${status}.`,
+    message === ""
+      ? { httpStatus: status }
+      : { httpStatus: status, sanitizedDetail: message },
+  );
 }

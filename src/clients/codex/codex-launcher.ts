@@ -17,6 +17,7 @@ import {
   type CodexRecoveryOutcome,
   type CodexRuntimeSessionManager,
 } from "./codex-runtime-session.js";
+import type { BridgeModelDefinition } from "../../bridge/responses/codex-model-catalog.js";
 
 export interface CodexProcessExit {
   readonly exitCode: number | null;
@@ -57,6 +58,8 @@ export interface LaunchCodexInput {
   readonly route: CodexLaunchRoute;
   readonly executable?: string;
   readonly additionalArgs?: readonly string[];
+  /** Existing Codex conversation id passed to `codex resume`. */
+  readonly resumeSessionId?: string;
   /** Pre-launch action-confirmation level passed to the client CLI. */
   readonly approvalLevel?: AgentApprovalLevel;
   readonly parentEnvironment?: NodeJS.ProcessEnv;
@@ -67,6 +70,7 @@ export interface LaunchCodexInput {
   readonly defaultReasoningLevel?: string;
   /** Forces the managed bridge even when the physical provider supports direct Responses. */
   readonly forceManagedBridge?: boolean;
+  readonly modelCatalog?: readonly BridgeModelDefinition[];
 }
 
 export class CodexLauncher {
@@ -84,6 +88,7 @@ export class CodexLauncher {
         `Provider '${input.profile.id}' is disabled and cannot be launched.`,
       );
     }
+    const resumeSessionId = validateCodexResumeSessionId(input.resumeSessionId);
     if (!input.fallback) assertModelEnabled(input.profile, input.modelId);
     for (const route of input.fallback?.logicalModel.routes ?? []) {
       const profile = input.fallback?.profiles.find(item => item.id === route.providerId);
@@ -111,15 +116,21 @@ export class CodexLauncher {
         projectDirectory: input.projectDirectory,
         route: resolution.route,
         ...(resolution.kind === "managed" ? { bridgeOwnership: "managed" as const } : {}),
+        ...(input.defaultReasoningLevel === undefined
+          ? {}
+          : { defaultReasoningLevel: input.defaultReasoningLevel }),
+        ...(input.modelCatalog === undefined ? {} : { modelCatalog: input.modelCatalog }),
       });
       const processHandle = await this.processes.start({
         executable: input.executable ?? "codex",
         args: [
+          ...(resumeSessionId === undefined ? [] : ["resume"]),
           "--strict-config",
           "--profile",
           runtime.profileName,
           ...codexApprovalArgs(input.approvalLevel),
           ...(input.additionalArgs ?? []),
+          ...(resumeSessionId === undefined ? [] : [resumeSessionId]),
         ],
         cwd: runtime.projectDirectory,
         environment: {
@@ -172,7 +183,8 @@ export class CodexLauncher {
       (profile) =>
         !["auto", "openai-responses", "openai-chat-completions"].includes(
           profile.apiType,
-        ),
+        ) &&
+        this.bridges?.supportsProfile?.(profile) !== true,
     );
     if (unsupportedProfile !== undefined) {
       throw new CodexRuntimeConfigurationError(
@@ -201,6 +213,7 @@ export class CodexLauncher {
       ...(input.defaultReasoningLevel === undefined
         ? {}
         : { defaultReasoningLevel: input.defaultReasoningLevel }),
+      ...(input.modelCatalog === undefined ? {} : { modelCatalog: input.modelCatalog }),
     });
     try {
       const address = await bridge.start();
@@ -224,6 +237,21 @@ type ResolvedCodexRoute =
       readonly route: CodexProviderRoute;
       readonly bridge: ManagedCodexBridge;
     };
+
+const codexResumeSessionIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateCodexResumeSessionId(
+  resumeSessionId: string | undefined,
+): string | undefined {
+  if (resumeSessionId === undefined) return undefined;
+  if (!codexResumeSessionIdPattern.test(resumeSessionId)) {
+    throw new CodexRuntimeConfigurationError(
+      "Invalid Codex resume session id; a UUID is required.",
+    );
+  }
+  return resumeSessionId;
+}
 
 function assertNoRecoveryConflicts(outcomes: readonly CodexRecoveryOutcome[]): void {
   const unsafe = outcomes.filter(

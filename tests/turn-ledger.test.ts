@@ -249,6 +249,49 @@ describe("TurnLedger", () => {
 });
 
 describe("extractResponsesTurnSignature", () => {
+  it("accepts equivalent object and JSON-string tool arguments across bridge boundaries", () => {
+    const argumentsObject = {
+      file_path: "/project/example.txt",
+      old_string: "before",
+      new_string: "after",
+    };
+    const delivered = extractResponsesDeliveredToolCalls({
+      output: [
+        {
+          type: "function_call",
+          call_id: "call_1c00faf8-1615-4254-9799-b0213b079621",
+          name: "Edit",
+          arguments: argumentsObject,
+        },
+      ],
+    })[0];
+    if (delivered === undefined) throw new Error("Expected a delivered tool call");
+
+    const ledger = new TurnLedger();
+    const first = ledger.admit(signature({ fingerprint: "fp-json-shape" }));
+    if (first.decision !== "accepted") throw new Error("Expected initial admission");
+    ledger.recordDeliveredToolCalls(first.token, [delivered]);
+    ledger.complete(first.token);
+
+    const continuation = extractResponsesTurnSignature({
+      input: [
+        {
+          type: "function_call",
+          call_id: delivered.callId,
+          name: delivered.name,
+          arguments: JSON.stringify(argumentsObject),
+        },
+        {
+          type: "function_call_output",
+          call_id: delivered.callId,
+          output: "File edited",
+        },
+      ],
+    });
+
+    expect(ledger.admit(continuation).decision).toBe("accepted");
+  });
+
   it("produces stable fingerprints and captures tool history", () => {
     const body = {
       model: "gpt-x",

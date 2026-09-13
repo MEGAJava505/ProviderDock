@@ -12,6 +12,7 @@ import type { SecretStore } from "../../core/security/secret-store.js";
 import { FileTurnLedgerStore } from "../../core/state-machine/persistent-turn-ledger.js";
 import type { UsageEventSink } from "../../core/usage/usage-event.js";
 import type { ProviderRuntimeHealthSignalSink } from "../../core/health/provider-runtime-health.js";
+import type { BridgeModelDefinition } from "../../bridge/responses/codex-model-catalog.js";
 
 export interface CreateClaudeBridgeInput {
   readonly profile: ProviderProfile;
@@ -21,6 +22,7 @@ export interface CreateClaudeBridgeInput {
   readonly fallback?: ProviderFallbackConfiguration;
   readonly onFallback?: (notification: FallbackNotification) => void;
   readonly sessionInstructions?: string;
+  readonly models?: readonly BridgeModelDefinition[];
 }
 
 export interface ManagedClaudeBridge {
@@ -78,6 +80,7 @@ export class AnthropicClaudeBridgeFactory implements ClaudeBridgeFactory {
       ...(input.sessionInstructions === undefined
         ? {}
         : { sessionInstructions: input.sessionInstructions }),
+      ...(input.models === undefined ? {} : { models: input.models }),
       sessionId: input.sessionId,
       ...(this.options.usageSink === undefined
         ? {}

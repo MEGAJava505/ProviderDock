@@ -14,6 +14,9 @@ export interface RelayResponsesStreamOptions {
   readonly heartbeatIntervalMs?: number;
   readonly idleTimeoutMs?: number;
   readonly maxEventCharacters?: number;
+  readonly transformForwardEvent?: (
+    event: JsonRecord,
+  ) => JsonRecord | Promise<JsonRecord>;
   readonly beforeForwardEvent?: (event: JsonRecord) => void | Promise<void>;
 }
 
@@ -59,7 +62,13 @@ export async function relayResponsesStream(
       const chunk = await reader.read();
       if (chunk.done) {
         for (const event of decoder.finish()) {
-          const done = await processEvent(event, state, options.response, options.beforeForwardEvent);
+          const done = await processEvent(
+            event,
+            state,
+            options.response,
+            options.transformForwardEvent,
+            options.beforeForwardEvent,
+          );
           if (done || state.terminalEventSeen) {
             sawDoneMarker = done;
             finished = true;
@@ -71,7 +80,13 @@ export async function relayResponsesStream(
 
       resetIdleTimer();
       for (const event of decoder.push(chunk.value)) {
-        const done = await processEvent(event, state, options.response, options.beforeForwardEvent);
+        const done = await processEvent(
+          event,
+          state,
+          options.response,
+          options.transformForwardEvent,
+          options.beforeForwardEvent,
+        );
         if (done || state.terminalEventSeen) {
           sawDoneMarker = done;
           finished = true;
@@ -110,8 +125,9 @@ export async function relayResponsesStream(
       : "Upstream stream ended before a terminal Responses event was received.",
   });
   if (repair !== undefined) {
-    await options.beforeForwardEvent?.(repair);
-    await writeJsonEvent(options.response, repair);
+    const transformed = await options.transformForwardEvent?.(repair) ?? repair;
+    await options.beforeForwardEvent?.(transformed);
+    await writeJsonEvent(options.response, transformed);
   }
   if (sawDoneMarker) {
     await writeResponseChunk(
@@ -132,6 +148,9 @@ async function processEvent(
   event: SseEvent,
   state: ResponsesStreamState,
   response: ServerResponse,
+  transformForwardEvent?: (
+    event: JsonRecord,
+  ) => JsonRecord | Promise<JsonRecord>,
   beforeForwardEvent?: (event: JsonRecord) => void | Promise<void>,
 ): Promise<boolean> {
   if (event.data === "[DONE]") return true;
@@ -158,13 +177,15 @@ async function processEvent(
   const observation = state.observe(parsed, event.id);
   if (observation.kind !== "forward") return false;
 
-  await beforeForwardEvent?.(observation.event);
+  const transformed =
+    await transformForwardEvent?.(observation.event) ?? observation.event;
+  await beforeForwardEvent?.(transformed);
 
   await writeResponseChunk(
     response,
     encodeSseEvent({
-      event: observation.event.type as string,
-      data: JSON.stringify(observation.event),
+      event: transformed.type as string,
+      data: JSON.stringify(transformed),
       ...(event.id === undefined ? {} : { id: event.id }),
       ...(event.retry === undefined ? {} : { retry: event.retry }),
       comments: event.comments,

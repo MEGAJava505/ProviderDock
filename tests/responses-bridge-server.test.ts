@@ -156,6 +156,92 @@ describe("ResponsesBridgeServer", () => {
     }
   });
 
+  it("classifies an upstream overload response without leaking its body or retrying it", async () => {
+    const signals: ProviderRuntimeHealthSignal[] = [];
+    const rawMessage =
+      "We're currently experiencing high demand, which may cause temporary errors. api_key=responses-secret";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: rawMessage } }), {
+        status: 500,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": "3",
+          "x-request-id": "upstream-request-500",
+        },
+      }),
+    );
+    const bridge = new ResponsesBridgeServer({
+      profile: testProfile(),
+      secretStore: new MemorySecretStore({ ROUTER_KEY: "responses-secret" }),
+      fetchImpl: fetchMock,
+      models: [{ modelId: "gpt-x" }],
+      sessionId: "55555555555555555555555555555555",
+      healthSignalSink: (signal) => {
+        signals.push(signal);
+      },
+    });
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: "overload",
+      });
+      const payload = await response.json() as {
+        error: { code: string; message: string };
+        providerdock: { normalized_type: string; http_status: number };
+      };
+      expect(response.status).toBe(500);
+      expect(payload.error.code).toBe("PROVIDER_UNAVAILABLE");
+      expect(payload.error.message).toContain("high demand");
+      expect(payload.error.message).not.toContain("responses-secret");
+      expect(payload.providerdock).toMatchObject({
+        normalized_type: "PROVIDER_UNAVAILABLE",
+        http_status: 500,
+      });
+      expect(response.headers.get("retry-after")).toBe("3");
+      expect(response.headers.get("x-request-id")).toBe("upstream-request-500");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(signals).toEqual([
+        expect.objectContaining({
+          outcome: "failed",
+          healthStatus: "OFFLINE",
+          errorType: "PROVIDER_UNAVAILABLE",
+          httpStatus: 500,
+          executionPhase: "unknown",
+        }),
+      ]);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("keeps local transport failures distinct from upstream HTTP 500 responses", async () => {
+    const bridge = new ResponsesBridgeServer({
+      profile: testProfile(),
+      secretStore: new MemorySecretStore(),
+      fetchImpl: vi.fn<typeof fetch>().mockRejectedValue(new Error("local relay failure")),
+      models: [{ modelId: "gpt-x" }],
+    });
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: "local failure",
+      });
+      const payload = await response.json() as {
+        error: { code: string; message: string };
+      };
+      expect(response.status).toBe(502);
+      expect(payload.error).toMatchObject({
+        code: "NETWORK_ERROR",
+        message: "Provider connection failed with an unknown execution state.",
+      });
+      expect(JSON.stringify(payload)).not.toContain("local relay failure");
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it("returns 503 and never contacts upstream when ledger persistence fails", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     const bridge = new ResponsesBridgeServer({
@@ -723,3 +809,196 @@ function postJson(baseUrl: string, body: Record<string, unknown>): Promise<Respo
     body: JSON.stringify(body),
   });
 }
+
+  it("rejects foreign encrypted reasoning locally before contacting upstream", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const bridge = testBridge(fetchMock);
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: [{
+          type: "reasoning",
+          id: "rs_foreign",
+          encrypted_content: "foreign-opaque",
+          providerdock_resource_scope: "foreign-resource",
+        }],
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        error: { code: "RESOURCE_SCOPE_MISMATCH" },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("tags native Responses reasoning in JSON and SSE output with its route scope", async () => {
+    const jsonBridge = testBridge(vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: "resp-native-json",
+        object: "response",
+        status: "completed",
+        output: [{ type: "reasoning", id: "rs_native_json", encrypted_content: "opaque", status: "completed" }],
+      }),
+    ));
+    const jsonAddress = await jsonBridge.start();
+    try {
+      const response = await postJson(jsonAddress.baseUrl, { model: "gpt-x", input: "tag JSON" });
+      expect(response.status).toBe(200);
+      const payload = await response.json() as { output: Array<Record<string, unknown>> };
+      expect(payload.output[0]?.providerdock_resource_scope).toBe(
+        JSON.stringify(["router", "https://upstream.test/v1", "openai-responses", null]),
+      );
+    } finally {
+      await jsonBridge.stop();
+    }
+
+    const streamBridge = testBridge(vi.fn<typeof fetch>().mockResolvedValue(
+      sseResponse([
+        encodeJsonEvent({
+          type: "response.output_item.done",
+          sequence_number: 0,
+          output_index: 0,
+          item: { type: "reasoning", id: "rs_native_stream", encrypted_content: "opaque", status: "completed" },
+        }),
+        encodeJsonEvent({
+          type: "response.completed",
+          sequence_number: 1,
+          response: { id: "resp-native-stream", object: "response", status: "completed", output: [] },
+        }),
+        encodeSseEvent({ data: "[DONE]", comments: [] }),
+      ].join("")),
+    ));
+    const streamAddress = await streamBridge.start();
+    try {
+      const events = await postStream(streamAddress.baseUrl, "tag SSE");
+      expect(events[0]).toMatchObject({
+        item: {
+          providerdock_resource_scope: JSON.stringify([
+            "router", "https://upstream.test/v1", "openai-responses", null,
+          ]),
+        },
+      });
+    } finally {
+      await streamBridge.stop();
+    }
+  });
+
+  it("rejects untagged encrypted reasoning locally without rewriting it", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const bridge = testBridge(fetchMock);
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: [{ type: "reasoning", id: "rs_untagged", encrypted_content: "opaque" }],
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: { code: "RESOURCE_SCOPE_MISMATCH" } });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("removes local scope metadata but preserves encrypted reasoning upstream", async () => {
+    const expectedScope = JSON.stringify([
+      "router",
+      "https://upstream.test/v1",
+      "openai-responses",
+      null,
+    ]);
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      const outbound = JSON.parse(String(init?.body)) as {
+        input: Array<Record<string, unknown>>;
+      };
+      expect(outbound.input[0]).toMatchObject({
+        type: "reasoning",
+        id: "rs_same",
+        encrypted_content: "opaque",
+        provider_extension: { keep: true },
+      });
+      expect(outbound.input[0]).not.toHaveProperty("providerdock_resource_scope");
+      return jsonResponse({
+        id: "resp-same-scope",
+        object: "response",
+        status: "completed",
+        output: [],
+      });
+    });
+    const bridge = testBridge(fetchMock);
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: [{
+          type: "reasoning",
+          id: "rs_same",
+          encrypted_content: "opaque",
+          providerdock_resource_scope: expectedScope,
+          provider_extension: { keep: true },
+        }],
+      });
+      expect(response.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("normalizes upstream ownership errors as resource-scope mismatches", async () => {
+    const bridge = testBridge(vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({
+        error: {
+          message: "Use the same resource that created the item to access it.",
+        },
+      }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      }),
+    ));
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: "continue",
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        error: { code: "RESOURCE_SCOPE_MISMATCH" },
+        providerdock: {
+          suggested_action: expect.stringMatching(/new conversation|route that created/i),
+        },
+      });
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("classifies plain-text ownership errors without exposing the raw body", async () => {
+    const rawMessage = "Use the same resource that created the item to access it.";
+    const bridge = testBridge(vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(rawMessage, {
+        status: 400,
+        headers: { "content-type": "text/plain" },
+      }),
+    ));
+    const address = await bridge.start();
+    try {
+      const response = await postJson(address.baseUrl, {
+        model: "gpt-x",
+        input: "continue",
+      });
+      const body = await response.json() as {
+        error?: { code?: string; message?: string };
+      };
+      expect(response.status).toBe(400);
+      expect(body.error?.code).toBe("RESOURCE_SCOPE_MISMATCH");
+      expect(body.error?.message).not.toContain(rawMessage);
+    } finally {
+      await bridge.stop();
+    }
+  });

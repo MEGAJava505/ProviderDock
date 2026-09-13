@@ -37,6 +37,26 @@ Returns both model envelopes needed by current clients:
 Capability claims are supplied as `BridgeModelDefinition` values. Callers should populate
 them from probe/fixture evidence rather than infer unsupported provider behavior.
 
+The Codex launcher serializes the same top-level `{ "models": [...] }` document to a
+per-session `model-catalog.json` and references it from the isolated profile with
+`model_catalog_json`, so Codex does not need to guess metadata for a custom or logical
+model ID.
+
+Reasoning metadata is resolved by exact model ID. The official overlay snapshot dated
+`2026-09-11` wins over stale gateway metadata; provider metadata is used only when no
+exact official entry exists. The result is one of:
+
+- `effort`: exact values, optional default, and source;
+- `thinking-mode`: a mode such as forced thinking, without an effort enum;
+- `unsupported`;
+- `unknown`.
+
+The bridge emits `supported_reasoning_levels` only for `effort`. It never turns
+`unknown` into `low/medium/high`, and it does not turn `glm-5.3` into
+`low/high/max`; that exact model is recorded as forced thinking. A caller may supply
+an explicit `user-override`, but that exception is deliberate and remains visible in
+the capability provenance.
+
 ### `POST /v1/responses`
 
 Builds the upstream URL, query authentication and headers through the shared provider HTTP
@@ -79,6 +99,60 @@ Raw upstream error bodies are not reflected to the client, preventing an upstrea
 from disclosing provider credentials. Normalized errors retain the HTTP status and one of
 the specification's internal error codes.
 
+## Provider-owned resource scope
+
+Provider-owned reasoning items are tagged on every JSON and SSE response, including
+nested `item`, `response.output`, translated Chat Completions events, and repaired
+terminal events. The tag is derived from:
+
+```text
+[provider ID, normalized base URL, resolved protocol, upstream resource ID or null]
+```
+
+When a later request contains nested reasoning with `encrypted_content` or a
+ProviderDock scope tag, the tag must match the currently selected route. Foreign or
+untagged encrypted state is rejected locally with HTTP 400
+`RESOURCE_SCOPE_MISMATCH`; no upstream request and no fallback replay is attempted.
+This is intentionally stricter than deleting an item: encrypted content and any
+provider-specific extension survive unchanged.
+
+Immediately before forwarding, ProviderDock removes only its own
+`providerdock_resource_scope` metadata. It continues to strip the stateless top-level
+`previous_response_id` and `conversation` handles, but never blindly removes nested
+encrypted reasoning. If an upstream still reports an ownership error such as “Use the
+same resource that created the item” or “encrypted content could not be verified”, the
+error is normalized to `RESOURCE_SCOPE_MISMATCH` and treated as non-retryable.
+
+## Managed Anthropic Messages compatibility
+
+For explicitly supported Anthropic Messages providers in a Codex logical route,
+ProviderDock places a private codex-shim child behind this bridge:
+
+```text
+ResponsesBridgeServer
+  -> synthetic Responses profile on a random loopback shim URL
+     -> codex-shim
+        -> Anthropic Messages
+```
+
+The shim is an optional, externally reviewed Python dependency; it is not a permanent
+daemon and ProviderDock never uses a fixed port such as `127.0.0.1:8317`. One child is
+created for each active Anthropic provider profile. The child accepts only `/health`
+and `/v1/responses`, requires a generated token, has isolated home directories, and
+exits when ProviderDock disappears.
+
+The synthetic profile keeps the original provider ID but appears to the bridge as a
+native Responses route. This keeps model access checks, telemetry, health identity,
+recovery identity, and logical-model routing stable. All safety and routing decisions
+remain in `ResponsesBridgeServer`; the shim is never allowed to retry, select routes,
+or bypass the TurnLedger.
+
+The ephemeral shim settings use `api_key_env`, never a plaintext `api_key`. Among
+spawned processes, only the Python child receives the upstream key. The outer bridge
+receives only the generated shim token. Normal shutdown stops the inner bridge, stops every
+shim, and removes the ephemeral files. See `docs/codex-runtime.md` for supported
+provider authentication, dependency overrides, and startup diagnostics.
+
 ## Current boundary
 
 This component provides native Responses passthrough plus canonical Chat Completions
@@ -86,7 +160,9 @@ request/JSON/SSE translation. It also executes priority-ordered logical-model
 routes for managed Codex sessions, with sticky safe fallback and route diagnostics.
 A session-scoped cross-request TurnLedger blocks unsafe replay, records completed
 upstream tool calls before client delivery, and atomically persists non-secret
-safety state across bridge reconstruction. Claude Code uses its own managed
-Anthropic Messages bridge documented in `docs/claude-code.md`. The Codex launcher
-starts and stops this bridge for every `auto` route, including ordinary Responses
-profiles. Explicit direct/external routes remain outside this normalization boundary.
+safety state across bridge reconstruction. Supported Anthropic Messages routes use
+the private managed codex-shim compatibility path above, while other custom protocols
+remain unsupported. Claude Code uses its own managed Anthropic Messages bridge
+documented in `docs/claude-code.md`. The Codex launcher starts and stops this bridge
+for every `auto` route, including ordinary Responses profiles. Explicit
+direct/external routes remain outside this normalization boundary.

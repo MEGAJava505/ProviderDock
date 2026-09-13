@@ -74,6 +74,7 @@ import {
   type ProviderRuntimeHealthSignalSink,
   type ProviderRuntimeOutcome,
 } from "../../core/health/provider-runtime-health.js";
+import type { BridgeModelDefinition } from "../responses/codex-model-catalog.js";
 
 const loopbackHost = "127.0.0.1";
 const defaultBodyLimitBytes = 64 * 1024 * 1024;
@@ -100,6 +101,7 @@ export interface AnthropicBridgeServerOptions {
   readonly sessionId?: string;
   readonly usageSink?: UsageEventSink;
   readonly healthSignalSink?: ProviderRuntimeHealthSignalSink;
+  readonly models?: readonly BridgeModelDefinition[];
 }
 
 export interface AnthropicBridgeAddress {
@@ -165,6 +167,7 @@ export class AnthropicBridgeServer {
   private readonly sessionId: string;
   private readonly usageSink: UsageEventSink | undefined;
   private readonly healthSignalSink: ProviderRuntimeHealthSignalSink | undefined;
+  private readonly models: readonly BridgeModelDefinition[];
   private readonly pendingHealthSignals = new Set<Promise<void>>();
   private readonly nativeMessagesSupport = new Map<string, boolean>();
   private lastFallback: FallbackNotification | undefined;
@@ -178,6 +181,7 @@ export class AnthropicBridgeServer {
   private readonly resolvedProtocols = new Map<string, UsageProtocol>();
 
   constructor(options: AnthropicBridgeServerOptions) {
+    this.models = options.models ?? options.profile.manualModelIds.map((modelId) => ({ modelId }));
     const prepareProfile = (profile: ProviderProfile): ProviderProfile =>
       options.adapterRegistry?.prepareProfile(profile) ?? profile;
     const preparedPrimary = prepareProfile(options.profile);
@@ -366,6 +370,18 @@ export class AnthropicBridgeServer {
       await this.handleMessages(request, response);
       return;
     }
+    if (requestUrl.pathname === "/v1/models") {
+      sendJson(response, 200, {
+        object: "list",
+        data: this.models.map((model) => ({
+          id: model.modelId,
+          object: "model",
+          created: 0,
+          owned_by: this.profile.id,
+        })),
+      });
+      return;
+    }
     sendAnthropicError(response, 404, "INVALID_REQUEST", "Bridge route was not found.");
   }
 
@@ -392,7 +408,7 @@ export class AnthropicBridgeServer {
       const turnSignature = extractAnthropicTurnSignature(body);
       const admission = await this.turnLedger.admit(turnSignature);
       if (admission.decision === "blocked") {
-        const headers = new Headers({ "x-providerdock-turn-block": admission.code });
+        const headers = localTurnBlockHeaders(admission.code);
         sendAnthropicError(response, 409, "INVALID_REQUEST", admission.message, headers);
         turnOutcome = "cancel";
         return;
@@ -1416,7 +1432,7 @@ export class AnthropicBridgeServer {
         409,
         "PROTOCOL_ERROR",
         error.message,
-        new Headers({ "x-providerdock-turn-block": error.code }),
+        localTurnBlockHeaders(error.code),
       );
       return;
     }
@@ -1932,6 +1948,13 @@ function sendJson(
   response.end(encoded);
 }
 
+function localTurnBlockHeaders(code: string): Headers {
+  return new Headers({
+    "x-providerdock-turn-block": code,
+    "x-should-retry": "false",
+  });
+}
+
 function sendAnthropicError(
   response: ServerResponse,
   status: number,
@@ -1983,7 +2006,11 @@ function normalizeSessionInstructions(value: string | undefined): string | undef
 }
 
 function providerErrorStatus(type: NormalizedErrorType): number {
-  if (type === "INVALID_REQUEST" || type === "UNSUPPORTED_FEATURE") return 400;
+  if (
+    type === "INVALID_REQUEST" ||
+    type === "RESOURCE_SCOPE_MISMATCH" ||
+    type === "UNSUPPORTED_FEATURE"
+  ) return 400;
   if (type === "AUTH_ERROR") return 401;
   if (type === "PERMISSION_ERROR") return 403;
   if (type === "TIMEOUT") return 504;

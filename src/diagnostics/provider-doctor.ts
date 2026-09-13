@@ -51,6 +51,7 @@ export interface DoctorReport {
 export interface RunDoctorOptions {
   readonly modelId?: string;
   readonly level?: DoctorLevel;
+  readonly protocol?: DoctorProtocol;
 }
 
 export interface ProviderDoctorOptions {
@@ -104,7 +105,11 @@ export class ProviderDoctor {
       } else if (prepared.disabledModelIds.includes(modelId) || !prepared.enabled) {
         checks.push(skipped("inference", "Skipped: model is disabled in provider settings."));
       } else {
-        const inference = await this.checkInference(prepared, modelId);
+        const inference = await this.checkInference(
+          prepared,
+          modelId,
+          options.protocol,
+        );
         checks.push(inference.check);
         protocol = inference.protocol;
 
@@ -163,9 +168,12 @@ export class ProviderDoctor {
   private async checkInference(
     profile: ProviderProfile,
     modelId: string,
+    forcedProtocol?: DoctorProtocol,
   ): Promise<{ check: DoctorCheck; protocol?: DoctorProtocol }> {
     const startedAt = this.monotonicNow();
-    const candidates = protocolCandidates(profile);
+    const candidates = forcedProtocol === undefined
+      ? protocolCandidates(profile)
+      : [forcedProtocol];
 
     let lastError: DoctorCheck | undefined;
     for (const protocol of candidates) {

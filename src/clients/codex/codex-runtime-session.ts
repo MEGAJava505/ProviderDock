@@ -22,6 +22,8 @@ import {
   CodexRuntimeConfigurationError,
   type CodexProviderRoute,
 } from "./codex-runtime-config.js";
+import { AgentSkillsRuntime } from "../agent-skills-runtime.js";
+import type { BridgeModelDefinition } from "../../bridge/responses/codex-model-catalog.js";
 
 const sessionIdSchema = z.string().regex(/^[a-f0-9]{32}$/);
 const manifestCoreShape = {
@@ -67,7 +69,12 @@ const runtimeRouteSchema = z.discriminatedUnion("kind", [
   }
 });
 const manifestV2Schema = z
-  .object({ version: z.literal(2), ...manifestCoreShape, route: runtimeRouteSchema })
+  .object({
+    version: z.literal(2),
+    ...manifestCoreShape,
+    route: runtimeRouteSchema,
+    modelCatalogSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  })
   .strict();
 const manifestSchema = z.discriminatedUnion("version", [manifestV1Schema, manifestV2Schema]);
 
@@ -89,6 +96,8 @@ export interface PrepareCodexRuntimeInput {
   readonly projectDirectory: string;
   readonly route: CodexProviderRoute;
   readonly bridgeOwnership?: CodexBridgeOwnership;
+  readonly defaultReasoningLevel?: string;
+  readonly modelCatalog?: readonly BridgeModelDefinition[];
 }
 
 export interface PreparedCodexRuntime {
@@ -97,6 +106,7 @@ export interface PreparedCodexRuntime {
   readonly profilePath: string;
   readonly codexHome: string;
   readonly sessionDirectory: string;
+  readonly modelCatalogPath: string;
   readonly manifestPath: string;
   readonly projectDirectory: string;
   readonly environment: Readonly<Record<string, string>>;
@@ -123,6 +133,7 @@ export interface CodexRuntimeSessionManagerOptions {
   readonly randomId?: () => string;
   readonly isProcessAlive?: (pid: number) => boolean;
   readonly isBridgeAlive?: (baseUrl: string, providerId: string) => Promise<boolean>;
+  readonly skillsRuntime?: AgentSkillsRuntime;
 }
 
 export class CodexRuntimeSessionManager {
@@ -134,6 +145,7 @@ export class CodexRuntimeSessionManager {
   private readonly randomId: () => string;
   private readonly isProcessAlive: (pid: number) => boolean;
   private readonly isBridgeAlive: (baseUrl: string, providerId: string) => Promise<boolean>;
+  private readonly skillsRuntime: AgentSkillsRuntime;
 
   constructor(options: CodexRuntimeSessionManagerOptions) {
     this.codexHome = options.codexHome;
@@ -150,6 +162,7 @@ export class CodexRuntimeSessionManager {
     this.randomId = options.randomId ?? (() => randomUUID().replaceAll("-", ""));
     this.isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
     this.isBridgeAlive = options.isBridgeAlive ?? defaultIsBridgeAlive;
+    this.skillsRuntime = options.skillsRuntime ?? new AgentSkillsRuntime();
   }
 
   createSessionId(): string {
@@ -169,16 +182,30 @@ export class CodexRuntimeSessionManager {
       input.sessionId === undefined
         ? this.createSessionId()
         : sessionIdSchema.parse(input.sessionId);
+    const sessionDirectory = join(this.runtimeRoot, sessionId);
+    const modelCatalogPath = join(sessionDirectory, "model-catalog.json");
     const built = await this.configFactory.build({
       profile: input.profile,
       modelId: input.modelId,
       projectDirectory: input.projectDirectory,
       route: input.route,
       sessionId,
+      modelCatalogPath,
+      ...(input.defaultReasoningLevel === undefined
+        ? {}
+        : { defaultReasoningLevel: input.defaultReasoningLevel }),
+      ...(input.modelCatalog === undefined ? {} : { modelCatalog: input.modelCatalog }),
     });
+    const modelCatalogContents = built.modelCatalogContents;
+    if (modelCatalogContents === undefined) {
+      throw new CodexRuntimeConfigurationError(
+        "Codex runtime model catalog contents were not generated.",
+      );
+    }
     const profileSha256 = sha256(built.contents);
+    const modelCatalogSha256 = sha256(modelCatalogContents);
     const providerCodexHome = await this.sessionHomes.prepare(input.profile.id);
-    const sessionDirectory = join(this.runtimeRoot, sessionId);
+    await this.skillsRuntime.prepare(providerCodexHome);
     const manifestPath = join(sessionDirectory, "manifest.json");
     const profilePath = join(providerCodexHome, `${built.profileName}.config.toml`);
     const route: CodexRuntimeManifestV2["route"] =
@@ -201,11 +228,16 @@ export class CodexRuntimeSessionManager {
       state: "PREPARING",
       createdAt: this.now().toISOString(),
       route,
+      modelCatalogSha256,
     };
 
     await mkdir(this.runtimeRoot, { recursive: true });
     await mkdir(sessionDirectory, { recursive: false });
     await writeFile(manifestPath, serializeManifest(manifest), { encoding: "utf8", flag: "wx" });
+    await writeFile(modelCatalogPath, modelCatalogContents, {
+      encoding: "utf8",
+      flag: "wx",
+    });
     await writeFile(profilePath, built.contents, { encoding: "utf8", flag: "wx" });
     await this.writeManifest(manifestPath, { ...manifest, state: "READY" });
 
@@ -215,6 +247,7 @@ export class CodexRuntimeSessionManager {
       profilePath,
       codexHome: providerCodexHome,
       sessionDirectory,
+      modelCatalogPath,
       manifestPath,
       projectDirectory: input.projectDirectory,
       environment: built.environment,
@@ -242,7 +275,7 @@ export class CodexRuntimeSessionManager {
 
   async cleanup(runtime: PreparedCodexRuntime): Promise<void> {
     const manifest = await this.readPreparedManifest(runtime);
-    await this.removeProfileIfUnchanged(manifest);
+    await this.removeRuntimeFilesIfUnchanged(manifest);
     await this.retainSessionsWhenProviderIsIdle(
       manifest.providerId,
       manifest.sessionId,
@@ -301,7 +334,7 @@ export class CodexRuntimeSessionManager {
       }
 
       try {
-        await this.removeProfileIfUnchanged(manifest);
+        await this.removeRuntimeFilesIfUnchanged(manifest);
         await this.retainSessionsWhenProviderIsIdle(manifest.providerId, sessionId);
         await this.removeSessionDirectory(sessionId);
         outcomes.push({ sessionId, status: "RECOVERED" });
@@ -337,7 +370,18 @@ export class CodexRuntimeSessionManager {
     return manifest;
   }
 
-  private async removeProfileIfUnchanged(manifest: CodexRuntimeManifest): Promise<void> {
+  private async removeRuntimeFilesIfUnchanged(
+    manifest: CodexRuntimeManifest,
+  ): Promise<void> {
+    const profilePath = await this.unchangedProfilePath(manifest);
+    const modelCatalogPath = await this.unchangedModelCatalogPath(manifest);
+    if (profilePath !== undefined) await unlink(profilePath);
+    if (modelCatalogPath !== undefined) await unlink(modelCatalogPath);
+  }
+
+  private async unchangedProfilePath(
+    manifest: CodexRuntimeManifest,
+  ): Promise<string | undefined> {
     let profilePath = this.profilePath(manifest);
     let contents: string;
     try {
@@ -348,26 +392,50 @@ export class CodexRuntimeSessionManager {
       // Builds before provider-scoped CODEX_HOME placed profiles directly in the
       // configured root. Recover those old temporary files when the new path is absent.
       const legacyProfilePath = join(this.codexHome, `${manifest.profileName}.config.toml`);
-      if (legacyProfilePath === profilePath) return;
+      if (legacyProfilePath === profilePath) return undefined;
       try {
         contents = await readFile(legacyProfilePath, "utf8");
         profilePath = legacyProfilePath;
       } catch (legacyError) {
-        if (isNodeError(legacyError) && legacyError.code === "ENOENT") return;
+        if (isNodeError(legacyError) && legacyError.code === "ENOENT") return undefined;
         throw legacyError;
       }
     }
     if (
       sha256(contents) !== manifest.profileSha256 &&
-      !isLegacyCodexTrustAppend(manifest, contents)
+      !isLegacyCodexTrustAppend(manifest, contents) &&
+      !isCodexReasoningEffortNormalization(manifest, contents) &&
+      !isProviderDockProfileMutation(contents)
     ) {
       throw new CodexRuntimeConfigurationError(
         `Temporary Codex profile '${basename(profilePath)}' changed after creation; it was not removed.`,
       );
     }
-    await unlink(profilePath);
+    return profilePath;
   }
 
+  private async unchangedModelCatalogPath(
+    manifest: CodexRuntimeManifest,
+  ): Promise<string | undefined> {
+    const expectedSha256 =
+      manifest.version === 2 ? manifest.modelCatalogSha256 : undefined;
+    if (expectedSha256 === undefined) return undefined;
+
+    const modelCatalogPath = join(this.runtimeRoot, manifest.sessionId, "model-catalog.json");
+    let contents: string;
+    try {
+      contents = await readFile(modelCatalogPath, "utf8");
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") return undefined;
+      throw error;
+    }
+    if (sha256(contents) !== expectedSha256) {
+      throw new CodexRuntimeConfigurationError(
+        `Temporary Codex model catalog '${basename(modelCatalogPath)}' changed after creation; it was not removed.`,
+      );
+    }
+    return modelCatalogPath;
+  }
   private async removeSessionDirectory(sessionId: string): Promise<void> {
     sessionIdSchema.parse(sessionId);
     await rm(join(this.runtimeRoot, sessionId), { recursive: true, force: true });
@@ -431,6 +499,13 @@ export class CodexRuntimeSessionManager {
   }
 }
 
+function isProviderDockProfileMutation(contents: string): boolean {
+  // Codex may persist harmless session settings (approval reviewer, trust,
+  // or effort) back into a generated profile. It is still our disposable
+  // providerdock profile, so stale recovery may safely remove it.
+  return contents.startsWith("# Generated by ProviderDock for one runtime session.");
+}
+
 function serializeManifest(manifest: CodexRuntimeManifest): string {
   return `${JSON.stringify(manifestSchema.parse(manifest), null, 2)}\n`;
 }
@@ -479,6 +554,23 @@ function manifestBridgeDiagnostics(
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function isCodexReasoningEffortNormalization(
+  manifest: CodexRuntimeManifest,
+  contents: string,
+): boolean {
+  const match = /model_reasoning_effort = "(minimal|low|medium|high|xhigh)"\n/.exec(
+    contents,
+  );
+  if (
+    match === null ||
+    (match.index > 0 && contents[match.index - 1] !== "\n")
+  ) {
+    return false;
+  }
+  const normalized = contents.slice(0, match.index) + contents.slice(match.index + match[0].length);
+  return sha256(normalized) === manifest.profileSha256;
 }
 
 function isLegacyCodexTrustAppend(

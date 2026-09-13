@@ -7,6 +7,8 @@ import type { ClaudeBridgeFactory, ManagedClaudeBridge } from "./claude-bridge-f
 import { spawnAgentTerminalProcess } from "../agent-terminal-process.js";
 import { claudeApprovalArgs, type AgentApprovalLevel } from "../agent-approval.js";
 import type { AgentSessionHomeManager } from "../agent-session-home.js";
+import { AgentSkillsRuntime } from "../agent-skills-runtime.js";
+import type { BridgeModelDefinition } from "../../bridge/responses/codex-model-catalog.js";
 
 export class ClaudeRuntimeConfigurationError extends Error {
   constructor(message: string) {
@@ -53,6 +55,8 @@ export interface LaunchClaudeInput {
   readonly projectDirectory: string;
   readonly executable?: string;
   readonly additionalArgs?: readonly string[];
+  /** Existing Claude Code conversation id to resume. */
+  readonly resumeSessionId?: string;
   /** Pre-launch action-confirmation level passed to the client CLI. */
   readonly approvalLevel?: AgentApprovalLevel;
   readonly parentEnvironment?: NodeJS.ProcessEnv;
@@ -62,6 +66,7 @@ export interface LaunchClaudeInput {
   readonly onFallback?: (notification: FallbackNotification) => void;
   readonly onStarted?: (client: "claude-code") => void;
   readonly sessionInstructions?: string;
+  readonly modelCatalog?: readonly BridgeModelDefinition[];
 }
 
 /**
@@ -94,6 +99,7 @@ export class ClaudeLauncher {
     private readonly bridges: ClaudeBridgeFactory,
     private readonly processes: ClaudeProcessRunner,
     private readonly sessionHomes: AgentSessionHomeManager,
+    private readonly skillsRuntime: AgentSkillsRuntime = new AgentSkillsRuntime(),
   ) {}
 
   async launch(input: LaunchClaudeInput): Promise<ClaudeProcessExit> {
@@ -105,6 +111,7 @@ export class ClaudeLauncher {
     if (input.modelId.trim().length === 0) {
       throw new ClaudeRuntimeConfigurationError("A model id is required to launch Claude Code.");
     }
+    const resumeArgs = claudeResumeArgs(input.resumeSessionId);
     if (!input.fallback) assertModelEnabled(input.profile, input.modelId);
     for (const route of input.fallback?.logicalModel.routes ?? []) {
       const profile = input.fallback?.profiles.find(item => item.id === route.providerId);
@@ -123,6 +130,7 @@ export class ClaudeLauncher {
     let sessionHome: string | undefined;
     try {
       sessionHome = await this.sessionHomes.beginSession(input.profile.id);
+      await this.skillsRuntime.prepare(sessionHome);
       const sessionToken = `providerdock-${randomBytes(16).toString("hex")}`;
       const sessionId = randomBytes(16).toString("hex");
       bridge = this.bridges.create({
@@ -135,6 +143,7 @@ export class ClaudeLauncher {
         ...(input.sessionInstructions === undefined
           ? {}
           : { sessionInstructions: input.sessionInstructions }),
+        ...(input.modelCatalog === undefined ? {} : { models: input.modelCatalog }),
       });
       const address = await bridge.start();
       const environment = buildClaudeChildEnvironment({
@@ -148,7 +157,11 @@ export class ClaudeLauncher {
 
       const processHandle = await this.processes.start({
         executable: input.executable ?? "claude",
-        args: [...claudeApprovalArgs(input.approvalLevel), ...(input.additionalArgs ?? [])],
+        args: [
+          ...claudeApprovalArgs(input.approvalLevel),
+          ...resumeArgs,
+          ...(input.additionalArgs ?? []),
+        ],
         cwd: input.projectDirectory,
         environment,
       });
@@ -173,6 +186,19 @@ export class ClaudeLauncher {
 async function disposeClaudeBridge(bridge: ManagedClaudeBridge): Promise<void> {
   if (bridge.dispose !== undefined) await bridge.dispose();
   else await bridge.stop();
+}
+
+const claudeResumeSessionIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function claudeResumeArgs(resumeSessionId: string | undefined): readonly string[] {
+  if (resumeSessionId === undefined) return [];
+  if (!claudeResumeSessionIdPattern.test(resumeSessionId)) {
+    throw new ClaudeRuntimeConfigurationError(
+      "Invalid Claude resume session id; a UUID is required.",
+    );
+  }
+  return ["--resume", resumeSessionId];
 }
 
 export interface BuildClaudeChildEnvironmentInput {

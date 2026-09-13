@@ -7,6 +7,7 @@ import {
   MemoryProviderHealthRepository,
   MemoryProviderProfileRepository,
   MemorySecretStore,
+  ModelUnavailableError,
   LogicalModelInUseByPromptProfileError,
   LogicalModelNotFoundError,
   PromptProfileNotFoundError,
@@ -20,6 +21,8 @@ import {
   ProviderNotFoundError,
   ProviderProbeService,
   SecretVaultUnavailableError,
+  mergeModelCatalog,
+  type CodexLauncher,
 } from "../src/index.js";
 
 describe("ProviderDockApplication", () => {
@@ -377,6 +380,329 @@ describe("ProviderDockApplication", () => {
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it("passes persisted model reasoning capability to the Codex launcher", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const health = new MemoryProviderHealthRepository();
+    const codexLaunch = vi.fn(async (_input: Parameters<CodexLauncher["launch"]>[0]) => ({ exitCode: 0, signal: null }));
+    const codex = { launch: codexLaunch };
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      codex as unknown as CodexLauncher,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    const profile = await application.setProvider({
+      id: "agentrouter",
+      displayName: "AgentRouter",
+      baseUrl: "https://agentrouter.org/v1",
+      manualModelIds: ["glm-5.3"],
+    });
+    await health.record({
+      health: {
+        providerId: "agentrouter",
+        status: "ONLINE",
+        checkedAt: "2026-08-30T10:00:00.000Z",
+        latencyMs: 12,
+        discoveredModelCount: 1,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(profile, [
+        {
+          modelId: "glm-5.3",
+          displayName: "glm-5.3",
+          raw: { supported_reasoning_levels: ["low", "high", "max"] },
+        },
+      ]),
+    });
+
+    await application.launchCodex({
+      providerId: "agentrouter",
+      modelId: "glm-5.3",
+      projectDirectory: tmpdir(),
+      route: { kind: "auto" },
+    });
+
+    expect(codexLaunch.mock.calls[0]?.[0]?.modelCatalog).toMatchObject([
+      {
+        modelId: "glm-5.3",
+        reasoning: {
+          kind: "thinking-mode",
+          mode: "forced",
+          source: "official-model-catalog",
+        },
+      },
+    ]);
+  });
+
+  it("rejects models absent from a successful catalog and lists available models", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const health = new MemoryProviderHealthRepository();
+    const codexLaunch = vi.fn(async (_input: Parameters<CodexLauncher["launch"]>[0]) => ({
+      exitCode: 0,
+      signal: null,
+    }));
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      { launch: codexLaunch } as unknown as CodexLauncher,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    const provider = await application.setProvider({
+      id: "router",
+      displayName: "Router",
+      baseUrl: "https://router.example.test/v1",
+      apiType: "openai-responses",
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "ONLINE",
+        checkedAt: "2026-09-13T10:00:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 1,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, [
+        { modelId: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", raw: {} },
+      ]),
+    });
+
+    await expect(application.launchCodex({
+      providerId: provider.id,
+      modelId: "claude-opus-5",
+      projectDirectory: tmpdir(),
+      route: { kind: "auto" },
+    })).rejects.toMatchObject({
+      constructor: ModelUnavailableError,
+      availableModelIds: ["gpt-5.6-sol"],
+      message: expect.stringContaining("gpt-5.6-sol"),
+    });
+    expect(codexLaunch).not.toHaveBeenCalled();
+  });
+
+  it("keeps explicitly configured manual models launchable when discovery is unavailable", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const codexLaunch = vi.fn(async (_input: Parameters<CodexLauncher["launch"]>[0]) => ({
+      exitCode: 0,
+      signal: null,
+    }));
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      { launch: codexLaunch } as unknown as CodexLauncher,
+    );
+    const provider = await application.setProvider({
+      id: "manual",
+      displayName: "Manual",
+      baseUrl: "https://manual.example.test/v1",
+      apiType: "openai-responses",
+      manualModelIds: ["gpt-5.6-sol"],
+    });
+
+    await application.launchCodex({
+      providerId: provider.id,
+      modelId: "gpt-5.6-sol",
+      projectDirectory: tmpdir(),
+      route: { kind: "auto" },
+    });
+
+    expect(codexLaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects manual-only models when an authoritative catalog is available", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const health = new MemoryProviderHealthRepository();
+    const codexLaunch = vi.fn(async (_input: Parameters<CodexLauncher["launch"]>[0]) => ({
+      exitCode: 0,
+      signal: null,
+    }));
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      { launch: codexLaunch } as unknown as CodexLauncher,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    const provider = await application.setProvider({
+      id: "router",
+      displayName: "Router",
+      baseUrl: "https://router.example.test/v1",
+      apiType: "openai-responses",
+      manualModelIds: ["manual-only"],
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "ONLINE",
+        checkedAt: "2026-09-13T10:00:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 1,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, [
+        { modelId: "discovered", displayName: "Discovered", raw: {} },
+      ]),
+    });
+
+    await expect(application.launchCodex({
+      providerId: provider.id,
+      modelId: "manual-only",
+      projectDirectory: tmpdir(),
+      route: { kind: "auto" },
+    })).rejects.toMatchObject({
+      constructor: ModelUnavailableError,
+      availableModelIds: ["discovered"],
+    });
+    expect(codexLaunch).not.toHaveBeenCalled();
+  });
+
+  it("keeps a previously discovered model launchable after an empty degraded refresh", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const health = new MemoryProviderHealthRepository();
+    const codexLaunch = vi.fn(async (_input: Parameters<CodexLauncher["launch"]>[0]) => ({
+      exitCode: 0,
+      signal: null,
+    }));
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      { launch: codexLaunch } as unknown as CodexLauncher,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    const provider = await application.setProvider({
+      id: "router",
+      displayName: "Router",
+      baseUrl: "https://router.example.test/v1",
+      apiType: "openai-responses",
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "ONLINE",
+        checkedAt: "2026-09-13T10:00:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 1,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, [
+        { modelId: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", raw: {} },
+      ]),
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "DEGRADED",
+        checkedAt: "2026-09-13T10:01:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 0,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, []),
+    });
+
+    await application.launchCodex({
+      providerId: provider.id,
+      modelId: "gpt-5.6-sol",
+      projectDirectory: tmpdir(),
+      route: { kind: "auto" },
+    });
+
+    expect(codexLaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes logical routes whose provider catalog authoritatively omits their model", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const health = new MemoryProviderHealthRepository();
+    const codexLaunch = vi.fn(async (_input: Parameters<CodexLauncher["launch"]>[0]) => ({
+      exitCode: 0,
+      signal: null,
+    }));
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      { launch: codexLaunch } as unknown as CodexLauncher,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    const primary = await application.setProvider({
+      id: "primary",
+      displayName: "Primary",
+      baseUrl: "https://primary.example.test/v1",
+      apiType: "openai-responses",
+    });
+    const secondary = await application.setProvider({
+      id: "secondary",
+      displayName: "Secondary",
+      baseUrl: "https://secondary.example.test/v1",
+      apiType: "openai-responses",
+    });
+    await health.record({
+      health: {
+        providerId: primary.id,
+        status: "ONLINE",
+        checkedAt: "2026-09-13T10:00:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 1,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(primary, [
+        { modelId: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", raw: {} },
+      ]),
+    });
+    await application.setLogicalModel({
+      id: "logical-gpt",
+      routes: [
+        { providerId: primary.id, modelId: "claude-opus-5", priority: 100 },
+        { providerId: secondary.id, modelId: "gpt-5.6-sol", priority: 90 },
+      ],
+    });
+
+    await application.launchCodexLogicalModel({
+      logicalModelId: "logical-gpt",
+      projectDirectory: tmpdir(),
+      route: { kind: "auto" },
+    });
+
+    expect(codexLaunch).toHaveBeenCalledTimes(1);
+    expect(codexLaunch.mock.calls[0]?.[0]?.fallback?.logicalModel.routes).toEqual([
+      { providerId: secondary.id, modelId: "gpt-5.6-sol", priority: 90, enabled: true },
+    ]);
+  });
+
 });
 
 function createApplication(): ProviderDockApplication {

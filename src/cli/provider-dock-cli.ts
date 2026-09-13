@@ -131,7 +131,11 @@ async function execute(
 ): Promise<number> {
   const [command, ...rest] = argv;
 
-  if (!command || command === "help" || command === "--help" || command === "-h") {
+  if (!command) {
+    return executeDashboard(["--open"], application, io);
+  }
+
+  if (command === "help" || command === "--help" || command === "-h") {
     io.stdout(helpText);
     return 0;
   }
@@ -719,6 +723,18 @@ function approvalOption(value: string | undefined): { approvalLevel?: AgentAppro
   return { approvalLevel: value as AgentApprovalLevel };
 }
 
+async function resolveApprovalOption(
+  application: ProviderDockApplication,
+  projectDirectory: string,
+  value: string | undefined,
+): Promise<{ approvalLevel: AgentApprovalLevel }> {
+  const approvalLevel = await application.resolveApprovalLevel(
+    projectDirectory,
+    approvalOption(value).approvalLevel,
+  );
+  return { approvalLevel };
+}
+
 async function executeLaunch(
   argv: readonly string[],
   application: ProviderDockApplication,
@@ -747,6 +763,12 @@ async function executeLaunch(
     strict: true,
   });
   assertNoPositionals(positionals);
+  const projectDirectory = requireString(values.project, "--project");
+  const approval = await resolveApprovalOption(
+    application,
+    projectDirectory,
+    values.approval,
+  );
   const bridgeUrl = values["bridge-url"];
   const logicalModelId = values["logical-model"];
   const promptProfileId = values["prompt-profile"];
@@ -764,9 +786,9 @@ async function executeLaunch(
     }
     exit = await application.launchCodexPromptProfile({
       promptProfileId,
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -784,10 +806,10 @@ async function executeLaunch(
     }
     exit = await application.launchCodexLogicalModel({
       logicalModelId,
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       route: { kind: "auto" },
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -803,9 +825,9 @@ async function executeLaunch(
     bridgeUrl === undefined
   ) {
     exit = await application.launchCodexProjectProfile({
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -819,10 +841,10 @@ async function executeLaunch(
     exit = await application.launchCodex({
       providerId: requireString(values.provider, "--provider"),
       modelId: requireString(values.model, "--model"),
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       route: bridgeUrl ? { kind: "bridge", baseUrl: bridgeUrl } : { kind: "auto" },
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
       parentEnvironment: environment,
     });
   }
@@ -853,10 +875,15 @@ async function executeLaunchAuto(
   });
   assertNoPositionals(positionals);
   const projectDirectory = requireString(values.project, "--project");
+  const approval = await resolveApprovalOption(
+    application,
+    projectDirectory,
+    values.approval,
+  );
   const common = {
     projectDirectory,
     ...(values.executable ? { executable: values.executable } : {}),
-    ...approvalOption(values.approval),
+    ...approval,
     parentEnvironment: environment,
     onFallback: (notification: FallbackNotification) => {
       io.stderr(
@@ -929,11 +956,18 @@ async function executeLaunchClaude(
       project: { type: "string" },
       executable: { type: "string" },
       approval: { type: "string" },
+      resume: { type: "string" },
     },
     allowPositionals: true,
     strict: true,
   });
   assertNoPositionals(positionals);
+  const projectDirectory = requireString(values.project, "--project");
+  const approval = await resolveApprovalOption(
+    application,
+    projectDirectory,
+    values.approval,
+  );
   const logicalModelId = values["logical-model"];
   const promptProfileId = values["prompt-profile"];
   let exit;
@@ -949,9 +983,9 @@ async function executeLaunchClaude(
     }
     exit = await application.launchClaudePromptProfile({
       promptProfileId,
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -969,9 +1003,9 @@ async function executeLaunchClaude(
     }
     exit = await application.launchClaudeLogicalModel({
       logicalModelId,
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -983,9 +1017,9 @@ async function executeLaunchClaude(
     });
   } else if (values.provider === undefined && values.model === undefined) {
     exit = await application.launchClaudeProjectProfile({
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
       parentEnvironment: environment,
       onFallback: (notification) => {
         io.stderr(
@@ -999,9 +1033,12 @@ async function executeLaunchClaude(
     exit = await application.launchClaude({
       providerId: requireString(values.provider, "--provider"),
       modelId: requireString(values.model, "--model"),
-      projectDirectory: requireString(values.project, "--project"),
+      projectDirectory,
       ...(values.executable ? { executable: values.executable } : {}),
-      ...approvalOption(values.approval),
+      ...approval,
+      ...(typeof values.resume === "string"
+        ? { resumeSessionId: values.resume }
+        : {}),
       parentEnvironment: environment,
     });
   }

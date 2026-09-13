@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { MemorySecretStore } from "../src/core/security/secret-store.js";
@@ -224,6 +224,55 @@ describe("portal state and polling", () => {
       await service.refreshDue(["one", "two"]);
       expect(await new FilePortalRepository(path).list()).toHaveLength(2);
       expect(await readFile(path, "utf8")).not.toMatch(/account-secret|private@example|do-not-serialize/);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("migrates legacy records while preserving connection secrets and dropping invalid snapshots", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "providerdock-portals-migrate-"));
+    try {
+      const path = join(directory, "accounts.json");
+      await writeFile(path, JSON.stringify({ version: 1, records: [{
+        connection: profile,
+        revision: "11111111-1111-4111-8111-111111111111",
+        failures: 2,
+        latest: { invalid: true },
+      }] }));
+      const repository = new FilePortalRepository(path);
+      expect(await repository.list()).toEqual([expect.objectContaining({
+        connection: expect.objectContaining({
+          providerId: "one",
+          auth: { kind: "bearer", secretRef: "ACCOUNT_TOKEN" },
+        }),
+        failures: 0,
+      })]);
+      expect(repository.status()).toMatchObject({ state: "recovered" });
+      await repository.update("one", (record) => record);
+      expect(JSON.parse(await readFile(path, "utf8"))).toMatchObject({
+        version: 2,
+        records: [{ connection: { auth: { secretRef: "ACCOUNT_TOKEN" } } }],
+      });
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("refuses to hide or overwrite a corrupt durable account store", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "providerdock-portals-corrupt-"));
+    try {
+      const path = join(directory, "accounts.json");
+      const corrupt = '{"version":1,"records":[';
+      await writeFile(path, corrupt);
+      const repository = new FilePortalRepository(path);
+      await expect(repository.list()).rejects.toThrow(/malformed JSON/);
+      await expect(repository.update("one", () => ({
+        connection: profile,
+        revision: "11111111-1111-4111-8111-111111111111",
+        failures: 0,
+      }))).rejects.toThrow(/malformed JSON/);
+      expect(await readFile(path, "utf8")).toBe(corrupt);
+      const status = repository.status();
+      expect(status).toMatchObject({ state: "corrupt", message: expect.stringMatching(/malformed JSON/) });
+      expect(status.backupPath).toBeDefined();
+      expect(await readFile(status.backupPath!, "utf8")).toBe(corrupt);
+      expect((await readdir(directory)).filter((name) => name.endsWith(".bak"))).toHaveLength(1);
     } finally { await rm(directory, { recursive: true, force: true }); }
   });
 

@@ -96,6 +96,7 @@ export function buildModelStorefront(
         displayName: catalog.get(modelId)?.displayName ?? modelId,
         source: catalog.has(modelId) ? "catalog" : "manual", enabled: profile.enabled && !locallyDisabled,
         locallyDisabled, lifecycle, removedAt,
+        removalExpiresAt: removedAt === null ? null : new Date(Date.parse(removedAt) + removedModelRetentionMs).toISOString(),
         status, availabilityReason, checkedAt, stale, diagnostic, lastSignal, ok, err, total,
         stability: total ? ok / total * 100 : undefined,
         errPct: total ? err / total * 100 : undefined,
@@ -104,10 +105,12 @@ export function buildModelStorefront(
         catalogCheckedAt: probe?.checkedAt,
         pricing: pricing ? { ...pricing, source: "manual" as const, verifiedAt: null } : null,
         siteModel: siteModels.get(modelId) ?? null,
-        siteCatalog: siteCatalog ? { status: siteCatalog.status, sourceUrl: siteCatalog.sourceUrl,
+        siteCatalog: siteCatalog ? { status: siteCatalog.status,
+          sourceUrl: publicPortalSourceUrl(portal?.connection.siteUrl, siteCatalog.sourceUrl),
           observedAt: siteCatalog.observedAt, stale: Date.parse(siteCatalog.expiresAt) <= now.valueOf() } : null,
         sitePerformance: sitePerformance.has(modelId) ? { ...sitePerformance.get(modelId)!,
-          sourceUrl: performance!.sourceUrl, observedAt: performance!.observedAt,
+          sourceUrl: publicPortalSourceUrl(portal?.connection.siteUrl, performance!.sourceUrl),
+          observedAt: performance!.observedAt,
           stale: Date.parse(performance!.expiresAt) <= now.valueOf(), windowHours: 24 } : null,
         listedForApiKey,
         // Account-specific APIs need provider adapters. Unknown is never zero/free.
@@ -115,4 +118,30 @@ export function buildModelStorefront(
       };
     });
   }).sort((a, b) => a.modelId.localeCompare(b.modelId) || a.providerName.localeCompare(b.providerName));
+}
+
+/** Browser links expose only a configured public site origin, never API provenance. */
+export function publicPortalSourceUrl(
+  configuredSiteUrl: string | undefined,
+  observedSourceUrl: string,
+): string | null {
+  if (configuredSiteUrl === undefined) return null;
+  try {
+    const configured = new URL(configuredSiteUrl);
+    const observed = new URL(observedSourceUrl);
+    if (configured.protocol !== "https:" || observed.protocol !== "https:") return null;
+    if (configured.username || configured.password || configured.search || configured.hash) return null;
+    if (observed.username || observed.password || observed.search || observed.hash) return null;
+    if (configured.origin !== observed.origin || isPrivateDashboardHost(configured.hostname)) return null;
+    return configured.origin;
+  } catch {
+    return null;
+  }
+}
+
+function isPrivateDashboardHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return host === "localhost" || host === "::1" || host === "0.0.0.0" ||
+    /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) ||
+    /^169\.254\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
 }

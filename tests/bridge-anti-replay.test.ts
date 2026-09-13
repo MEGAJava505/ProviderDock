@@ -47,6 +47,7 @@ describe("bridge anti-replay guard", () => {
       });
       expect(replay.status).toBe(409);
       expect(replay.headers.get("x-providerdock-turn-block")).toBe("TURN_ALREADY_COMPLETED");
+      expect(replay.headers.get("x-should-retry")).toBe("false");
       // The blocked replay must never reach the upstream provider.
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -162,6 +163,7 @@ describe("bridge anti-replay guard", () => {
       expect(replayedCall.headers.get("x-providerdock-turn-block")).toBe(
         "TOOL_LOOP_DETECTED",
       );
+      expect(replayedCall.headers.get("x-should-retry")).toBe("false");
       expect(fetchMock).toHaveBeenCalledTimes(3);
     } finally {
       await bridge.stop();

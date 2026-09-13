@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+.scratch/
 .env
 .env.*
 !.env.example
@@ -9,3 +10,5 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Local experimental bridge material; keep live provider settings out of Git.
+justworker-codex-bridge/

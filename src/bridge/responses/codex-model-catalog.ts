@@ -1,3 +1,6 @@
+import { officialReasoningCapabilityFor } from "../../core/providers/official-model-capabilities.js";
+import type { ReasoningCapability } from "../../core/providers/reasoning-capability.js";
+
 export interface BridgeModelDefinition {
   readonly modelId: string;
   readonly displayName?: string;
@@ -6,6 +9,7 @@ export interface BridgeModelDefinition {
   readonly maxContextWindow?: number;
   readonly defaultReasoningLevel?: string;
   readonly supportedReasoningLevels?: readonly string[];
+  readonly reasoning?: ReasoningCapability;
   readonly supportsImages?: boolean;
   readonly supportsParallelToolCalls?: boolean;
   readonly supportsSearchTool?: boolean;
@@ -34,9 +38,31 @@ export function createCodexModelInfo(
     contextWindow,
     positiveInteger(model.maxContextWindow, contextWindow),
   );
-  const supportedReasoningLevels = model.supportedReasoningLevels ?? ["low", "medium", "high"];
+  const official = officialReasoningCapabilityFor(model.modelId);
+  const explicitReasoning = model.reasoning;
+  const isUserOverride =
+    explicitReasoning !== undefined &&
+    "source" in explicitReasoning &&
+    explicitReasoning.source === "user-override";
+  const reasoning =
+    official.kind !== "unknown" && !isUserOverride
+      ? official
+      : explicitReasoning ??
+        (model.supportedReasoningLevels !== undefined &&
+        model.supportedReasoningLevels.length > 0
+          ? {
+              kind: "effort" as const,
+              values: model.supportedReasoningLevels,
+              source: "provider-metadata" as const,
+            }
+          : official);
+  const supportedReasoningLevels = reasoning.kind === "effort" ? reasoning.values : [];
   const defaultReasoningLevel =
-    model.defaultReasoningLevel ?? supportedReasoningLevels[0] ?? "low";
+    reasoning.kind === "effort"
+      ? model.defaultReasoningLevel ?? reasoning.default ?? supportedReasoningLevels[0]
+      : reasoning.kind === "unknown"
+        ? model.defaultReasoningLevel
+        : undefined;
   const inputModalities = model.supportsImages === true ? ["text", "image"] : ["text"];
 
   return {
@@ -44,7 +70,9 @@ export function createCodexModelInfo(
     display_name: model.displayName ?? model.modelId,
     description:
       model.description ?? "Provider model exposed through the local ProviderDock Responses bridge.",
-    default_reasoning_level: defaultReasoningLevel,
+    ...(defaultReasoningLevel === undefined
+      ? {}
+      : { default_reasoning_level: defaultReasoningLevel }),
     supported_reasoning_levels: supportedReasoningLevels.map((effort) => ({
       effort,
       description: reasoningDescriptions[effort] ?? `Reasoning level: ${effort}`,
@@ -105,6 +133,12 @@ export function createCodexModelCatalog(
   models: readonly BridgeModelDefinition[],
 ): readonly Readonly<Record<string, unknown>>[] {
   return models.map((model, index) => createCodexModelInfo(model, index + 1));
+}
+
+export function createCodexModelCatalogDocument(
+  models: readonly BridgeModelDefinition[],
+): { readonly models: readonly Readonly<Record<string, unknown>>[] } {
+  return { models: createCodexModelCatalog(models) };
 }
 
 function positiveInteger(value: number | undefined, fallback: number): number {

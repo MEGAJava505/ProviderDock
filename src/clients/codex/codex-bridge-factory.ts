@@ -8,6 +8,7 @@ import type {
 import { ResponsesBridgeServer } from "../../bridge/responses/responses-bridge-server.js";
 import type { FallbackNotification } from "../../core/fallback/fallback-session-router.js";
 import type { ProviderAdapterRegistry } from "../../core/providers/provider-adapter-registry.js";
+import type { BridgeModelDefinition } from "../../bridge/responses/codex-model-catalog.js";
 import type { ProviderProfile } from "../../core/providers/provider-profile.js";
 import type { SecretStore } from "../../core/security/secret-store.js";
 import { FileTurnLedgerStore } from "../../core/state-machine/persistent-turn-ledger.js";
@@ -22,6 +23,7 @@ export interface CreateCodexBridgeInput {
   readonly onFallback?: (notification: FallbackNotification) => void;
   readonly sessionInstructions?: string;
   readonly defaultReasoningLevel?: string;
+  readonly modelCatalog?: readonly BridgeModelDefinition[];
 }
 
 export interface ManagedCodexBridge {
@@ -31,6 +33,8 @@ export interface ManagedCodexBridge {
 
 export interface CodexBridgeFactory {
   create(input: CreateCodexBridgeInput): ManagedCodexBridge;
+  /** Optional capability probe used before a non-native protocol route is admitted. */
+  supportsProfile?(profile: ProviderProfile): boolean;
 }
 
 export interface ResponsesCodexBridgeFactoryOptions {
@@ -69,13 +73,11 @@ export class ResponsesCodexBridgeFactory implements CodexBridgeFactory {
       ...(this.options.fetchImpl === undefined ? {} : { fetchImpl: this.options.fetchImpl }),
       models: [
         {
+          ...(input.modelCatalog?.find((model) => model.modelId === input.modelId) ?? {}),
           modelId: input.modelId,
           ...(input.defaultReasoningLevel === undefined
             ? {}
-            : {
-                defaultReasoningLevel: input.defaultReasoningLevel,
-                supportedReasoningLevels: [input.defaultReasoningLevel],
-              }),
+            : { defaultReasoningLevel: input.defaultReasoningLevel }),
         },
       ],
       ...(input.fallback === undefined ? {} : { fallback: input.fallback }),

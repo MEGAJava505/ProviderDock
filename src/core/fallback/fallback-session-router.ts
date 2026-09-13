@@ -336,11 +336,11 @@ function staleAttempt(): FallbackSelection {
 }
 
 function isFallbackRetryable(type: NormalizedErrorType): boolean {
-  return type !== "INVALID_REQUEST";
+  return type !== "INVALID_REQUEST" && type !== "RESOURCE_SCOPE_MISMATCH";
 }
 
 function countsForCircuit(type: NormalizedErrorType): boolean {
-  return type !== "INVALID_REQUEST";
+  return type !== "INVALID_REQUEST" && type !== "RESOURCE_SCOPE_MISMATCH";
 }
 
 function opensCircuitImmediately(type: NormalizedErrorType): boolean {

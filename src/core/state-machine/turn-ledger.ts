@@ -26,6 +26,8 @@ export interface TurnToolCall {
   readonly callId: string;
   readonly name: string;
   readonly argumentsHash: string;
+  /** Request-history-only equivalent for Claude's defaulted Edit.replace_all. */
+  readonly defaultArgumentsHash?: string;
 }
 
 export interface TurnToolResult {
@@ -375,7 +377,9 @@ export class TurnLedger {
       const known = this.toolCalls.get(call.callId);
       if (
         known !== undefined &&
-        (known.name !== call.name || known.argumentsHash !== call.argumentsHash)
+        (known.name !== call.name ||
+          (known.argumentsHash !== call.argumentsHash &&
+            known.argumentsHash !== call.defaultArgumentsHash))
       ) {
         return blocked(
           "TOOL_CALL_CONFLICT",
@@ -539,7 +543,7 @@ export function extractResponsesTurnSignature(body: Readonly<Record<string, unkn
         toolCalls.push({
           callId,
           name: typeof item.name === "string" ? item.name : "",
-          argumentsHash: sha256(stableStringify(item.arguments ?? item.input ?? "")),
+          argumentsHash: toolArgumentsHash(item.arguments ?? item.input ?? ""),
         });
       } else if (type === "function_call_output" || type === "custom_tool_call_output") {
         toolResults.push({
@@ -573,7 +577,7 @@ export function extractResponsesDeliveredToolCalls(
     calls.push({
       callId: item.call_id,
       name: typeof item.name === "string" ? item.name : "",
-      argumentsHash: sha256(stableStringify(item.arguments ?? item.input ?? "")),
+      argumentsHash: toolArgumentsHash(item.arguments ?? item.input ?? ""),
     });
   }
   return calls;
@@ -604,7 +608,8 @@ export function extractAnthropicTurnSignature(
           toolCalls.push({
             callId: block.id,
             name: typeof block.name === "string" ? block.name : "",
-            argumentsHash: sha256(stableStringify(block.input ?? {})),
+            argumentsHash: toolArgumentsHash(block.input ?? {}),
+            ...claudeEditDefaultHash(block.name, block.input),
           });
         } else if (
           block.type === "tool_result" &&
@@ -625,6 +630,20 @@ export function extractAnthropicTurnSignature(
   return { fingerprint, toolCalls, toolResults };
 }
 
+/** Keep original hashes for persisted sessions; permit only this known default
+ * in echoed Claude history. Delivery validation and all other fields stay strict.
+ */
+function claudeEditDefaultHash(name: unknown, input: unknown): { defaultArgumentsHash?: string } {
+  if (name !== "Edit" || typeof input !== "object" || input === null || Array.isArray(input)) return {};
+  const args = input as Record<string, unknown>;
+  if (typeof args.file_path !== "string" || typeof args.old_string !== "string" || typeof args.new_string !== "string") return {};
+  const alternate = { ...args };
+  if (!Object.hasOwn(args, "replace_all")) alternate.replace_all = false;
+  else if (args.replace_all === false) delete alternate.replace_all;
+  else return {};
+  return { defaultArgumentsHash: sha256(stableStringify(alternate)) };
+}
+
 /** Extracts tool_use blocks from a complete Anthropic message. */
 export function extractAnthropicDeliveredToolCalls(
   payload: Readonly<Record<string, unknown>>,
@@ -638,7 +657,7 @@ export function extractAnthropicDeliveredToolCalls(
     calls.push({
       callId: block.id,
       name: typeof block.name === "string" ? block.name : "",
-      argumentsHash: sha256(stableStringify(block.input ?? {})),
+      argumentsHash: toolArgumentsHash(block.input ?? {}),
     });
   }
   return calls;
@@ -647,6 +666,25 @@ export function extractAnthropicDeliveredToolCalls(
 /** Deterministic JSON encoding with sorted object keys. */
 export function stableStringify(value: unknown): string {
   return JSON.stringify(sortValue(value)) ?? "null";
+}
+
+/**
+ * Hashes tool arguments by semantic JSON value. Responses providers are
+ * expected to carry function arguments as a JSON string, but a few compatible
+ * gateways decode that field before returning it. Parsing valid JSON strings
+ * here keeps the delivered response and echoed request history equivalent
+ * across that boundary while preserving non-JSON strings exactly.
+ */
+export function toolArgumentsHash(value: unknown): string {
+  let normalized = value;
+  if (typeof value === "string") {
+    try {
+      normalized = JSON.parse(value) as unknown;
+    } catch {
+      // A non-JSON string is a literal tool argument; retain it as-is.
+    }
+  }
+  return sha256(stableStringify(normalized));
 }
 
 function sortValue(value: unknown): unknown {

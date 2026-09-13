@@ -115,6 +115,7 @@ function record(
     history: [],
     diagnostics: [],
     runtimeSignals: [],
+    surfaceChecks: [],
     ...values,
   };
 }

@@ -125,6 +125,10 @@ export const providerDashboardHtml = `<!doctype html>
       <section class="panel activity-chart-panel"><div class="chart-tabs" role="tablist" aria-label="Графики активности"><button type="button" data-chart="tokens" class="active">Расход токенов</button><button type="button" data-chart="requests">Запросы</button><button type="button" data-chart="statuses">Состояния моделей</button><button type="button" data-chart="ranking">Использование моделей</button></div><div id="activity-chart" class="activity-chart"></div></section>
       <section class="panel"><div class="panel-head"><h2>Модели по провайдерам</h2><span class="hint">Наблюдения за 24 часа</span></div><div id="activity-provider-models"></div></section>
     </section>
+    <section class="panel agent-history-panel" data-page="activity" hidden>
+      <div class="panel-head"><h2>Прошлые сессии</h2><input id="agent-session-search" class="agent-session-search" type="search" placeholder="Поиск по проекту, модели или заголовку" aria-label="Поиск прошлых сессий"></div>
+      <div id="agent-sessions" class="item-list agent-session-list compact"></div>
+    </section>
     <div class="two-col activity-history" data-page="activity" hidden>
       <section class="panel">
         <div class="panel-head"><h2>Активность</h2></div>
@@ -170,7 +174,7 @@ export const providerDashboardHtml = `<!doctype html>
 <dialog id="launch-dialog" aria-labelledby="launch-dialog-title"><div class="dialog-card launch-dialog-card"><div class="dialog-head"><div><span class="eyebrow">РАБОЧАЯ СЕССИЯ</span><h2 id="launch-dialog-title">Запустить агента</h2></div><button type="button" class="icon-button" data-close-dialog="launch-dialog" aria-label="Закрыть">×</button></div>        <form class="dialog-body" id="launch-form" novalidate>
           <label>Папка проекта<span class="input-action"><input id="launch-project" name="projectDirectory" required readonly placeholder="Папка не выбрана"><button id="pick-launch-project" class="button" type="button">Выбрать папку</button></span></label>
           <label>Агент<select id="launch-client" name="client"><option value="auto">Авто</option><option value="codex">Codex CLI</option><option value="claude-code">Claude Code</option></select></label>
-          <label>Подтверждение действий<select id="launch-approval" name="approvalLevel"><option value="ask">Подтверждать действия</option><option value="auto">Автоматически в проекте</option><option value="full-auto">Без подтверждений (опасно)</option></select><small>«Автоматически» разрешает правки только в папке проекта. «Без подтверждений» отключает запросы и песочницу.</small></label>
+          <label>Подтверждение действий<select id="launch-approval" name="approvalLevel"><option value="">???????????? ???????????</option><option value="ask">Подтверждать действия</option><option value="auto">Автоматически в проекте</option><option value="full-auto">Без подтверждений (опасно)</option></select><small>«Автоматически» разрешает правки только в папке проекта. «Без подтверждений» отключает запросы и песочницу.</small></label>
           <div class="field-label">Маршрут</div>
           <div class="route-tabs" id="route-tabs">
             <button type="button" class="route-tab active" data-route="provider">Модель</button>
@@ -186,6 +190,11 @@ export const providerDashboardHtml = `<!doctype html>
           <label id="prompt-route-field" class="route-fields" hidden>Профиль инструкций<select id="launch-prompt-profile" name="promptProfileId"></select></label>
           <p id="project-route-hint" class="hint route-fields" hidden>Настройки возьмутся из привязки выбранной папки.</p>
           <div id="binding-hint" class="hint accent" hidden></div>
+<div class="launch-history" id="launch-history">
+            <div class="field-label">Прошлые сессии</div>
+            <input id="launch-agent-session-search" class="agent-session-search" type="search" placeholder="Поиск по проекту, модели или заголовку" aria-label="Поиск прошлых сессий для запуска">
+            <div id="launch-agent-sessions" class="item-list agent-session-list compact launch-agent-session-list"></div>
+          </div>
           <div id="launch-preview" class="launch-preview" aria-live="polite"></div><button id="launch-submit" class="button primary launch-submit" type="submit">Запустить агента</button>
           <div id="launch-status" class="status-line" aria-live="polite"></div>
         </form></div></dialog>

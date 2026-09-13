@@ -59,6 +59,18 @@ provider is stopped before the client can execute it:
 - `TOOL_LOOP_DETECTED` — a resolved call is presented as pending again
   (the recursive tool loop observed with AgentRouter).
 
+Tool arguments are hashed by semantic JSON value at both boundaries. This
+keeps a JSON object and the equivalent JSON-encoded string equivalent when a
+compatibility gateway changes the wire representation between the delivered
+response and the echoed request history. Invalid JSON strings remain literal
+arguments. A genuine change to a tool name, call ID, or argument value still
+blocks the request.
+
+Local 409 admission responses include `x-should-retry: false`. A client that
+receives `TOOL_CALL_CONFLICT`, `TOOL_LOOP_DETECTED`, or `UNSAFE_REPLAY` must
+stop replaying the stale request and start a new runtime session after
+preserving the project files and conversation handoff.
+
 ## Crash-safe persistence
 
 Managed Codex and Claude sessions persist a versioned ledger snapshot under

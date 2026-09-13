@@ -28,15 +28,24 @@ describe("CodexRuntimeSessionManager", () => {
     const runtime = await fixture.manager.prepare(runtimeInput(fixture.projectDirectory));
 
     expect(await readFile(userConfigPath, "utf8")).toBe('model = "user-model"\n');
-    expect(await readFile(runtime.profilePath, "utf8")).toContain(
+    const profileContents = await readFile(runtime.profilePath, "utf8");
+    expect(profileContents).toContain(
       'model_provider = "providerdock-abcdef0123456789abcdef0123456789"',
     );
+    expect(profileContents).toContain(
+      `model_catalog_json = ${JSON.stringify(runtime.modelCatalogPath)}`,
+    );
+    const catalog = JSON.parse(await readFile(runtime.modelCatalogPath, "utf8")) as {
+      models: Array<Record<string, unknown>>;
+    };
+    expect(catalog.models[0]).toMatchObject({ slug: "model-x" });
     expect(await readFile(runtime.manifestPath, "utf8")).not.toContain("secret-value");
 
     await fixture.manager.cleanup(runtime);
 
     expect(await readFile(userConfigPath, "utf8")).toBe('model = "user-model"\n');
     await expect(access(runtime.profilePath)).rejects.toThrow();
+    await expect(access(runtime.modelCatalogPath)).rejects.toThrow();
     await expect(access(runtime.sessionDirectory)).rejects.toThrow();
   });
 
@@ -69,6 +78,7 @@ describe("CodexRuntimeSessionManager", () => {
       unknown
     >;
     delete current.route;
+    delete current.modelCatalogSha256;
     current.version = 1;
     await writeFile(runtime.manifestPath, `${JSON.stringify(current, null, 2)}\n`, "utf8");
 
@@ -89,6 +99,25 @@ describe("CodexRuntimeSessionManager", () => {
     expect(outcomes[0]).toMatchObject({ sessionId, status: "CONFLICT" });
     expect(await readFile(runtime.profilePath, "utf8")).toBe("user changed this file\n");
     expect(await readFile(runtime.manifestPath, "utf8")).toContain(sessionId);
+    await expect(access(runtime.modelCatalogPath)).resolves.toBeUndefined();
+  });
+
+  it("preserves a changed model catalog and reports a conflict", async () => {
+    const fixture = await createFixture();
+    const runtime = await fixture.manager.prepare(runtimeInput(fixture.projectDirectory));
+    await writeFile(runtime.modelCatalogPath, "user changed this catalog\n", "utf8");
+
+    const outcomes = await fixture.manager.recoverStaleSessions();
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({ sessionId, status: "CONFLICT" });
+    expect(await readFile(runtime.modelCatalogPath, "utf8")).toBe(
+      "user changed this catalog\n",
+    );
+    expect(await readFile(runtime.manifestPath, "utf8")).toContain(sessionId);
+    expect(await readFile(runtime.profilePath, "utf8")).toContain(
+      `model_catalog_json = ${JSON.stringify(runtime.modelCatalogPath)}`,
+    );
   });
 
   it("recovers a legacy profile when Codex only appended trust for the same project", async () => {
@@ -108,6 +137,28 @@ describe("CodexRuntimeSessionManager", () => {
       "utf8",
     );
 
+    expect(await fixture.manager.recoverStaleSessions()).toEqual([
+      { sessionId, status: "RECOVERED" },
+    ]);
+    await expect(access(runtime.profilePath)).rejects.toThrow();
+    await expect(access(runtime.sessionDirectory)).rejects.toThrow();
+  });
+
+  it("recovers a stale legacy profile after Codex adds only a known reasoning-effort line", async () => {
+    const fixture = await createFixture();
+    const runtime = await fixture.manager.prepare(runtimeInput(fixture.projectDirectory));
+    const original = await readFile(runtime.profilePath, "utf8");
+    const manifest = JSON.parse(await readFile(runtime.manifestPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    manifest.profileSha256 = createHash("sha256").update(original, "utf8").digest("hex");
+    await writeFile(runtime.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    const changed = original.replace(
+      'model_provider = "providerdock-abcdef0123456789abcdef0123456789"\n',
+      'model_provider = "providerdock-abcdef0123456789abcdef0123456789"\nmodel_reasoning_effort = "xhigh"\n',
+    );
+    await writeFile(runtime.profilePath, changed, "utf8");
     expect(await fixture.manager.recoverStaleSessions()).toEqual([
       { sessionId, status: "RECOVERED" },
     ]);
@@ -333,6 +384,39 @@ describe("CodexLauncher", () => {
     await expect(
       access(join(fixture.codexHome, "providers", "router", `providerdock-${sessionId}.config.toml`)),
     ).rejects.toThrow();
+  });
+
+  it("launches codex resume with the isolated runtime profile and session id", async () => {
+    const fixture = await createFixture();
+    const runner = new FakeProcessRunner();
+    const launcher = new CodexLauncher(fixture.manager, runner);
+
+    await expect(
+      launcher.launch({
+        ...runtimeInput(fixture.projectDirectory),
+        resumeSessionId: "not-a-session-id",
+      }),
+    ).rejects.toThrow("resume session id");
+    expect(runner.request).toBeUndefined();
+
+    await launcher.launch({
+      ...runtimeInput(fixture.projectDirectory),
+      resumeSessionId: "01a08736-06ba-7b92-97a4-0fbdb4e6976c",
+      additionalArgs: ["--no-alt-screen"],
+    });
+
+    expect(runner.request?.args).toEqual([
+      "resume",
+      "--strict-config",
+      "--profile",
+      `providerdock-${sessionId}`,
+      "--sandbox",
+      "read-only",
+      "--ask-for-approval",
+      "on-request",
+      "--no-alt-screen",
+      "01a08736-06ba-7b92-97a4-0fbdb4e6976c",
+    ]);
   });
 
   it("cleans the temporary profile when process start fails", async () => {

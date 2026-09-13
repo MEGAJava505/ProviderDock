@@ -9,7 +9,7 @@ import {
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import {
-  normalizeHttpStatus,
+  providerErrorFromUpstream,
   providerErrorGuidance,
   ProviderRequestError,
   type NormalizedErrorType,
@@ -36,7 +36,7 @@ import {
 import type { ProviderFallbackConfiguration } from "../../core/fallback/provider-fallback-configuration.js";
 import { encodeSseEvent } from "../sse/sse-decoder.js";
 import {
-  createCodexModelCatalog,
+  createCodexModelCatalogDocument,
   type BridgeModelDefinition,
 } from "./codex-model-catalog.js";
 import { relayResponsesStream } from "./responses-stream-relay.js";
@@ -54,6 +54,12 @@ import {
   translateChatResponseToResponses,
 } from "../../protocols/openai-chat/chat-to-responses-response.js";
 import { ChatToResponsesStreamTranslator } from "../../protocols/openai-chat/chat-to-responses-stream.js";
+import {
+  stripResourceScopeMetadata,
+  tagProviderOwnedItems,
+  validateProviderOwnedInput,
+  type ResourceScope,
+} from "./resource-scope.js";
 import type { CanonicalRequest } from "../../protocols/canonical/canonical-protocol.js";
 import {
   relayChatCompletionsStream,
@@ -133,6 +139,7 @@ interface OpenedUpstream {
   readonly upstream: Response;
   readonly redactionValues: readonly string[];
   readonly canonicalRequest?: CanonicalRequest;
+  readonly resourceScope: ResourceScope;
 }
 
 interface RouteSelectionMetadata {
@@ -400,7 +407,7 @@ export class ResponsesBridgeServer {
           created: 0,
           owned_by: this.fallbackSession?.group.id ?? this.profile.id,
         })),
-        models: createCodexModelCatalog(this.models),
+        ...createCodexModelCatalogDocument(this.models),
       });
       return;
     }
@@ -444,7 +451,7 @@ export class ResponsesBridgeServer {
       const turnSignature = extractResponsesTurnSignature(body);
       const admission = await this.turnLedger.admit(turnSignature);
       if (admission.decision === "blocked") {
-        const headers = new Headers({ "x-providerdock-turn-block": admission.code });
+        const headers = localTurnBlockHeaders(admission.code);
         sendBridgeError(response, 409, "INVALID_REQUEST", admission.message, headers);
         return;
       }
@@ -463,10 +470,10 @@ export class ResponsesBridgeServer {
         const { upstream } = selected;
 
         if (!upstream.ok) {
+          const normalizedType = await this.upstreamErrorType(selected);
           const sanitizedDetail = await readSanitizedProviderErrorBody(upstream, {
             sensitiveValues: selected.redactionValues,
           });
-          const normalizedType = normalizeHttpStatus(upstream.status);
           const headers = this.routeHeaders(
             safeUpstreamHeaders(upstream, false),
             selected,
@@ -524,6 +531,8 @@ export class ResponsesBridgeServer {
             heartbeatIntervalMs: this.heartbeatIntervalMs,
             idleTimeoutMs: this.streamIdleTimeoutMs,
             maxEventCharacters: this.maxSseEventCharacters,
+            transformForwardEvent: (event) =>
+              tagProviderOwnedItems(event, selected.resourceScope),
             beforeForwardEvent: async (event) => {
               usage.observe(extractOpenAiTokenUsage(event));
               try {
@@ -560,8 +569,11 @@ export class ResponsesBridgeServer {
           );
         }
 
-        const payload = normalizeResponsesResponse(
-          await readUpstreamJson(upstream, this.responseBodyLimitBytes),
+        const payload = tagProviderOwnedItems(
+          normalizeResponsesResponse(
+            await readUpstreamJson(upstream, this.responseBodyLimitBytes),
+          ),
+          selected.resourceScope,
         );
         await this.recordDeliveredResponsesCalls(turnToken, payload);
         if (wantsStream) {
@@ -646,7 +658,7 @@ export class ResponsesBridgeServer {
       try {
         const opened = await this.fetchRoute(body, wantsStream, controller, route);
         if (!opened.upstream.ok) {
-          const errorType = normalizeHttpStatus(opened.upstream.status);
+          const errorType = await this.upstreamErrorType(opened);
           await this.recordRuntimeHealth(
             route,
             responsesProtocolForRoute(route),
@@ -732,7 +744,7 @@ export class ResponsesBridgeServer {
           };
         }
 
-        const errorType = normalizeHttpStatus(opened.upstream.status);
+        const errorType = await this.upstreamErrorType(opened);
         const failure: FallbackFailure & { readonly httpStatus: number } = {
           errorType,
           phase: fallbackFailurePhaseForHttpStatus(opened.upstream.status),
@@ -852,11 +864,30 @@ export class ResponsesBridgeServer {
       );
     }
 
-    const routedBody =
-      this.fallbackSession === undefined ? body : { ...body, model: route.route.modelId };
-    const chatTranslation =
+    const useChat =
       route.profile.apiType === "openai-chat-completions" ||
-      (route.profile.apiType === "auto" && this.autoChatRoutes.has(logicalRouteKey(route.route)))
+      (route.profile.apiType === "auto" &&
+        this.autoChatRoutes.has(logicalRouteKey(route.route)));
+    const resourceScope: ResourceScope = {
+      providerId: route.profile.id,
+      baseUrl: route.profile.baseUrl,
+      protocol: useChat
+        ? "openai-chat-completions"
+        : "openai-responses",
+    };
+    validateProviderOwnedInput(body, resourceScope);
+    const {
+      previous_response_id: _previousResponseId,
+      conversation: _conversation,
+      ...statelessBody
+    } = body;
+    const scrubbedBody = stripResourceScopeMetadata(statelessBody);
+    const routedBody =
+      this.fallbackSession === undefined
+        ? scrubbedBody
+        : { ...scrubbedBody, model: route.route.modelId };
+    const chatTranslation =
+      useChat
         ? translateResponsesRequestToChat(routedBody)
         : undefined;
     const upstreamPayload = chatTranslation?.chatRequest ?? routedBody;
@@ -906,6 +937,7 @@ export class ResponsesBridgeServer {
         ...(chatTranslation === undefined
           ? {}
           : { canonicalRequest: chatTranslation.canonical }),
+        resourceScope,
       };
     } catch (error) {
       if (error instanceof ProviderRequestError || error instanceof UpstreamAttemptError) throw error;
@@ -939,6 +971,23 @@ export class ResponsesBridgeServer {
       throw new TypeError(`Fallback route '${logicalRouteKey(route)}' is not configured.`);
     }
     return resolved;
+  }
+
+  private async upstreamErrorType(
+    opened: OpenedUpstream,
+  ): Promise<NormalizedErrorType> {
+    let detail: string | undefined;
+    try {
+      detail = await readSanitizedProviderErrorBody(opened.upstream.clone(), {
+        sensitiveValues: opened.redactionValues,
+        // Classification may need a bounded plain-text error body, while the
+        // original response is still sanitized separately before exposure.
+        allowPlainText: true,
+      });
+    } catch {
+      detail = undefined;
+    }
+    return classifyUpstreamErrorType(opened.upstream.status, detail);
   }
 
   private activeRouteProfile(): ProviderProfile {
@@ -996,11 +1045,11 @@ export class ResponsesBridgeServer {
         : status === "incomplete"
           ? "response.incomplete"
           : "response.completed";
-    const normalizedResponse = {
+    const normalizedResponse = tagProviderOwnedItems({
       ...payload,
       object: "response",
       status: type === "response.completed" ? "completed" : status,
-    };
+    }, selected.resourceScope);
     const headers = this.routeHeaders(safeUpstreamHeaders(upstream, true), selected);
     headers.set("x-providerdock-normalization", "json-to-sse");
     response.writeHead(200, headersToNode(headers));
@@ -1053,6 +1102,8 @@ export class ResponsesBridgeServer {
         heartbeatIntervalMs: this.heartbeatIntervalMs,
         idleTimeoutMs: this.streamIdleTimeoutMs,
         maxEventCharacters: this.maxSseEventCharacters,
+        transformForwardEvent: (event) =>
+          tagProviderOwnedItems(event, selected.resourceScope),
         beforeForwardEvent: async (event) => {
           usage.observe(extractOpenAiTokenUsage(event));
           try {
@@ -1092,7 +1143,8 @@ export class ResponsesBridgeServer {
     const payload = await readUpstreamJson(upstream, this.responseBodyLimitBytes);
     if (wantsStream) {
       const translator = new ChatToResponsesStreamTranslator({ request: canonicalRequest });
-      const events = [...translator.feed(payload), ...translator.finish()];
+      const events = [...translator.feed(payload), ...translator.finish()]
+        .map((event) => tagProviderOwnedItems(event, selected.resourceScope) as typeof event);
       const usage = new TokenUsageAccumulator();
       for (const event of events) usage.observe(extractOpenAiTokenUsage(event));
       for (const event of events) await this.recordDeliveredResponsesCalls(turnToken, event);
@@ -1119,11 +1171,15 @@ export class ResponsesBridgeServer {
     }
 
     const translated = translateChatResponseToResponses(payload, { request: canonicalRequest });
-    await this.recordDeliveredResponsesCalls(turnToken, translated.response);
+    const taggedResponse = tagProviderOwnedItems(
+      translated.response,
+      selected.resourceScope,
+    );
+    await this.recordDeliveredResponsesCalls(turnToken, taggedResponse);
     sendJson(
       response,
       200,
-      translated.response,
+      taggedResponse,
       this.routeHeaders(
         safeUpstreamHeaders(upstream, false, "chat-completions"),
         selected,
@@ -1290,7 +1346,7 @@ export class ResponsesBridgeServer {
         409,
         "PROTOCOL_ERROR",
         error.message,
-        new Headers({ "x-providerdock-turn-block": error.code }),
+        localTurnBlockHeaders(error.code),
       );
       return;
     }
@@ -1314,6 +1370,13 @@ export class ResponsesBridgeServer {
     }
     sendBridgeError(response, 500, "UNKNOWN", "ProviderDock bridge request failed.");
   }
+}
+
+function localTurnBlockHeaders(code: string): Headers {
+  return new Headers({
+    "x-providerdock-turn-block": code,
+    "x-should-retry": "false",
+  });
 }
 
 class BridgeRequestError extends Error {
@@ -1590,11 +1653,21 @@ function normalizeSessionInstructions(value: string | undefined): string | undef
 }
 
 function providerErrorStatus(type: NormalizedErrorType): number {
-  if (type === "INVALID_REQUEST") return 400;
+  if (type === "INVALID_REQUEST" || type === "RESOURCE_SCOPE_MISMATCH") return 400;
   if (type === "AUTH_ERROR") return 401;
   if (type === "PERMISSION_ERROR") return 403;
   if (type === "TIMEOUT") return 504;
   return 502;
+}
+
+function classifyUpstreamErrorType(
+  status: number,
+  detail: string | undefined,
+): NormalizedErrorType {
+  return providerErrorFromUpstream(
+    status,
+    detail === undefined ? {} : { message: detail },
+  ).type;
 }
 
 function bridgeAddress(address: AddressInfo): ResponsesBridgeAddress {

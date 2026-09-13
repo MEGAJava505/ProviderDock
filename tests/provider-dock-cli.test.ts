@@ -13,6 +13,11 @@ import {
   runProviderDockCli,
   type CliIo,
 } from "../src/index.js";
+import { openDashboardInBrowser } from "../src/ui/open-dashboard-browser.js";
+
+vi.mock("../src/ui/open-dashboard-browser.js", () => ({
+  openDashboardInBrowser: vi.fn(async () => undefined),
+}));
 
 describe("ProviderDock management CLI", () => {
   it("sets, lists, shows, and removes a provider without storing a secret value", async () => {
@@ -89,6 +94,36 @@ describe("ProviderDock management CLI", () => {
 
     expect(result.code).toBe(1);
     expect(result.stderr.join("\n")).toContain("must use auth or secretHeaders");
+  });
+
+  it("uses a persisted approval preference when --approval is omitted", async () => {
+    const application = createApplication();
+    const resolveApprovalLevel = vi
+      .spyOn(application, "resolveApprovalLevel")
+      .mockResolvedValue("full-auto");
+    const launchCodex = vi
+      .spyOn(application, "launchCodex")
+      .mockResolvedValue({ exitCode: 0, signal: null });
+
+    const result = await runCli(application, [
+      "launch",
+      "codex",
+      "--provider",
+      "provider-a",
+      "--model",
+      "model-a",
+      "--project",
+      "C:\\Projects\\example",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(resolveApprovalLevel).toHaveBeenCalledWith(
+      "C:\\Projects\\example",
+      undefined,
+    );
+    expect(launchCodex).toHaveBeenCalledWith(
+      expect.objectContaining({ approvalLevel: "full-auto" }),
+    );
   });
 
   it("probes models and reports normalized health", async () => {
@@ -309,6 +344,31 @@ describe("ProviderDock management CLI", () => {
     expect(unknown.stderr.join("\n")).toContain("Provider 'missing' is not configured");
   });
 
+  it("opens the dashboard when no command is provided", async () => {
+    const openBrowser = vi.mocked(openDashboardInBrowser);
+    openBrowser.mockClear();
+    const once = vi.spyOn(process, "once").mockImplementation((event, listener) => {
+      if (event === "SIGINT") {
+        queueMicrotask(() => {
+          listener("SIGINT");
+        });
+      }
+      return process;
+    });
+
+    try {
+      const result = await runCli(createApplication(), []);
+
+      expect(result).toMatchObject({ code: 0 });
+      expect(result.stdout.join("\n")).toContain("ProviderDock dashboard:");
+      expect(openBrowser).toHaveBeenCalledTimes(1);
+      expect(String(openBrowser.mock.calls[0]?.[0])).toMatch(
+        /^http:\/\/127\.0\.0\.1:\d+\//,
+      );
+    } finally {
+      once.mockRestore();
+    }
+  });
   it("manages prompt profiles from a multiline instructions file with reference integrity", async () => {
     const application = createApplication();
     for (const id of ["primary", "direct"]) {

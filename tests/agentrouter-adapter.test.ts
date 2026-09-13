@@ -41,6 +41,27 @@ describe("AgentRouterAdapter", () => {
     expect(requestHeaders.get("originator")).toBe(agentRouterIdentityDefaults.Originator);
   });
 
+  it("does not invent GLM reasoning levels when AgentRouter omits metadata", async () => {
+    const adapter = new AgentRouterAdapter({
+      secretStore: new MemorySecretStore({ AGENTROUTER_API_KEY: "secret-value" }),
+      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: [
+              { id: "glm-5.3", object: "model", owned_by: "custom", supported_endpoint_types: ["openai"] },
+            ],
+          }),
+          { status: 200 },
+        ),
+      ),
+    });
+
+    const models = await adapter.discoverModels(createAgentRouterProfile());
+
+    expect(models).toHaveLength(1);
+    expect(models[0]?.raw.supported_reasoning_levels).toBeUndefined();
+  });
+
   it("preserves an explicit identity override", () => {
     const adapter = new AgentRouterAdapter({ secretStore: new MemorySecretStore() });
     const prepared = adapter.prepareProfile(

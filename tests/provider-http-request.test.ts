@@ -3,6 +3,7 @@ import {
   MemorySecretStore,
   ProviderHttpRequestBuilder,
   parseProviderProfile,
+  SecretProtectionError,
 } from "../src/index.js";
 
 describe("ProviderHttpRequestBuilder", () => {
@@ -46,5 +47,26 @@ describe("ProviderHttpRequestBuilder", () => {
     await expect(
       new ProviderHttpRequestBuilder(new MemorySecretStore()).build(profile, "models"),
     ).rejects.toMatchObject({ type: "AUTH_ERROR" });
+  });
+
+  it("reports a secret-vault decryption failure as an authentication error", async () => {
+    const profile = parseProviderProfile({
+      id: "router",
+      displayName: "Router",
+      baseUrl: "https://example.test/v1",
+      auth: { kind: "bearer", secretRef: "BROKEN" },
+    });
+    const brokenVault = {
+      get: async () => {
+        throw new SecretProtectionError("Windows DPAPI operation failed.");
+      },
+    };
+
+    await expect(
+      new ProviderHttpRequestBuilder(brokenVault).build(profile, "responses"),
+    ).rejects.toMatchObject({
+      type: "AUTH_ERROR",
+      message: "Provider credential could not be loaded from the local secret vault.",
+    });
   });
 });

@@ -3,7 +3,12 @@ import type { AutomaticLaunchResult } from "../src/application/provider-dock-app
 import type { ProviderProfile } from "../src/core/providers/provider-profile.js";
 import type { ProviderDashboardApplication } from "../src/ui/provider-dashboard-server.js";
 import { ProviderDashboardServer } from "../src/ui/provider-dashboard-server.js";
-import { providerDashboardJavaScript } from "../src/ui/provider-dashboard-page.js";
+import { PortalRepositoryCorruptionError } from "../src/core/portals/portal-repository.js";
+import {
+  providerDashboardCss,
+  providerDashboardHtml,
+  providerDashboardJavaScript,
+} from "../src/ui/provider-dashboard-page.js";
 
 const profile: ProviderProfile = {
   id: "provider-a",
@@ -95,6 +100,7 @@ describe("ProviderDashboardServer", () => {
     const snapshot = (await snapshotResponse.json()) as {
       providers: readonly ProviderProfile[];
       generatedAt: string;
+      portalStatus: { state: string; message?: string; backupPath?: string };
     };
     expect(snapshot.providers).toEqual([profile]);
     expect((snapshot as unknown as { storefront: unknown[] }).storefront).toEqual([
@@ -102,12 +108,61 @@ describe("ProviderDashboardServer", () => {
         balance: null, providerLoad: null }),
     ]);
     expect(snapshot.generatedAt).toBe("2026-08-30T12:00:00.000Z");
+    expect(snapshot.portalStatus).toEqual({ state: "healthy" });
+    expect(snapshot.portalStatus).not.toHaveProperty("backupPath");
     expect((snapshot as unknown as { secretVault: unknown }).secretVault).toEqual({
       available: true,
       references: ["PROVIDER_A_KEY"],
     });
     expect(JSON.stringify(snapshot)).toContain("dashboard-session");
     expect(JSON.stringify(snapshot)).not.toContain("actual-provider-secret");
+  });
+
+  it("does not expose the local portal recovery backup path", async () => {
+    const application = createApplication({
+      providerPortalStatus: vi.fn(() => ({
+        state: "corrupt" as const,
+        message: "Portal state needs recovery.",
+        backupPath: "C:\\Users\\operator\\private\\portals.json.bak",
+      })),
+    });
+    const server = createServer(application);
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/snapshot`);
+    const source = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(source).toContain("Portal state needs recovery.");
+    expect(source).not.toContain("backupPath");
+    expect(source).not.toContain("Users\\\\operator");
+  });
+
+  it("keeps the snapshot available when the portal store is corrupt", async () => {
+    const application = createApplication({
+      listProviderPortals: vi.fn(async () => {
+        throw new PortalRepositoryCorruptionError("Portal account store is corrupt.");
+      }),
+      providerPortalStatus: vi.fn(() => ({
+        state: "corrupt" as const,
+        message: "Portal account store is corrupt.",
+      })),
+    });
+    const server = createServer(application);
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/snapshot`);
+    const snapshot = (await response.json()) as {
+      portals: readonly unknown[];
+      portalStatus: { state: string; message?: string };
+    };
+
+    expect(response.status).toBe(200);
+    expect(snapshot.portals).toEqual([]);
+    expect(snapshot.portalStatus).toEqual({
+      state: "corrupt",
+      message: "Portal account store is corrupt.",
+    });
   });
 
   it("blocks cross-origin mutations before calling the application", async () => {
@@ -378,6 +433,142 @@ describe("ProviderDashboardServer", () => {
     });
   });
 
+  it("resolves an omitted launch approval from the stored preference", async () => {
+    const application = createApplication({
+      resolveApprovalLevel: vi.fn(async () => "full-auto" as const),
+      launchProviderAutomatic: vi.fn(async () => ({
+        client: "codex" as const,
+        exit: { exitCode: 0, signal: null },
+      })),
+    });
+    const server = createServer(application);
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/launches`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        client: "auto",
+        projectDirectory: "C:\\Projects\\example",
+        providerId: "provider-a",
+        modelId: "model-a",
+      }),
+    });
+    const accepted = (await response.json()) as {
+      launch: { resolvedApprovalLevel?: string };
+    };
+
+    expect(response.status).toBe(202);
+    expect(application.resolveApprovalLevel).toHaveBeenCalledWith(
+      "C:\\Projects\\example",
+      undefined,
+    );
+    expect(application.launchProviderAutomatic).toHaveBeenCalledWith(
+      expect.objectContaining({ approvalLevel: "full-auto" }),
+    );
+    expect(accepted.launch.resolvedApprovalLevel).toBe("full-auto");
+  });
+
+  it("serves agent session history without exposing filesystem paths and deletes safely", async () => {
+    const sessions = [
+      {
+        id: "8fbf0290-d6ae-44a9-85e2-fc36e0915743",
+        client: "claude-code" as const,
+        providerId: "agentrouter-2",
+        projectDirectory: "E:\\Projects\\provider__switcher",
+        modelId: "claude-opus-4.8",
+        title: "Claude title",
+        updatedAt: "2026-09-10T10:00:00.000Z",
+        resumable: true,
+      },
+      {
+        id: "01a08736-06ba-7b92-97a4-0fbdb4e6976c",
+        client: "codex" as const,
+        providerId: "legacy",
+        projectDirectory: "E:\\Projects\\legacy",
+        modelId: "gpt-5.6-sol",
+        title: "Legacy Codex session",
+        updatedAt: "2026-09-09T10:00:00.000Z",
+        resumable: false,
+        resumeBlockedReason: "legacy-provider" as const,
+      },
+    ];
+    const application = createApplication({
+      listAgentSessions: vi.fn(async () => sessions),
+      deleteAgentSession: vi.fn(async () => true),
+    });
+    const server = createServer(application);
+    const address = await server.start();
+
+    const list = await fetch(`${address.url}api/agent-sessions`);
+    expect(list.status).toBe(200);
+    const body = (await list.json()) as { sessions: readonly unknown[] };
+    expect(body.sessions).toEqual(sessions);
+    expect(JSON.stringify(body)).not.toContain("path");
+
+    const deleted = await fetch(
+      `${address.url}api/agent-sessions/claude-code/8fbf0290-d6ae-44a9-85e2-fc36e0915743?providerId=agentrouter-2`,
+      { method: "DELETE" },
+    );
+    expect(deleted.status).toBe(200);
+    expect(application.deleteAgentSession).toHaveBeenCalledWith(
+      "claude-code",
+      "8fbf0290-d6ae-44a9-85e2-fc36e0915743",
+      "agentrouter-2",
+    );
+
+    const page = await fetch(address.url);
+    const pageBody = await page.text();
+    expect(pageBody).toContain("Прошлые сессии");
+    expect(pageBody).toContain('id="agent-sessions"');
+    expect(pageBody).toContain('id="agent-session-search"');
+    expect(pageBody).toContain('id="launch-agent-sessions"');
+    expect(pageBody).toContain('id="launch-agent-session-search"');
+    expect(providerDashboardJavaScript).toContain("providerSessionList.id='provider-agent-sessions'");
+    expect(providerDashboardCss).toContain(".agent-session-list.compact");
+    expect(providerDashboardJavaScript).toContain("agentSessionUnavailableReason");
+    expect(providerDashboardJavaScript).toContain("providerAgentSessions");
+    expect(providerDashboardJavaScript).toContain("старая Codex-сессия без привязки к провайдеру");
+    expect(providerDashboardJavaScript).toContain("в истории нет модели");
+    expect(providerDashboardJavaScript).toContain("в истории нет проекта");
+    expect(providerDashboardJavaScript).toContain("некорректный ID сессии");
+  });
+
+  it("starts a resume launch from selected agent history", async () => {
+    const application = createApplication({
+      launchClaude: vi.fn(async () => ({ exitCode: 0, signal: null })),
+    });
+    const server = createServer(application);
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/launches`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        client: "claude-code",
+        projectDirectory: "E:\\Projects\\provider__switcher",
+        providerId: "agentrouter-2",
+        modelId: "claude-opus-4.8",
+        resumeSessionId: "8fbf0290-d6ae-44a9-85e2-fc36e0915743",
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await vi.waitFor(() => {
+      expect(application.launchClaude).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectDirectory: "E:\\Projects\\provider__switcher",
+          providerId: "agentrouter-2",
+          modelId: "claude-opus-4.8",
+          resumeSessionId: "8fbf0290-d6ae-44a9-85e2-fc36e0915743",
+          approvalLevel: "ask",
+          onFallback: expect.any(Function),
+          onStarted: expect.any(Function),
+        }),
+      );
+    });
+  });
+
   it("ships browser JavaScript that parses without external dependencies", () => {
     expect(() => new Function(providerDashboardJavaScript)).not.toThrow();
     expect(providerDashboardJavaScript).toContain("Последний сигнал: запрос через");
@@ -396,6 +587,10 @@ describe("ProviderDashboardServer", () => {
     expect(providerDashboardJavaScript).toContain("openCookieOverview");
     expect(providerDashboardJavaScript).toContain("api/portals/import");
     expect(providerDashboardJavaScript).toContain("await refresh();byId('cookie-import-dialog').close()");
+    expect(providerDashboardJavaScript).toContain("renderAgentSessions");
+    expect(providerDashboardJavaScript).toContain("renderAgentSessionList('launch-agent-sessions'");
+    expect(providerDashboardJavaScript).toContain("resumeAgentSession");
+    expect(providerDashboardJavaScript).toContain("deleteAgentSession");
   });
 
   it("starts the TTL-aware metadata health monitor without blocking startup", async () => {
@@ -463,6 +658,7 @@ function createApplication(
   const base = {
     listProviders: vi.fn(async () => [profile]),
     listProviderPortals: vi.fn(async () => []),
+    providerPortalStatus: vi.fn(() => ({ state: "healthy" as const })),
     listPortalAdapters: vi.fn(() => []),
     setProviderPortal: vi.fn(),
     refreshProviderPortal: vi.fn(),
@@ -518,6 +714,9 @@ function createApplication(
     removePromptProfile: vi.fn(async () => undefined),
     setProjectProfile: vi.fn(async (input: unknown) => input as never),
     removeProjectProfile: vi.fn(async () => undefined),
+    listAgentSessions: vi.fn(async () => []),
+    deleteAgentSession: vi.fn(async () => false),
+    resolveApprovalLevel: vi.fn(async () => "ask"),
     launchCodex: vi.fn(async () => ({ exitCode: 0, signal: null })),
     launchCodexLogicalModel: vi.fn(async () => ({ exitCode: 0, signal: null })),
     launchCodexPromptProfile: vi.fn(async () => ({ exitCode: 0, signal: null })),
@@ -550,3 +749,28 @@ function createApplication(
     readonly launchProviderAutomatic: ReturnType<typeof vi.fn>;
   };
 }
+
+describe("dashboard launch history layout", () => {
+  it("renders launch route tabs as a readable two-column grid", () => {
+    expect(providerDashboardCss).toMatch(
+      /#launch-dialog \.route-tabs\{[^}]*display:grid;[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
+    );
+    expect(providerDashboardCss).not.toMatch(
+      /#launch-dialog \.route-tabs\{[^}]*display:flex/,
+    );
+    expect(providerDashboardCss).toMatch(
+      /#launch-dialog \.route-tab\{[^}]*min-width:0;[^}]*padding:[^}]*\}/,
+    );
+  });
+
+  it("wires launch history to the selected provider", () => {
+    expect(providerDashboardHtml).toContain('id="launch-history"');
+    expect(providerDashboardJavaScript).toContain("agentSessionHistoryView");
+    expect(providerDashboardJavaScript).toContain(
+      "byId('launch-provider').addEventListener('change',()=>{renderModelOptions();renderAgentSessions()})",
+    );
+    expect(providerDashboardJavaScript).toMatch(
+      /function setRouteKind\([\s\S]*?renderAgentSessions\(\)/,
+    );
+  });
+});

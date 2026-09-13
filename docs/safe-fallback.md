@@ -70,8 +70,14 @@ or a provider/model pair, allowing separate breaker scopes.
 `providerdock launch codex --logical-model ID --project DIRECTORY` resolves the
 enabled routes and provider profiles, starts one managed loopback Responses
 bridge, and exposes only the logical-model ID to Codex. Each upstream attempt
-rewrites that ID to the route's provider-specific model ID and may use either
-native Responses or the existing Chat Completions translation path.
+rewrites that ID to the route's provider-specific model ID and may use native
+Responses, canonical Chat Completions translation, or the managed per-session
+codex-shim compatibility path for explicitly supported Anthropic Messages providers.
+
+For an Anthropic route, the outer Responses bridge still owns the TurnLedger,
+sticky route, breaker, telemetry, and fallback decision. The private shim only
+translates one already-selected request. It is never asked to retry a turn or choose
+another provider by itself.
 
 The bridge can select another unused healthy route only when it has evidence of
 a safe boundary:
@@ -81,11 +87,13 @@ a safe boundary:
 - a continuation whose complete tool call/result history is retained.
 
 Connection resets with unknown execution state, ambiguous gateway errors, partial
-streams, and unresolved tool histories never trigger a second upstream request.
-Fallback responses identify the active provider and switch in
-`x-providerdock-*` headers. `/health` retains the stable primary bridge identity
-for crash recovery and reports `active_provider_id`, the sticky route snapshot,
-and the last fallback notification. The CLI prints every switch to stderr.
+streams, and unresolved tool histories never trigger a second upstream request. This
+includes Anthropic shim routes: an ambiguous failure on a shim-backed provider is
+returned to Codex rather than replayed through the shim or another route. Fallback
+responses identify the active provider and switch in `x-providerdock-*` headers.
+`/health` retains the stable primary bridge identity for crash recovery and reports
+`active_provider_id`, the sticky route snapshot, and the last fallback notification.
+The CLI prints every switch to stderr.
 
 ## Anthropic bridge and Claude Code integration
 

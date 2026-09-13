@@ -8,6 +8,7 @@ export class ProviderPortalService {
   constructor(private readonly records: PortalRepository, private readonly adapters: ProviderPortalAdapterRegistry,
     private readonly now: () => Date = () => new Date()) {}
   list() { return this.records.list(); }
+  status() { return this.records.status(); }
   listAdapters() { return this.adapters.list(); }
   async configure(input: unknown): Promise<PortalRecord> {
     const parsed = portalConnectionSchema.parse(input);

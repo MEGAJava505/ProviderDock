@@ -11,7 +11,9 @@ import {
   modelHealthStatuses,
   type CapabilityStatus,
   type ClientCompatibilityStatus,
+  type ModelCatalogEntry,
 } from "../providers/model-catalog.js";
+import { sanitizeProviderErrorBody } from "../security/provider-error-redaction.js";
 import { usageClients, usageProtocols } from "../usage/usage-event.js";
 import {
   providerRuntimeOutcomes,
@@ -23,9 +25,28 @@ import type {
   ProviderProbeResult,
 } from "./provider-probe-service.js";
 
-const storageVersion = 1 as const;
+const storageVersion = 2 as const;
 const defaultMaximumFileBytes = 16 * 1024 * 1024;
 const defaultMaximumHistoryEntries = 256;
+export const providerSurfaceNames = [
+  "openai-api",
+  "anthropic-api",
+  "codex-cli",
+  "claude-code",
+] as const;
+export type ProviderSurfaceName = (typeof providerSurfaceNames)[number];
+export const providerSurfaceClients = [
+  "providerdock",
+  "codex",
+  "claude-code",
+] as const;
+export type ProviderSurfaceClient = (typeof providerSurfaceClients)[number];
+export const providerSurfaceCheckOutcomes = [
+  "passed",
+  "failed",
+  "unsupported",
+  "unavailable",
+] as const;
 
 const providerIdSchema = z
   .string()
@@ -48,6 +69,35 @@ const providerHealthSnapshotSchema = z
   })
   .strict();
 
+const reasoningCapabilitySchema = z.union([
+  z.object({ kind: z.literal("unknown") }).strict(),
+  z.object({ kind: z.literal("unsupported") }).strict(),
+  z
+    .object({
+      kind: z.literal("effort"),
+      values: z.array(z.string().min(1).max(64)).max(64),
+      default: z.string().min(1).max(64).optional(),
+      source: z.enum([
+        "official-model-catalog",
+        "provider-metadata",
+        "probe",
+        "user-override",
+      ]),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("thinking-mode"),
+      mode: z.enum(["forced", "toggle", "adaptive", "unknown"]),
+      source: z.enum([
+        "official-model-catalog",
+        "provider-metadata",
+        "probe",
+        "user-override",
+      ]),
+    })
+    .strict(),
+]);
 const modelCatalogEntrySchema = z
   .object({
     internalId: z.string().min(1).max(512),
@@ -58,6 +108,11 @@ const modelCatalogEntrySchema = z
     healthStatus: z.enum(modelHealthStatuses),
     codexCompatibility: z.enum(clientCompatibilityStatuses),
     claudeCompatibility: z.enum(clientCompatibilityStatuses),
+    reasoning: reasoningCapabilitySchema.optional(),
+    supportedReasoningLevels: z
+      .array(z.string().min(1).max(64))
+      .max(64)
+      .optional(),
   })
   .strict();
 
@@ -120,6 +175,7 @@ const providerRuntimeHealthSignalSchema = z
     providerId: providerIdSchema,
     modelId: z.string().min(1).max(256),
     observedAt: z.string().datetime(),
+    durationMs: z.number().int().nonnegative().optional(),
     client: z.enum(usageClients),
     protocol: z.enum(usageProtocols),
     sessionId: z.string().min(1).max(128).optional(),
@@ -142,6 +198,20 @@ const providerRuntimeHealthSignalSchema = z
       });
     }
   });
+
+const providerSurfaceCheckSchema = z.object({
+  providerId: providerIdSchema,
+  modelId: z.string().min(1).max(256),
+  surface: z.enum(providerSurfaceNames),
+  configurationFingerprint: z.string().min(1).max(128),
+  checkedAt: z.string().datetime(),
+  durationMs: z.number().int().nonnegative(),
+  outcome: z.enum(providerSurfaceCheckOutcomes),
+  client: z.enum(providerSurfaceClients),
+  protocol: z.enum(usageProtocols).optional(),
+  errorType: z.enum(normalizedErrorTypes).optional(),
+  errorMessage: z.string().max(1_024).optional(),
+}).strict();
 
 const providerProbeResultSchema = z
   .object({
@@ -189,6 +259,7 @@ const providerHealthRecordSchema = z
       .array(providerRuntimeHealthSignalSchema)
       .max(10_000)
       .default([]),
+    surfaceChecks: z.array(providerSurfaceCheckSchema).max(10_000).default([]),
   })
   .strict()
   .superRefine((record, context) => {
@@ -217,6 +288,15 @@ const providerHealthRecordSchema = z
           code: z.ZodIssueCode.custom,
           message: "Runtime signal providerId must match the record providerId.",
           path: ["runtimeSignals", index, "providerId"],
+        });
+      }
+    }
+    for (const [index, check] of record.surfaceChecks.entries()) {
+      if (check.providerId !== record.providerId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Surface check providerId must match the record providerId.",
+          path: ["surfaceChecks", index, "providerId"],
         });
       }
     }
@@ -260,7 +340,14 @@ const storedHealthSchema = z
     }
   });
 
-type StoredProviderHealthSnapshot = z.infer<typeof providerHealthSnapshotSchema>;
+const legacyStoredHealthSchema = z.object({
+  version: z.literal(1),
+  providers: z.array(z.unknown()).max(512),
+}).strict();
+
+type StoredProviderHealthSnapshot = z.infer<
+  typeof providerHealthSnapshotSchema
+>;
 type StoredProviderProbeResult = z.infer<typeof providerProbeResultSchema>;
 type StoredModelCapabilitySnapshot = z.infer<
   typeof modelCapabilitySnapshotSchema
@@ -268,6 +355,7 @@ type StoredModelCapabilitySnapshot = z.infer<
 type StoredProviderRuntimeHealthSignal = z.infer<
   typeof providerRuntimeHealthSignalSchema
 >;
+type StoredProviderSurfaceCheck = z.infer<typeof providerSurfaceCheckSchema>;
 type StoredProviderHealthRecord = z.infer<typeof providerHealthRecordSchema>;
 
 export interface ProviderHealthRecord {
@@ -278,6 +366,97 @@ export interface ProviderHealthRecord {
   readonly knownModelIds?: readonly string[];
   readonly diagnostics: readonly ModelCapabilitySnapshot[];
   readonly runtimeSignals: readonly ProviderRuntimeHealthSignal[];
+  readonly surfaceChecks: readonly ProviderSurfaceCheck[];
+}
+
+export interface ProviderSurfaceCheck {
+  readonly providerId: string;
+  readonly modelId: string;
+  readonly surface: ProviderSurfaceName;
+  readonly configurationFingerprint: string;
+  readonly checkedAt: string;
+  readonly durationMs: number;
+  readonly outcome: (typeof providerSurfaceCheckOutcomes)[number];
+  readonly client: ProviderSurfaceClient;
+  readonly protocol?: (typeof usageProtocols)[number];
+  readonly errorType?: (typeof normalizedErrorTypes)[number];
+  readonly errorMessage?: string;
+}
+
+export interface ProviderSurfaceSummary {
+  readonly surface: ProviderSurfaceName;
+  readonly modelId: string;
+  readonly client: ProviderSurfaceClient;
+  readonly protocol?: (typeof usageProtocols)[number];
+  readonly checkedAt: string;
+  readonly durationMs: number;
+  readonly measurements: number;
+  readonly successes: number;
+  readonly successRate: number;
+  readonly outcome: (typeof providerSurfaceCheckOutcomes)[number];
+  readonly errorType?: (typeof normalizedErrorTypes)[number];
+  readonly errorMessage?: string;
+}
+
+export interface ProviderSurfaceOverview {
+  readonly surfaces: readonly ProviderSurfaceSummary[];
+  readonly recommendedSurface?: ProviderSurfaceName;
+}
+
+export function summarizeProviderSurfaces(
+  record: Pick<ProviderHealthRecord, "surfaceChecks"> | undefined,
+  configurationFingerprint: string,
+  now: Date = new Date(),
+  maximumAgeMs = 24 * 60 * 60 * 1_000,
+): ProviderSurfaceOverview {
+  const minimumTime = now.valueOf() - maximumAgeMs;
+  const matching = (record?.surfaceChecks ?? []).filter((check) =>
+    check.configurationFingerprint === configurationFingerprint &&
+    Date.parse(check.checkedAt) >= minimumTime &&
+    Date.parse(check.checkedAt) <= now.valueOf()
+  );
+  const surfaces: ProviderSurfaceSummary[] = [];
+  for (const surface of providerSurfaceNames) {
+    const samples = matching
+      .filter((check) => check.surface === surface)
+      .sort((left, right) =>
+        left.checkedAt.localeCompare(right.checkedAt)
+      );
+    const latest = samples.at(-1);
+    if (latest === undefined) continue;
+    const successes = samples.filter((check) => check.outcome === "passed").length;
+    surfaces.push({
+      surface,
+      modelId: latest.modelId,
+      client: latest.client,
+      ...(latest.protocol === undefined ? {} : { protocol: latest.protocol }),
+      checkedAt: latest.checkedAt,
+      durationMs: latest.durationMs,
+      measurements: samples.length,
+      successes,
+      successRate: successes / samples.length,
+      outcome: latest.outcome,
+      ...(latest.errorType === undefined ? {} : { errorType: latest.errorType }),
+      ...(latest.errorMessage === undefined
+        ? {}
+        : { errorMessage: latest.errorMessage }),
+    });
+  }
+  const recommended = surfaces
+    .filter((summary) => summary.outcome === "passed")
+    .sort((left, right) =>
+      right.successRate - left.successRate ||
+      right.measurements - left.measurements ||
+      left.durationMs - right.durationMs ||
+      providerSurfaceNames.indexOf(left.surface) -
+        providerSurfaceNames.indexOf(right.surface)
+    )[0];
+  return {
+    surfaces,
+    ...(recommended === undefined
+      ? {}
+      : { recommendedSurface: recommended.surface }),
+  };
 }
 
 export interface ModelCapabilitySnapshot {
@@ -302,6 +481,7 @@ export interface ProviderHealthRepository {
   recordRuntimeSignal(
     signal: ProviderRuntimeHealthSignal,
   ): Promise<ProviderHealthRecord>;
+  recordSurfaceCheck(check: ProviderSurfaceCheck): Promise<ProviderHealthRecord>;
   delete(providerId: string): Promise<boolean>;
 }
 
@@ -353,14 +533,25 @@ export class FileProviderHealthRepository implements ProviderHealthRepository {
       const record: ProviderHealthRecord = {
         providerId: parsed.health.providerId,
         latest: parsed,
-      modelRemovals: updateModelRemovals(previous, parsed),
-      knownModelIds: [...new Set([...(previous?.knownModelIds ?? []), ...(previous?.latest?.models ?? []).filter(model => model.source === "discovered").map(model => model.modelId), ...parsed.models.filter(model => model.source === "discovered").map(model => model.modelId)])].slice(-5000),
+        modelRemovals: updateModelRemovals(previous, parsed),
+        knownModelIds: [
+          ...new Set([
+            ...(previous?.knownModelIds ?? []),
+            ...(previous?.latest?.models ?? [])
+              .filter((model) => model.source === "discovered")
+              .map((model) => model.modelId),
+            ...parsed.models
+              .filter((model) => model.source === "discovered")
+              .map((model) => model.modelId),
+          ]),
+        ].slice(-5_000),
         history: [
           ...(previous?.history ?? []),
           parsed.health,
         ].slice(-this.maximumHistoryEntries),
         diagnostics: previous?.diagnostics ?? [],
         runtimeSignals: previous?.runtimeSignals ?? [],
+        surfaceChecks: previous?.surfaceChecks ?? [],
       };
       if (index < 0) records.push(record);
       else records[index] = record;
@@ -390,10 +581,11 @@ export class FileProviderHealthRepository implements ProviderHealthRepository {
         providerId: parsed.providerId,
         ...(previous?.latest === undefined ? {} : { latest: previous.latest }),
         history: previous?.history ?? [],
-      ...(previous?.modelRemovals ? { modelRemovals: previous.modelRemovals } : {}),
-      ...(previous?.knownModelIds ? { knownModelIds: previous.knownModelIds } : {}),
+        ...(previous?.modelRemovals ? { modelRemovals: previous.modelRemovals } : {}),
+        ...(previous?.knownModelIds ? { knownModelIds: previous.knownModelIds } : {}),
         diagnostics,
         runtimeSignals: previous?.runtimeSignals ?? [],
+        surfaceChecks: previous?.surfaceChecks ?? [],
       };
       if (index < 0) records.push(record);
       else records[index] = record;
@@ -419,11 +611,39 @@ export class FileProviderHealthRepository implements ProviderHealthRepository {
         providerId: parsed.providerId,
         ...(previous?.latest === undefined ? {} : { latest: previous.latest }),
         history: previous?.history ?? [],
-      ...(previous?.modelRemovals ? { modelRemovals: previous.modelRemovals } : {}),
-      ...(previous?.knownModelIds ? { knownModelIds: previous.knownModelIds } : {}),
+        ...(previous?.modelRemovals ? { modelRemovals: previous.modelRemovals } : {}),
+        ...(previous?.knownModelIds ? { knownModelIds: previous.knownModelIds } : {}),
         diagnostics: previous?.diagnostics ?? [],
         runtimeSignals: [...(previous?.runtimeSignals ?? []), parsed].slice(
           -this.maximumHistoryEntries,
+        ),
+        surfaceChecks: previous?.surfaceChecks ?? [],
+      };
+      if (index < 0) records.push(record);
+      else records[index] = record;
+      records.sort((left, right) => left.providerId.localeCompare(right.providerId));
+      await this.writeAtomically(records);
+      return record;
+    });
+  }
+
+  recordSurfaceCheck(check: ProviderSurfaceCheck): Promise<ProviderHealthRecord> {
+    const parsed = normalizeSurfaceCheck(providerSurfaceCheckSchema.parse(check));
+    return this.serializeMutation(async () => {
+      const records = [...(await this.load())];
+      const index = records.findIndex((record) => record.providerId === parsed.providerId);
+      const previous = index < 0 ? undefined : records[index];
+      const record: ProviderHealthRecord = {
+        providerId: parsed.providerId,
+        ...(previous?.latest === undefined ? {} : { latest: previous.latest }),
+        history: previous?.history ?? [],
+        ...(previous?.modelRemovals ? { modelRemovals: previous.modelRemovals } : {}),
+        ...(previous?.knownModelIds ? { knownModelIds: previous.knownModelIds } : {}),
+        diagnostics: previous?.diagnostics ?? [],
+        runtimeSignals: previous?.runtimeSignals ?? [],
+        surfaceChecks: retainSurfaceChecks(
+          [...(previous?.surfaceChecks ?? []), parsed],
+          this.maximumHistoryEntries,
         ),
       };
       if (index < 0) records.push(record);
@@ -452,7 +672,9 @@ export class FileProviderHealthRepository implements ProviderHealthRepository {
           `Health history exceeds ${this.maximumFileBytes} bytes.`,
         );
       }
-      const document = storedHealthSchema.parse(JSON.parse(contents));
+      const input = JSON.parse(contents) as unknown;
+      const current = storedHealthSchema.safeParse(input);
+      const document = current.success ? current.data : migrateStoredHealth(input, current.error);
       for (const record of document.providers) {
         if (record.history.length > this.maximumHistoryEntries) {
           throw new RangeError(
@@ -465,7 +687,15 @@ export class FileProviderHealthRepository implements ProviderHealthRepository {
           );
         }
       }
-      return document.providers.map(normalizeHealthRecord);
+      return document.providers.map((record) =>
+        normalizeHealthRecord({
+          ...record,
+          surfaceChecks: retainSurfaceChecks(
+            record.surfaceChecks,
+            this.maximumHistoryEntries,
+          ),
+        }),
+      );
     } catch (error) {
       if (isNodeError(error) && error.code === "ENOENT") return [];
       throw error;
@@ -528,13 +758,24 @@ export class MemoryProviderHealthRepository implements ProviderHealthRepository 
       providerId: parsed.health.providerId,
       latest: parsed,
       modelRemovals: updateModelRemovals(previous, parsed),
-      knownModelIds: [...new Set([...(previous?.knownModelIds ?? []), ...(previous?.latest?.models ?? []).filter(model => model.source === "discovered").map(model => model.modelId), ...parsed.models.filter(model => model.source === "discovered").map(model => model.modelId)])].slice(-5000),
+      knownModelIds: [
+        ...new Set([
+          ...(previous?.knownModelIds ?? []),
+          ...(previous?.latest?.models ?? [])
+            .filter((model) => model.source === "discovered")
+            .map((model) => model.modelId),
+          ...parsed.models
+            .filter((model) => model.source === "discovered")
+            .map((model) => model.modelId),
+        ]),
+      ].slice(-5_000),
       history: [
         ...(previous?.history ?? []),
         parsed.health,
       ].slice(-this.maximumHistoryEntries),
       diagnostics: previous?.diagnostics ?? [],
       runtimeSignals: previous?.runtimeSignals ?? [],
+      surfaceChecks: previous?.surfaceChecks ?? [],
     };
     this.records.set(record.providerId, record);
     return record;
@@ -561,6 +802,7 @@ export class MemoryProviderHealthRepository implements ProviderHealthRepository 
       ...(previous?.knownModelIds ? { knownModelIds: previous.knownModelIds } : {}),
       diagnostics,
       runtimeSignals: previous?.runtimeSignals ?? [],
+      surfaceChecks: previous?.surfaceChecks ?? [],
     };
     this.records.set(record.providerId, record);
     return record;
@@ -582,6 +824,27 @@ export class MemoryProviderHealthRepository implements ProviderHealthRepository 
       diagnostics: previous?.diagnostics ?? [],
       runtimeSignals: [...(previous?.runtimeSignals ?? []), parsed].slice(
         -this.maximumHistoryEntries,
+      ),
+      surfaceChecks: previous?.surfaceChecks ?? [],
+    };
+    this.records.set(record.providerId, record);
+    return record;
+  }
+
+  async recordSurfaceCheck(check: ProviderSurfaceCheck): Promise<ProviderHealthRecord> {
+    const parsed = normalizeSurfaceCheck(providerSurfaceCheckSchema.parse(check));
+    const previous = this.records.get(parsed.providerId);
+    const record: ProviderHealthRecord = {
+      providerId: parsed.providerId,
+      ...(previous?.latest === undefined ? {} : { latest: previous.latest }),
+      history: previous?.history ?? [],
+      ...(previous?.modelRemovals ? { modelRemovals: previous.modelRemovals } : {}),
+      ...(previous?.knownModelIds ? { knownModelIds: previous.knownModelIds } : {}),
+      diagnostics: previous?.diagnostics ?? [],
+      runtimeSignals: previous?.runtimeSignals ?? [],
+      surfaceChecks: retainSurfaceChecks(
+        [...(previous?.surfaceChecks ?? []), parsed],
+        this.maximumHistoryEntries,
       ),
     };
     this.records.set(record.providerId, record);
@@ -616,7 +879,13 @@ function normalizeProbeResult(
 ): ProviderProbeResult {
   return {
     health: normalizeHealthSnapshot(result.health),
-    models: result.models,
+    models: result.models.map(({ supportedReasoningLevels, ...model }) => ({
+      ...model,
+      reasoning: (model.reasoning ?? { kind: "unknown" }) as ModelCatalogEntry["reasoning"],
+      ...(supportedReasoningLevels === undefined
+        ? {}
+        : { supportedReasoningLevels }),
+    })),
   };
 }
 
@@ -649,6 +918,7 @@ function normalizeRuntimeHealthSignal(
     providerId: signal.providerId,
     modelId: signal.modelId,
     observedAt: signal.observedAt,
+    ...(signal.durationMs === undefined ? {} : { durationMs: signal.durationMs }),
     client: signal.client,
     protocol: signal.protocol,
     ...(signal.sessionId === undefined ? {} : { sessionId: signal.sessionId }),
@@ -669,6 +939,27 @@ function normalizeRuntimeHealthSignal(
   };
 }
 
+function retainSurfaceChecks<T extends Pick<
+  ProviderSurfaceCheck,
+  "surface" | "configurationFingerprint"
+>>(
+  checks: readonly T[],
+  maximumEntriesPerSeries: number,
+): T[] {
+  const retainedIndexes = new Set<number>();
+  const counts = new Map<string, number>();
+  for (let index = checks.length - 1; index >= 0; index -= 1) {
+    const check = checks[index];
+    if (check === undefined) continue;
+    const key = `${check.surface}\u0000${check.configurationFingerprint}`;
+    const count = counts.get(key) ?? 0;
+    if (count >= maximumEntriesPerSeries) continue;
+    counts.set(key, count + 1);
+    retainedIndexes.add(index);
+  }
+  return checks.filter((_check, index) => retainedIndexes.has(index));
+}
+
 function normalizeHealthRecord(
   record: StoredProviderHealthRecord,
 ): ProviderHealthRecord {
@@ -682,7 +973,42 @@ function normalizeHealthRecord(
     ...(record.knownModelIds ? { knownModelIds: record.knownModelIds } : {}),
     diagnostics: record.diagnostics.map(normalizeCapabilitySnapshot),
     runtimeSignals: record.runtimeSignals.map(normalizeRuntimeHealthSignal),
+    surfaceChecks: record.surfaceChecks.map(normalizeSurfaceCheck),
   };
+}
+
+function normalizeSurfaceCheck(check: StoredProviderSurfaceCheck): ProviderSurfaceCheck {
+  const errorMessage = check.errorMessage === undefined
+    ? undefined
+    : sanitizeProviderErrorBody(check.errorMessage, {
+        allowPlainText: true,
+        maximumCharacters: 1_024,
+      });
+  return {
+    providerId: check.providerId,
+    modelId: check.modelId,
+    surface: check.surface,
+    configurationFingerprint: check.configurationFingerprint,
+    checkedAt: check.checkedAt,
+    durationMs: check.durationMs,
+    outcome: check.outcome,
+    client: check.client,
+    ...(check.protocol === undefined ? {} : { protocol: check.protocol }),
+    ...(check.errorType === undefined ? {} : { errorType: check.errorType }),
+    ...(errorMessage === undefined ? {} : { errorMessage }),
+  };
+}
+
+function migrateStoredHealth(input: unknown, cause: z.ZodError) {
+  const legacy = legacyStoredHealthSchema.safeParse(input);
+  if (!legacy.success) throw cause;
+  return storedHealthSchema.parse({
+    version: storageVersion,
+    providers: legacy.data.providers.map((provider) => ({
+      ...(provider as Record<string, unknown>),
+      surfaceChecks: [],
+    })),
+  });
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

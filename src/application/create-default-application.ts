@@ -6,6 +6,7 @@ import { ProviderProbeService } from "../core/health/provider-probe-service.js";
 import { FileLogicalModelRepository } from "../core/fallback/logical-model-repository.js";
 import { FilePromptProfileRepository } from "../core/profiles/prompt-profile-repository.js";
 import { FileProjectProfileRepository } from "../core/profiles/project-profile-repository.js";
+import { FileAgentApprovalPreferenceRepository } from "../clients/agent-approval-preference.js";
 import { FileProviderHealthRepository } from "../core/health/provider-health-repository.js";
 import { FileUsageRepository } from "../core/usage/usage-repository.js";
 import { ProviderAdapterRegistry } from "../core/providers/provider-adapter-registry.js";
@@ -25,7 +26,7 @@ import {
   CodexLauncher,
   NodeCodexProcessRunner,
 } from "../clients/codex/codex-launcher.js";
-import { ResponsesCodexBridgeFactory } from "../clients/codex/codex-bridge-factory.js";
+import { CodexShimCompatibilityBridgeFactory } from "../clients/codex/codex-shim-bridge-factory.js";
 import {
   ClaudeLauncher,
   NodeClaudeProcessRunner,
@@ -36,6 +37,7 @@ import {
   AgentSessionHomeManager,
   claudeAgentSessionLayout,
 } from "../clients/agent-session-home.js";
+import { AgentSessionHistory } from "../clients/agent-session-history.js";
 import { ProviderDoctor } from "../diagnostics/provider-doctor.js";
 import { ProviderDockApplication } from "./provider-dock-application.js";
 import {
@@ -56,6 +58,7 @@ export interface ProviderDockPaths {
   readonly logicalModelsFile: string;
   readonly promptProfilesFile: string;
   readonly projectProfilesFile: string;
+  readonly launchPreferencesFile: string;
   readonly healthHistoryFile: string;
   readonly usageHistoryFile: string;
   readonly secretsDirectory: string;
@@ -89,6 +92,7 @@ export function resolveProviderDockPaths(
     logicalModelsFile: join(dataDirectory, "fallback", "logical-models.json"),
     promptProfilesFile: join(dataDirectory, "prompts", "profiles.json"),
     projectProfilesFile: join(dataDirectory, "projects", "profiles.json"),
+    launchPreferencesFile: join(dataDirectory, "launch", "preferences.json"),
     healthHistoryFile: join(dataDirectory, "health", "history.json"),
     usageHistoryFile: join(dataDirectory, "usage", "events.json"),
     secretsDirectory: join(dataDirectory, "secrets"),
@@ -156,11 +160,13 @@ interface DefaultApplicationRuntime {
   readonly logicalModels: FileLogicalModelRepository;
   readonly promptProfiles: FilePromptProfileRepository;
   readonly projectProfiles: FileProjectProfileRepository;
+  readonly approvalPreferences: FileAgentApprovalPreferenceRepository;
   readonly healthRecords: FileProviderHealthRepository;
   readonly usageRecords: FileUsageRepository;
   readonly secrets: SecretStore;
   readonly secretVault: SecretVault | undefined;
   readonly adapters: ProviderAdapterRegistry;
+  readonly environment: NodeJS.ProcessEnv;
   readonly fetchImpl: typeof fetch | undefined;
 }
 
@@ -173,6 +179,9 @@ function createDefaultApplicationRuntime(
   const logicalModels = new FileLogicalModelRepository(paths.logicalModelsFile);
   const promptProfiles = new FilePromptProfileRepository(paths.promptProfilesFile);
   const projectProfiles = new FileProjectProfileRepository(paths.projectProfilesFile);
+  const approvalPreferences = new FileAgentApprovalPreferenceRepository(
+    paths.launchPreferencesFile,
+  );
   const healthRecords = new FileProviderHealthRepository(paths.healthHistoryFile);
   const usageRecords = new FileUsageRepository(paths.usageHistoryFile);
   const environmentSecrets = new EnvironmentSecretStore(environment);
@@ -201,11 +210,13 @@ function createDefaultApplicationRuntime(
     logicalModels,
     promptProfiles,
     projectProfiles,
+    approvalPreferences,
     healthRecords,
     usageRecords,
     secrets,
     secretVault,
     adapters,
+    environment,
     fetchImpl: options.fetchImpl,
   };
 }
@@ -220,11 +231,13 @@ function assembleDefaultApplication(
     logicalModels,
     promptProfiles,
     projectProfiles,
+    approvalPreferences,
     healthRecords,
     usageRecords,
     secrets,
     secretVault,
     adapters,
+    environment,
   } = runtime;
   const usageSink = async (
     event: Parameters<FileUsageRepository["record"]>[0],
@@ -247,6 +260,12 @@ function assembleDefaultApplication(
     return knownModelProtocol(health, portal, modelId, client);
   };
   const probes = new ProviderProbeService(adapters);
+  const shimPython = configuredText(environment.PROVIDER_DOCK_CODEX_SHIM_PYTHON);
+  const shimSource = configuredText(environment.PROVIDER_DOCK_CODEX_SHIM_SOURCE);
+  const shimModule = configuredText(environment.PROVIDER_DOCK_CODEX_SHIM_MODULE);
+  const shimStartupTimeout = configuredPositiveInteger(
+    environment.PROVIDER_DOCK_CODEX_SHIM_STARTUP_TIMEOUT_MS,
+  );
   const codexLauncher = new CodexLauncher(
     new CodexRuntimeSessionManager({
       codexHome: paths.codexHome,
@@ -254,7 +273,7 @@ function assembleDefaultApplication(
       secrets,
     }),
     new NodeCodexProcessRunner(),
-    new ResponsesCodexBridgeFactory({
+    new CodexShimCompatibilityBridgeFactory({
       secretStore: secrets,
       adapterRegistry: adapters,
       runtimeRoot: join(paths.runtimeDirectory, "codex"),
@@ -265,6 +284,10 @@ function assembleDefaultApplication(
       ...(runtime.fetchImpl === undefined
         ? {}
         : { fetchImpl: runtime.fetchImpl }),
+      ...(shimPython === undefined ? {} : { pythonExecutable: shimPython }),
+      ...(shimSource === undefined ? {} : { shimSourceDirectory: shimSource }),
+      ...(shimModule === undefined ? {} : { shimModule }),
+      ...(shimStartupTimeout === undefined ? {} : { startupTimeoutMs: shimStartupTimeout }),
     }),
   );
 
@@ -322,5 +345,22 @@ function assembleDefaultApplication(
         .register(new HelyxPortalAdapter(secrets,
           runtime.fetchImpl ? { fetchImpl: runtime.fetchImpl } : {})),
     ),
+    new AgentSessionHistory({
+      claudeHome: paths.claudeHome,
+      codexHome: paths.codexHome,
+    }),
+    approvalPreferences,
   );
+}
+
+function configuredText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+function configuredPositiveInteger(value: string | undefined): number | undefined {
+  const trimmed = configuredText(value);
+  if (trimmed === undefined) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : undefined;
 }
