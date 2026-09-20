@@ -5,8 +5,11 @@ import { describe, expect, it } from "vitest";
 import {
   ChainedSecretStore,
   DpapiFileSecretVault,
+  encryptPortableSecretPayload,
+  decryptPortableSecretPayload,
   EnvironmentSecretStore,
   MemorySecretStore,
+  SecretProtectionError,
   WindowsDpapiProtector,
   type SecretProtector,
 } from "../src/index.js";
@@ -51,6 +54,44 @@ describe("ChainedSecretStore", () => {
     expect(await chained.get("SHARED")).toBe("vault-value");
     expect(await chained.get("FALLBACK")).toBe("fallback-value");
     expect(await chained.get("MISSING")).toBeUndefined();
+  });
+});
+
+describe("portable secret envelope", () => {
+  it("round-trips a JSON payload without serializing plaintext", async () => {
+    const payload = {
+      version: 1,
+      credentials: [{ id: "cred-1", value: "actual-secret-value" }],
+    };
+
+    const envelope = await encryptPortableSecretPayload(payload, "correct horse battery staple");
+
+    expect(JSON.stringify(envelope)).not.toContain("actual-secret-value");
+    await expect(
+      decryptPortableSecretPayload(envelope, "correct horse battery staple"),
+    ).resolves.toEqual(payload);
+  });
+
+  it("rejects a wrong passphrase and tampered ciphertext with one sanitized error", async () => {
+    const envelope = await encryptPortableSecretPayload({ value: "actual-secret-value" }, "passphrase");
+    const tampered = { ...envelope, ciphertext: `${envelope.ciphertext.slice(0, -1)}A` };
+
+    await expect(decryptPortableSecretPayload(envelope, "wrong")).rejects.toMatchObject({
+      name: "SecretProtectionError",
+      message: "Portable credential backup could not be opened.",
+    });
+    await expect(decryptPortableSecretPayload(tampered, "passphrase")).rejects.toBeInstanceOf(
+      SecretProtectionError,
+    );
+  });
+
+  it("rejects unsupported or malformed envelopes before returning data", async () => {
+    await expect(
+      decryptPortableSecretPayload({ version: 99 }, "passphrase"),
+    ).rejects.toBeInstanceOf(SecretProtectionError);
+    await expect(
+      decryptPortableSecretPayload({ version: 1, ciphertext: "not-an-envelope" }, "passphrase"),
+    ).rejects.toBeInstanceOf(SecretProtectionError);
   });
 });
 

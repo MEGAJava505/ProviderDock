@@ -1,5 +1,7 @@
 export * from "./application/create-default-application.js";
 export * from "./application/provider-dock-application.js";
+export * from "./application/omp-launch-service.js";
+export * from "./migration/omp-route-decisions.js";
 export * from "./cli/provider-dock-cli.js";
 export * from "./clients/agent-approval.js";
 export * from "./clients/agent-approval-preference.js";
@@ -51,6 +53,7 @@ export * from "./core/state-machine/persistent-turn-ledger.js";
 export * from "./diagnostics/provider-doctor.js";
 export * from "./diagnostics/doctor-capability-snapshot.js";
 export * from "./core/security/dpapi-secret-vault.js";
+export * from "./core/security/portable-secret-vault.js";
 export * from "./bridge/sse/sse-decoder.js";
 export * from "./bridge/responses/codex-model-catalog.js";
 export * from "./bridge/responses/responses-stream-state.js";
