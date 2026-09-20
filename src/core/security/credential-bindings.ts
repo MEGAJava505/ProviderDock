@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { PortalRepository } from "../portals/portal-repository.js";
+import { PortalRepositoryCorruptionError } from "../portals/portal-repository.js";
 import type { ProviderProfileRepository } from "../providers/provider-profile-repository.js";
 import type {
   CredentialBinding,
@@ -24,7 +25,14 @@ export class ApplicationCredentialBindings implements CredentialBindingAdapter {
         });
       }
     }
-    for (const record of await this.portals.list()) {
+    let portalRecords = [] as Awaited<ReturnType<PortalRepository["list"]>>;
+    try {
+      portalRecords = await this.portals.list();
+    } catch (error) {
+      // A corrupt portal catalog must not hide otherwise recoverable provider API bindings.
+      if (!(error instanceof PortalRepositoryCorruptionError)) throw error;
+    }
+    for (const record of portalRecords) {
       if (record.connection.auth.kind !== "none") {
         bindings.push({
           providerId: record.connection.providerId,
