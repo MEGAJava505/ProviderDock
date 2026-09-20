@@ -22,8 +22,11 @@ import {
   ProviderProbeService,
   SecretVaultUnavailableError,
   mergeModelCatalog,
+  type ClaudeLauncher,
   type CodexLauncher,
 } from "../src/index.js";
+import { ApplicationCredentialBindings } from "../src/core/security/credential-bindings.js";
+import { MemoryPortalRepository } from "../src/core/portals/portal-repository.js";
 
 describe("ProviderDockApplication", () => {
   it("supports provider set, get, list, and remove", async () => {
@@ -638,6 +641,131 @@ describe("ProviderDockApplication", () => {
     expect(codexLaunch).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects an unknown model after an empty degraded refresh", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const health = new MemoryProviderHealthRepository();
+    const codexLaunch = vi.fn(async (_input: Parameters<CodexLauncher["launch"]>[0]) => ({
+      exitCode: 0,
+      signal: null,
+    }));
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      { launch: codexLaunch } as unknown as CodexLauncher,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    const provider = await application.setProvider({
+      id: "router",
+      displayName: "Router",
+      baseUrl: "https://router.example.test/v1",
+      apiType: "openai-responses",
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "ONLINE",
+        checkedAt: "2026-09-13T10:00:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 1,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, [
+        { modelId: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", raw: {} },
+      ]),
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "DEGRADED",
+        checkedAt: "2026-09-13T10:01:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 0,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, []),
+    });
+
+    await expect(application.launchCodex({
+      providerId: provider.id,
+      modelId: "claude-opus-5",
+      projectDirectory: tmpdir(),
+      route: { kind: "auto" },
+    })).rejects.toMatchObject({
+      constructor: ModelUnavailableError,
+      availableModelIds: ["gpt-5.6-sol"],
+    });
+    expect(codexLaunch).not.toHaveBeenCalled();
+  });
+
+  it("applies degraded catalog validation to Claude launches", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const health = new MemoryProviderHealthRepository();
+    const claudeLaunch = vi.fn(async (_input: Parameters<ClaudeLauncher["launch"]>[0]) => ({
+      exitCode: 0,
+      signal: null,
+    }));
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { launch: claudeLaunch } as unknown as ClaudeLauncher,
+      undefined,
+      undefined,
+      undefined,
+      health,
+    );
+    const provider = await application.setProvider({
+      id: "router",
+      displayName: "Router",
+      baseUrl: "https://router.example.test/v1",
+      apiType: "anthropic-messages",
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "ONLINE",
+        checkedAt: "2026-09-13T10:00:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 1,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, [
+        { modelId: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", raw: {} },
+      ]),
+    });
+    await health.record({
+      health: {
+        providerId: provider.id,
+        status: "DEGRADED",
+        checkedAt: "2026-09-13T10:01:00.000Z",
+        latencyMs: 1,
+        discoveredModelCount: 0,
+        appliedFixes: [],
+      },
+      models: mergeModelCatalog(provider, []),
+    });
+
+    await expect(application.launchClaude({
+      providerId: provider.id,
+      modelId: "claude-opus-5",
+      projectDirectory: tmpdir(),
+    })).rejects.toMatchObject({
+      constructor: ModelUnavailableError,
+      availableModelIds: ["gpt-5.6-sol"],
+    });
+    expect(claudeLaunch).not.toHaveBeenCalled();
+  });
+
   it("removes logical routes whose provider catalog authoritatively omits their model", async () => {
     const profiles = new MemoryProviderProfileRepository();
     const health = new MemoryProviderHealthRepository();
@@ -703,6 +831,72 @@ describe("ProviderDockApplication", () => {
     ]);
   });
 
+});
+
+describe("ApplicationCredentialBindings", () => {
+  it("rotates provider API credentials without changing the portal session binding", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const portals = new MemoryPortalRepository();
+    await profiles.upsert({
+      id: "fixture",
+      displayName: "Fixture",
+      baseUrl: "https://inference.invalid/v1",
+      auth: { kind: "bearer", secretRef: "OLD_API" },
+    });
+    await portals.update("fixture", () => ({
+      connection: {
+        providerId: "fixture",
+        adapterId: "new-api",
+        siteUrl: "https://account.invalid",
+        auth: { kind: "cookie", secretRef: "OLD_SESSION" },
+        autoRefresh: true,
+        refreshIntervalMs: 300000,
+      },
+      revision: "00000000-0000-4000-8000-000000000001",
+      failures: 0,
+    }));
+    const bindings = new ApplicationCredentialBindings(profiles, portals);
+
+    await bindings.activate({ providerId: "fixture", purpose: "provider-api", secretRef: "NEW_API" });
+
+    expect((await profiles.get("fixture"))?.auth).toEqual({ kind: "bearer", secretRef: "NEW_API" });
+    expect((await portals.get("fixture"))?.connection.auth).toEqual({ kind: "cookie", secretRef: "OLD_SESSION" });
+    expect(await bindings.isReferenced("OLD_API")).toBe(false);
+    expect(await bindings.isReferenced("NEW_API")).toBe(true);
+  });
+
+  it("rotates a portal session independently and enumerates active references", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const portals = new MemoryPortalRepository();
+    await profiles.upsert({
+      id: "fixture",
+      displayName: "Fixture",
+      baseUrl: "https://inference.invalid/v1",
+      auth: { kind: "bearer", secretRef: "API" },
+    });
+    await portals.update("fixture", () => ({
+      connection: {
+        providerId: "fixture",
+        adapterId: "new-api",
+        siteUrl: "https://account.invalid",
+        auth: { kind: "cookie", secretRef: "SESSION" },
+        autoRefresh: true,
+        refreshIntervalMs: 300000,
+      },
+      revision: "00000000-0000-4000-8000-000000000002",
+      failures: 0,
+    }));
+    const bindings = new ApplicationCredentialBindings(profiles, portals);
+
+    await bindings.activate({ providerId: "fixture", purpose: "portal-session", secretRef: "NEW_SESSION" });
+
+    expect((await portals.get("fixture"))?.connection.auth).toEqual({ kind: "cookie", secretRef: "NEW_SESSION" });
+    expect(await bindings.list()).toEqual(expect.arrayContaining([
+      { providerId: "fixture", purpose: "provider-api", secretRef: "API" },
+      { providerId: "fixture", purpose: "portal-session", secretRef: "NEW_SESSION" },
+    ]));
+    expect(await bindings.isReferenced("SESSION")).toBe(false);
+  });
 });
 
 function createApplication(): ProviderDockApplication {
