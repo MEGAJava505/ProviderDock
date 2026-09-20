@@ -4,13 +4,18 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ChainedSecretStore,
+  CredentialManager,
   DpapiFileSecretVault,
   encryptPortableSecretPayload,
   decryptPortableSecretPayload,
   EnvironmentSecretStore,
+  FileCredentialMetadataRepository,
+  MemoryCredentialMetadataRepository,
   MemorySecretStore,
   SecretProtectionError,
   WindowsDpapiProtector,
+  type CredentialBindingAdapter,
+  type CredentialBinding,
   type SecretProtector,
 } from "../src/index.js";
 
@@ -55,6 +60,20 @@ describe("ChainedSecretStore", () => {
     expect(await chained.get("FALLBACK")).toBe("fallback-value");
     expect(await chained.get("MISSING")).toBeUndefined();
   });
+
+  it("falls through an undecryptable protected store to an explicit environment value", async () => {
+    const protectedStore = {
+      async get(): Promise<string | undefined> {
+        throw new SecretProtectionError("Windows DPAPI operation failed.");
+      },
+    };
+    const chained = new ChainedSecretStore([
+      protectedStore,
+      new EnvironmentSecretStore({ RECOVERED: "environment-value" }),
+    ]);
+
+    await expect(chained.get("RECOVERED")).resolves.toBe("environment-value");
+  });
 });
 
 describe("portable secret envelope", () => {
@@ -95,6 +114,109 @@ describe("portable secret envelope", () => {
   });
 });
 
+describe("CredentialManager", () => {
+  it("supports multiple masked credentials and resolves only the explicit active one", async () => {
+    const bindings = new TestCredentialBindings();
+    const manager = new CredentialManager({
+      secrets: new MemorySecretStore(),
+      metadata: new MemoryCredentialMetadataRepository(),
+      bindings,
+      now: () => new Date("2026-09-21T00:00:00.000Z"),
+    });
+
+    const first = await manager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "abc123456789WXYZ",
+      activate: true,
+    });
+    const second = await manager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "def987654321LMNO",
+    });
+
+    expect(first.maskedValue).toBe("abc…WXYZ");
+    expect(second.maskedValue).toBe("def…LMNO");
+    const listed = await manager.list("vsllm", "provider-api");
+    expect(listed).toHaveLength(2);
+    expect(listed).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: first.id, state: "active", maskedValue: "abc…WXYZ" }),
+      expect.objectContaining({ id: second.id, state: "available", maskedValue: "def…LMNO" }),
+    ]));
+    await expect(manager.resolveActive("vsllm", "provider-api")).resolves.toBe("abc123456789WXYZ");
+  });
+
+  it("rotates explicitly, blocks referenced removal, and restores an additive backup", async () => {
+    const secrets = new MemorySecretStore();
+    const bindings = new TestCredentialBindings();
+    const metadata = new MemoryCredentialMetadataRepository();
+    const manager = new CredentialManager({ secrets, metadata, bindings });
+    const oldCredential = await manager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "old-provider-secret",
+      activate: true,
+    });
+    const newCredential = await manager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "new-provider-secret",
+    });
+
+    await expect(manager.remove("vsllm", oldCredential.id)).rejects.toThrow(
+      "Credential is still referenced by an active binding.",
+    );
+    await manager.activate("vsllm", "provider-api", newCredential.id);
+    await expect(manager.resolveActive("vsllm", "provider-api")).resolves.toBe("new-provider-secret");
+    await manager.remove("vsllm", oldCredential.id);
+
+    const backupPath = join(await mkdtemp(join(tmpdir(), "provider-dock-backup-")), "credentials.pdv");
+    await manager.createBackup(backupPath, "backup-passphrase");
+    const restoredSecrets = new MemorySecretStore();
+    const restoredManager = new CredentialManager({
+      secrets: restoredSecrets,
+      metadata: new MemoryCredentialMetadataRepository(),
+      bindings: new TestCredentialBindings(),
+    });
+    const report = await restoredManager.restoreBackup(backupPath, "backup-passphrase");
+
+    expect(report.restored).toBe(1);
+    expect((await restoredManager.list("vsllm", "provider-api"))).toEqual([
+      expect.objectContaining({ maskedValue: "new…cret", state: "available" }),
+    ]);
+    expect(await restoredSecrets.listReferences()).toHaveLength(1);
+  });
+
+  it("persists metadata without a plaintext value and reports an unavailable payload", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-credential-registry-"));
+    const registryPath = join(directory, "credentials", "registry.json");
+    const secrets = new MemorySecretStore();
+    const manager = new CredentialManager({
+      secrets,
+      metadata: new FileCredentialMetadataRepository(registryPath),
+      bindings: new TestCredentialBindings(),
+    });
+
+    const added = await manager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "persisted-secret-value",
+    });
+    const registryContents = await readFile(registryPath, "utf8");
+    expect(registryContents).not.toContain("persisted-secret-value");
+
+    const unavailable = new CredentialManager({
+      secrets: new UnavailableSecretVault(),
+      metadata: new FileCredentialMetadataRepository(registryPath),
+      bindings: new TestCredentialBindings(),
+    });
+    expect(await unavailable.list("vsllm", "provider-api")).toEqual([
+      expect.objectContaining({ id: added.id, state: "unavailable" }),
+    ]);
+  });
+});
+
 const windowsIt = process.platform === "win32" ? it : it.skip;
 
 windowsIt("round-trips a value through the current Windows user's DPAPI", async () => {
@@ -113,5 +235,37 @@ class Base64Protector implements SecretProtector {
 
   async unprotect(protectedValue: string): Promise<string> {
     return Buffer.from(protectedValue, "base64").toString("utf8");
+  }
+}
+
+class TestCredentialBindings implements CredentialBindingAdapter {
+  private readonly active = new Map<string, CredentialBinding>();
+
+  async list(): Promise<readonly CredentialBinding[]> {
+    return [...this.active.values()];
+  }
+
+  async activate(binding: CredentialBinding): Promise<void> {
+    this.active.set(`${binding.providerId}:${binding.purpose}`, binding);
+  }
+
+  async isReferenced(secretRef: string): Promise<boolean> {
+    return [...this.active.values()].some((binding) => binding.secretRef === secretRef);
+  }
+}
+
+class UnavailableSecretVault {
+  async get(): Promise<string | undefined> {
+    throw new SecretProtectionError("Windows DPAPI operation failed.");
+  }
+
+  async set(): Promise<void> {}
+
+  async delete(): Promise<boolean> {
+    return false;
+  }
+
+  async listReferences(): Promise<readonly string[]> {
+    return [];
   }
 }

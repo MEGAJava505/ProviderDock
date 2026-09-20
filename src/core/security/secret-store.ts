@@ -1,3 +1,5 @@
+import { SecretProtectionError } from "./dpapi-secret-vault.js";
+
 export interface SecretStore {
   get(reference: string): Promise<string | undefined>;
 }
@@ -46,8 +48,13 @@ export class ChainedSecretStore implements SecretStore {
 
   async get(reference: string): Promise<string | undefined> {
     for (const store of this.stores) {
-      const secret = await store.get(reference);
-      if (secret !== undefined) return secret;
+      try {
+        const secret = await store.get(reference);
+        if (secret !== undefined) return secret;
+      } catch (error) {
+        if (error instanceof SecretProtectionError) continue;
+        throw error;
+      }
     }
     return undefined;
   }

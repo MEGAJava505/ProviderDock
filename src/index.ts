@@ -54,6 +54,8 @@ export * from "./diagnostics/provider-doctor.js";
 export * from "./diagnostics/doctor-capability-snapshot.js";
 export * from "./core/security/dpapi-secret-vault.js";
 export * from "./core/security/portable-secret-vault.js";
+export * from "./core/security/credential-repository.js";
+export * from "./core/security/credential-manager.js";
 export * from "./bridge/sse/sse-decoder.js";
 export * from "./bridge/responses/codex-model-catalog.js";
 export * from "./bridge/responses/responses-stream-state.js";
