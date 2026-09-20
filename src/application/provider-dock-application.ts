@@ -760,8 +760,12 @@ export class ProviderDockApplication {
     return this.requireCredentialManager().activate(providerId, purpose, credentialId);
   }
 
-  async removeCredential(providerId: string, credentialId: string): Promise<void> {
-    await this.requireCredentialManager().remove(providerId, credentialId);
+  async removeCredential(
+    providerId: string,
+    credentialId: string,
+    purpose?: CredentialPurpose,
+  ): Promise<void> {
+    await this.requireCredentialManager().remove(providerId, credentialId, purpose);
   }
 
   async createCredentialBackup(destination: string, passphrase: string): Promise<void> {

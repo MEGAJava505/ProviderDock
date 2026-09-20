@@ -212,9 +212,17 @@ export class CredentialManager {
     return this.toSummary(updated, true);
   }
 
-  async remove(providerId: string, credentialId: string): Promise<void> {
+  async remove(
+    providerId: string,
+    credentialId: string,
+    purpose?: CredentialPurpose,
+  ): Promise<void> {
     const record = await this.options.metadata.get(credentialId);
-    if (record === undefined || record.providerId !== providerId) {
+    if (
+      record === undefined ||
+      record.providerId !== providerId ||
+      (purpose !== undefined && record.purpose !== purpose)
+    ) {
       throw new CredentialManagerError("NOT_FOUND", "Credential was not found.");
     }
     if (record.state === "active" || await this.options.bindings?.isReferenced(record.secretRef)) {

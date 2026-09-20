@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { z } from "zod";
@@ -60,6 +60,16 @@ import {
 import { ProviderDashboardServer } from "../ui/provider-dashboard-server.js";
 import { openDashboardInBrowser } from "../ui/open-dashboard-browser.js";
 import { providerErrorGuidance } from "../core/errors/provider-error.js";
+import type { OmpLaunchInput, OmpLaunchResult } from "../application/omp-launch-service.js";
+import type { OmpPreflightResult } from "../clients/omp/omp-runtime.js";
+import type { OmpRunRecord } from "../clients/omp/omp-run-repository.js";
+import { sanitizeOperationDiagnostic } from "../core/errors/operation-diagnostic.js";
+import {
+  CredentialManagerError,
+  type CredentialPurpose,
+  type CredentialSummary,
+} from "../core/security/credential-manager.js";
+import { readHiddenSecret } from "./secret-prompt.js";
 
 export interface CliIo {
   readonly stdout: (message: string) => void;
@@ -70,7 +80,16 @@ export interface RunProviderDockCliOptions {
   readonly application: ProviderDockApplication;
   readonly io?: CliIo;
   readonly environment?: NodeJS.ProcessEnv;
+  readonly ompLauncher?: ProviderDockOmpLauncher;
+  readonly credentialPassphraseReader?: () => Promise<string>;
 }
+
+export interface ProviderDockOmpLauncher {
+  preflight(input: OmpLaunchInput): Promise<OmpPreflightResult>;
+  launch(input: OmpLaunchInput): Promise<OmpLaunchResult>;
+  listRuns(): Promise<readonly OmpRunRecord[]>;
+  cancel(runId: string): Promise<OmpRunRecord | undefined>;
+  reconcileAfterRestart(): Promise<readonly OmpRunRecord[]>;}
 
 const consoleIo: CliIo = {
   stdout: (message) => console.log(message),
@@ -84,7 +103,14 @@ export async function runProviderDockCli(
   const io = options.io ?? consoleIo;
 
   try {
-    return await execute(argv, options.application, io, options.environment ?? process.env);
+    return await execute(
+      argv,
+      options.application,
+      io,
+      options.environment ?? process.env,
+      options.ompLauncher,
+      options.credentialPassphraseReader,
+    );
   } catch (error) {
     if (
       error instanceof CliUsageError ||
@@ -106,6 +132,7 @@ export async function runProviderDockCli(
       error instanceof ProviderPluginValidationError ||
       error instanceof SecretVaultUnavailableError ||
       error instanceof SecretProtectionError ||
+      error instanceof CredentialManagerError ||
       error instanceof CodexRuntimeConfigurationError
     ) {
       io.stderr(`Error: ${error.message}`);
@@ -128,11 +155,13 @@ async function execute(
   application: ProviderDockApplication,
   io: CliIo,
   environment: NodeJS.ProcessEnv,
+  ompLauncher: ProviderDockOmpLauncher | undefined,
+  credentialPassphraseReader: (() => Promise<string>) | undefined,
 ): Promise<number> {
   const [command, ...rest] = argv;
 
   if (!command) {
-    return executeDashboard(["--open"], application, io);
+    return executeDashboard(["--open"], application, io, ompLauncher);
   }
 
   if (command === "help" || command === "--help" || command === "-h") {
@@ -150,9 +179,12 @@ async function execute(
   if (command === "health") return executeHealth(rest, application, io);
   if (command === "doctor") return executeDoctor(rest, application, io);
   if (command === "usage") return executeUsage(rest, application, io);
-  if (command === "dashboard") return executeDashboard(rest, application, io);
+  if (command === "dashboard") return executeDashboard(rest, application, io, ompLauncher);
   if (command === "secrets") return executeSecrets(rest, application, io, environment);
-  if (command === "launch") return executeLaunch(rest, application, io, environment);
+  if (command === "credentials") {
+    return executeCredentials(rest, application, io, credentialPassphraseReader);
+  }
+  if (command === "launch") return executeLaunch(rest, application, io, environment, ompLauncher);
   if (command === "recover") return executeRecovery(rest, application, io);
 
   throw new CliUsageError(`Unknown command '${command}'. Run 'providerdock help'.`);
@@ -162,6 +194,7 @@ async function executeDashboard(
   argv: readonly string[],
   application: ProviderDockApplication,
   io: CliIo,
+  ompLauncher: ProviderDockOmpLauncher | undefined,
 ): Promise<number> {
   const { values, positionals } = parseArgs({
     args: [...argv],
@@ -180,7 +213,11 @@ async function executeDashboard(
 
   let server: ProviderDashboardServer;
   try {
-    server = new ProviderDashboardServer({ application, port });
+    server = new ProviderDashboardServer({
+      application,
+      port,
+      ...(ompLauncher === undefined ? {} : { ompLauncher }),
+    });
   } catch (error) {
     throw new CliUsageError(
       error instanceof Error
@@ -740,8 +777,13 @@ async function executeLaunch(
   application: ProviderDockApplication,
   io: CliIo,
   environment: NodeJS.ProcessEnv,
+  ompLauncher: ProviderDockOmpLauncher | undefined,
 ): Promise<number> {
   const [client, ...rest] = argv;
+  if (client === "omp") {
+    if (ompLauncher === undefined) throw new CliUsageError("OMP launcher is not configured.");
+    return executeLaunchOmp(rest, application, io, environment, ompLauncher);
+  }
   if (client === "auto") return executeLaunchAuto(rest, application, io, environment);
   if (client === "claude") return executeLaunchClaude(rest, application, io, environment);
   if (client !== "codex") {
@@ -851,6 +893,59 @@ async function executeLaunch(
   const status = exit.exitCode === null ? `signal ${exit.signal ?? "unknown"}` : `exit code ${exit.exitCode}`;
   io.stdout(`Codex session finished with ${status}.`);
   return exit.exitCode ?? 1;
+}
+
+async function executeLaunchOmp(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+  environment: NodeJS.ProcessEnv,
+  ompLauncher: ProviderDockOmpLauncher,
+): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: [...argv],
+    options: {
+      provider: { type: "string" },
+      model: { type: "string" },
+      "omp-account": { type: "string" },
+      project: { type: "string" },
+      "omp-read-only-pilot-no-sandbox": { type: "boolean", default: false },
+      approval: { type: "string" },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+  assertNoPositionals(positionals);
+  if (values["omp-read-only-pilot-no-sandbox"] !== true) {
+    throw new CliUsageError("OMP_PERMISSION_CONFIRMATION_REQUIRED");
+  }
+  if (values.approval !== undefined) {
+    throw new CliUsageError("--approval cannot substitute --omp-read-only-pilot-no-sandbox.");
+  }
+  const input: OmpLaunchInput = {
+    providerId: requireString(values.provider, "--provider"),
+    modelId: requireString(values.model, "--model"),
+    accountId: requireString(values["omp-account"], "--omp-account"),
+    projectDirectory: requireString(values.project, "--project"),
+    permissionAcknowledgement: "read-only-pilot-no-sandbox",
+  };
+  const preflight = await ompLauncher.preflight(input);
+  if (!preflight.ok) {
+    io.stderr(formatOmpDiagnostic("OMP preflight failed", preflight.diagnostic));
+    return 1;
+  }
+  const launched = await ompLauncher.launch(input);
+  if (!launched.ok) {
+    io.stderr(formatOmpDiagnostic("OMP launch failed", launched.diagnostic));
+    return 1;
+  }
+  io.stdout(`OMP run started: ${launched.runId}`);
+  return 0;
+}
+
+function formatOmpDiagnostic(prefix: string, diagnostic: unknown): string {
+  const safe = sanitizeOperationDiagnostic(diagnostic);
+  return `${prefix}: ${safe.code}: ${safe.message} [${safe.operationId}]`;
 }
 
 async function executeLaunchAuto(
@@ -1147,6 +1242,186 @@ async function executeSecrets(
     default:
       throw new CliUsageError("Expected secrets subcommand: list, set, or remove.");
   }
+}
+
+const credentialPurposes = ["provider-api", "portal-session"] as const;
+
+async function executeCredentials(
+  argv: readonly string[],
+  application: ProviderDockApplication,
+  io: CliIo,
+  passphraseReader: (() => Promise<string>) | undefined,
+): Promise<number> {
+  const [command, ...rest] = argv;
+  switch (command) {
+    case "list": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: {
+          provider: { type: "string" },
+          purpose: { type: "string" },
+          json: { type: "boolean", default: false },
+        },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const providerId = values.provider === undefined
+        ? undefined
+        : requireString(values.provider, "--provider");
+      const purpose = values.purpose === undefined
+        ? undefined
+        : parseCredentialPurpose(values.purpose);
+      const summaries = await application.listCredentials(providerId, purpose);
+      if (values.json) io.stdout(JSON.stringify(summaries, null, 2));
+      else if (summaries.length === 0) io.stdout("No managed credentials.");
+      else io.stdout(renderCredentialTable(summaries));
+      return 0;
+    }
+    case "import": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: {
+          provider: { type: "string" },
+          purpose: { type: "string" },
+          file: { type: "string" },
+          activate: { type: "boolean", default: false },
+          json: { type: "boolean", default: false },
+        },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const providerId = requireString(values.provider, "--provider");
+      const purpose = parseCredentialPurpose(requireString(values.purpose, "--purpose"));
+      const source = requireString(values.file, "--file");
+      const value = await readSingleCredentialFile(source);
+      const summary = await application.addCredential({
+        providerId,
+        purpose,
+        value,
+        activate: values.activate === true,
+      });
+      if (values.json) io.stdout(JSON.stringify(summary, null, 2));
+      else io.stdout(`Imported credential '${summary.id}' (${summary.maskedValue}).`);
+      return 0;
+    }
+    case "activate": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: {
+          provider: { type: "string" },
+          purpose: { type: "string" },
+          credential: { type: "string" },
+          json: { type: "boolean", default: false },
+        },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const providerId = requireString(values.provider, "--provider");
+      const purpose = parseCredentialPurpose(requireString(values.purpose, "--purpose"));
+      const credentialId = requireString(values.credential, "--credential");
+      const summary = await application.activateCredential(providerId, purpose, credentialId);
+      if (values.json) io.stdout(JSON.stringify(summary, null, 2));
+      else io.stdout(`Activated credential '${summary.id}' (${summary.maskedValue}).`);
+      return 0;
+    }
+    case "remove": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: {
+          provider: { type: "string" },
+          purpose: { type: "string" },
+          credential: { type: "string" },
+        },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const providerId = requireString(values.provider, "--provider");
+      const purpose = parseCredentialPurpose(requireString(values.purpose, "--purpose"));
+      const credentialId = requireString(values.credential, "--credential");
+      await application.removeCredential(providerId, credentialId, purpose);
+      io.stdout(`Removed credential '${credentialId}'.`);
+      return 0;
+    }
+    case "backup": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: { file: { type: "string" } },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const destination = requireString(values.file, "--file");
+      const passphrase = await readCredentialPassphrase(passphraseReader);
+      await application.createCredentialBackup(destination, passphrase);
+      io.stdout(`Credential backup written to '${destination}'.`);
+      return 0;
+    }
+    case "restore": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: { file: { type: "string" } },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const source = requireString(values.file, "--file");
+      const passphrase = await readCredentialPassphrase(passphraseReader);
+      const report = await application.restoreCredentialBackup(source, passphrase);
+      io.stdout(`Restored ${report.restored} credential(s); skipped ${report.skipped}.`);
+      return 0;
+    }
+    default:
+      throw new CliUsageError(
+        "Expected credentials subcommand: list, import, activate, remove, backup, or restore.",
+      );
+  }
+}
+
+function parseCredentialPurpose(value: string): CredentialPurpose {
+  return parseEnum(value, credentialPurposes, "--purpose");
+}
+
+async function readSingleCredentialFile(source: string): Promise<string> {
+  let stat;
+  try {
+    stat = await lstat(source);
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
+    throw new CliUsageError(`Unable to inspect credential file '${source}': ${details}`);
+  }
+  if (stat.isSymbolicLink()) {
+    throw new CliUsageError("Credential import refuses symbolic-link files.");
+  }
+  if (!stat.isFile()) throw new CliUsageError("Credential import requires a regular file.");
+  let content: string;
+  try {
+    const bytes = await readFile(source);
+    if (bytes.byteLength > 65_536) throw new CliUsageError("Credential file is too large.");
+    content = bytes.toString("utf8");
+  } catch (error) {
+    if (error instanceof CliUsageError) throw error;
+    const details = error instanceof Error ? error.message : String(error);
+    throw new CliUsageError(`Unable to read credential file '${source}': ${details}`);
+  }
+  if (content.endsWith("\r\n")) content = content.slice(0, -2);
+  else if (content.endsWith("\n") || content.endsWith("\r")) content = content.slice(0, -1);
+  if (content.length === 0) throw new CliUsageError("Credential file is empty.");
+  if (/[\r\n]/u.test(content)) {
+    throw new CliUsageError("Credential file must contain exactly one line.");
+  }
+  return content;
+}
+
+async function readCredentialPassphrase(
+  reader: (() => Promise<string>) | undefined,
+): Promise<string> {
+  const passphrase = await (reader ?? (() => readHiddenSecret("Credential backup passphrase: ")))();
+  if (passphrase.length === 0) throw new CliUsageError("Credential backup passphrase must not be empty.");
+  return passphrase;
 }
 
 async function executeProviders(
@@ -1901,6 +2176,20 @@ function renderUsageSummary(rows: readonly UsageSummaryRow[]): string {
   );
 }
 
+function renderCredentialTable(summaries: readonly CredentialSummary[]): string {
+  return renderTable(
+    ["ID", "PROVIDER", "PURPOSE", "VALUE", "STATE", "CREATED"],
+    summaries.map((summary) => [
+      summary.id,
+      summary.providerId,
+      summary.purpose,
+      summary.maskedValue,
+      summary.state,
+      summary.createdAt,
+    ]),
+  );
+}
+
 function formatMicrounits(currency: string, microunits: number): string {
   const whole = Math.floor(microunits / 1_000_000);
   const fractional = String(microunits % 1_000_000).padStart(6, "0");
@@ -1988,6 +2277,12 @@ Usage:
   providerdock secrets list
   providerdock secrets set <reference> --from-env VARIABLE
   providerdock secrets remove <reference>
+  providerdock credentials list [--provider ID] [--purpose provider-api|portal-session] [--json]
+  providerdock credentials import --provider ID --purpose provider-api|portal-session --file FILE [--activate] [--json]
+  providerdock credentials activate --provider ID --purpose provider-api|portal-session --credential ID [--json]
+  providerdock credentials remove --provider ID --purpose provider-api|portal-session --credential ID
+  providerdock credentials backup --file FILE
+  providerdock credentials restore --file FILE
   providerdock launch codex --provider ID --model MODEL --project DIRECTORY [--bridge-url URL] [--approval LEVEL]
   providerdock launch codex --logical-model ID --project DIRECTORY [--approval LEVEL]
   providerdock launch codex --prompt-profile ID --project DIRECTORY [--approval LEVEL]
@@ -1998,6 +2293,7 @@ Usage:
   providerdock launch auto --logical-model ID --project DIRECTORY [--approval LEVEL]
   providerdock launch auto --prompt-profile ID --project DIRECTORY [--approval LEVEL]
   providerdock launch auto --project DIRECTORY [--approval LEVEL]
+  providerdock launch omp --provider ID --model MODEL --omp-account ACCOUNT_ID --project DIRECTORY --omp-read-only-pilot-no-sandbox
   providerdock recover codex [--json]
 
 Doctor levels (run manually; deeper levels send real inference requests):

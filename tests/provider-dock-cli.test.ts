@@ -12,8 +12,12 @@ import {
   ProviderProbeService,
   runProviderDockCli,
   type CliIo,
+  type CredentialSummary,
 } from "../src/index.js";
+import { createServer } from "node:net";
 import { openDashboardInBrowser } from "../src/ui/open-dashboard-browser.js";
+import type { OmpLaunchInput } from "../src/application/omp-launch-service.js"
+import type { OperationDiagnostic } from "../src/core/errors/operation-diagnostic.js";
 
 vi.mock("../src/ui/open-dashboard-browser.js", () => ({
   openDashboardInBrowser: vi.fn(async () => undefined),
@@ -124,6 +128,153 @@ describe("ProviderDock management CLI", () => {
     expect(launchCodex).toHaveBeenCalledWith(
       expect.objectContaining({ approvalLevel: "full-auto" }),
     );
+  });
+
+
+  it("launches OMP only after explicit preflight and separate acknowledgement", async () => {
+    const application = createApplication();
+    const preflight = vi.fn(async (input: OmpLaunchInput) => ({
+      ok: true as const,
+      providerId: input.providerId,
+      accountId: input.accountId,
+      modelId: input.modelId,
+      api: "openai-responses" as const,
+    }));
+    const launch = vi.fn(async () => ({ ok: true as const, runId: "omp-run-1" }));
+    const listRuns = vi.fn(async () => []);
+    const cancel = vi.fn(async () => undefined);
+    const reconcileAfterRestart = vi.fn(async () => []);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runProviderDockCli(
+      [
+        "launch",
+        "omp",
+        "--provider",
+        "provider-a",
+        "--model",
+        "model-a",
+        "--omp-account",
+        "account-a",
+        "--project",
+        "C:\\Projects\\example",
+        "--omp-read-only-pilot-no-sandbox",
+      ],
+      {
+        application,
+        io: { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) },
+        environment: {},
+        ompLauncher: { preflight, launch, listRuns, cancel, reconcileAfterRestart },
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(stdout).toEqual(["OMP run started: omp-run-1"]);
+    expect(stderr).toEqual([]);
+    expect(preflight).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerId: "provider-a",
+        modelId: "model-a",
+        accountId: "account-a",
+        projectDirectory: "C:\\Projects\\example",
+        permissionAcknowledgement: "read-only-pilot-no-sandbox",
+      }),
+    );
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(launch).toHaveBeenCalledWith(
+      expect.objectContaining({ permissionAcknowledgement: "read-only-pilot-no-sandbox" }),
+    );
+  });
+
+  it("requires the separate OMP acknowledgement and rejects --approval as a substitute", async () => {
+    const application = createApplication();
+    const preflight = vi.fn(async (input: OmpLaunchInput) => ({
+      ok: true as const,
+      providerId: input.providerId,
+      accountId: input.accountId,
+      modelId: input.modelId,
+      api: "openai-responses" as const,
+    }));
+    const launch = vi.fn(async () => ({ ok: true as const, runId: "omp-run-1" }));
+    const listRuns = vi.fn(async () => []);
+    const cancel = vi.fn(async () => undefined);
+    const reconcileAfterRestart = vi.fn(async () => []);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runProviderDockCli(
+      [
+        "launch",
+        "omp",
+        "--provider",
+        "provider-a",
+        "--model",
+        "model-a",
+        "--omp-account",
+        "account-a",
+        "--project",
+        "C:\\Projects\\example",
+        "--approval",
+        "full-auto",
+      ],
+      {
+        application,
+        io: { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) },
+        environment: {},
+        ompLauncher: { preflight, launch, listRuns, cancel, reconcileAfterRestart },
+      },
+    );
+
+    expect(code).toBe(1);
+    expect(stderr.join("\n")).toContain("OMP_PERMISSION_CONFIRMATION_REQUIRED");
+    expect(stdout).toEqual([]);
+    expect(preflight).not.toHaveBeenCalled();
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it("prints only a safe diagnostic when OMP preflight fails", async () => {
+    const application = createApplication();
+    const unsafeDiagnostic: OperationDiagnostic = {
+      code: "OPERATION_FAILED",
+      stage: "validation",
+      operationId: "01937d71-7ae7-7abc-8100-000000000003",
+      occurredAt: "2026-09-15T00:00:00.000Z",
+      retryable: false,
+      suggestedAction: "Use a safe fixture",
+      message: "Bearer sk-secret",
+    };
+    const preflight = vi.fn(async () => ({ ok: false as const, diagnostic: unsafeDiagnostic }));
+    const launch = vi.fn(async () => ({ ok: true as const, runId: "omp-run-1" }));
+    const listRuns = vi.fn(async () => []);
+    const cancel = vi.fn(async () => undefined);
+    const reconcileAfterRestart = vi.fn(async () => []);
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await runProviderDockCli(
+      [
+        "launch",
+        "omp",
+        "--provider",
+        "provider-a",
+        "--model",
+        "model-a",
+        "--omp-account",
+        "account-a",
+        "--project",
+        "C:\\Projects\\example",
+        "--omp-read-only-pilot-no-sandbox",
+      ],
+      {
+        application,
+        io: { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) },
+        environment: {},
+        ompLauncher: { preflight, launch, listRuns, cancel, reconcileAfterRestart },
+      },
+    );
+
+    expect(code).toBe(1);
+    expect(stderr.join("\n")).toContain("OPERATION_FAILED");
+    expect([...stdout, ...stderr].join("\n")).not.toContain("sk-secret");
+    expect(launch).not.toHaveBeenCalled();
   });
 
   it("probes models and reports normalized health", async () => {
@@ -369,6 +520,81 @@ describe("ProviderDock management CLI", () => {
       once.mockRestore();
     }
   });
+  it("passes the direct OMP launcher to the dashboard", async () => {
+    const application = createApplication();
+    const ompLauncher = {
+      preflight: vi.fn(async () => ({
+        ok: true as const,
+        providerId: "provider-a",
+        accountId: "account-a",
+        modelId: "model-a",
+        api: "openai-responses" as const,
+      })),
+      launch: vi.fn(async () => ({ ok: true as const, runId: "01937d71-7ae7-7abc-8100-000000000001" })),
+      listRuns: vi.fn(async () => []),
+      cancel: vi.fn(async () => undefined),
+      reconcileAfterRestart: vi.fn(async () => []),
+    };
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    let finish: (() => void) | undefined;
+    const once = vi.spyOn(process, "once").mockImplementation((event, listener) => {
+      if (event === "SIGINT") {
+        finish = () => listener("SIGINT");
+      }
+      return process;
+    });
+
+    try {
+      const dashboardPort = await new Promise<number>((resolve, reject) => {
+        const listener = createServer();
+        listener.once("error", reject);
+        listener.listen(0, "127.0.0.1", () => {
+          const address = listener.address();
+          if (address === null || typeof address === "string") {
+            reject(new Error("Could not allocate a dashboard test port."));
+            return;
+          }
+          listener.close(() => resolve(address.port));
+        });
+      });
+      let dashboardFailure: unknown;
+      const dashboard = runProviderDockCli(["dashboard", "--port", String(dashboardPort)], {
+        application,
+        io: {
+          stdout: (message) => stdout.push(message),
+          stderr: (message) => stderr.push(message),
+        },
+        environment: {},
+        ompLauncher,
+      });
+      dashboard.catch((error: unknown) => {
+        dashboardFailure = error;
+      });
+      const deadline = Date.now() + 5_000;
+      while (stdout.length === 0) {
+        if (Date.now() >= deadline) {
+          if (dashboardFailure !== undefined) throw dashboardFailure;
+          throw new Error(`Dashboard did not start. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      const dashboardUrl = /^ProviderDock dashboard: (\S+)/.exec(stdout[0] ?? "")?.[1];
+      expect(dashboardUrl).toBeDefined();
+      const runsResponse = await fetch(`${dashboardUrl}api/omp/runs`);
+      expect(runsResponse.status).toBe(200);
+      expect(await runsResponse.json()).toEqual({ runs: [] });
+      expect(ompLauncher.reconcileAfterRestart).toHaveBeenCalledTimes(1);
+      expect(ompLauncher.listRuns).toHaveBeenCalledTimes(1);
+
+      finish?.();
+      expect(await dashboard).toBe(0);
+      expect(stderr).toEqual([]);
+    } finally {
+      finish?.();
+      once.mockRestore();
+    }
+  });
   it("manages prompt profiles from a multiline instructions file with reference integrity", async () => {
     const application = createApplication();
     for (const id of ["primary", "direct"]) {
@@ -507,6 +733,89 @@ describe("ProviderDock management CLI", () => {
   });
 });
 
+describe("credential maintenance CLI", () => {
+  it("lists only masked credential summaries", async () => {
+    const application = createApplication();
+    const summary: CredentialSummary = {
+      id: "00000000-0000-4000-8000-000000000001",
+      providerId: "vsllm",
+      purpose: "provider-api",
+      maskedValue: "abc…WXYZ",
+      state: "active",
+      createdAt: "2026-09-21T00:00:00.000Z",
+    };
+    vi.spyOn(application, "listCredentials").mockResolvedValue([summary]);
+
+    const result = await runCli(application, [
+      "credentials",
+      "list",
+      "--provider",
+      "vsllm",
+      "--purpose",
+      "provider-api",
+      "--json",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout[0] ?? "[]")).toEqual([summary]);
+    expect(result.stdout.join("\n")).not.toContain("actual-secret-value");
+  });
+
+  it("imports a single raw file without echoing its value", async () => {
+    const application = createApplication();
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-credential-cli-"));
+    const source = join(directory, ".env-key");
+    await writeFile(source, "actual-secret-value\n", "utf8");
+    const add = vi.spyOn(application, "addCredential").mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000002",
+      providerId: "vsllm",
+      purpose: "provider-api",
+      maskedValue: "act…alue",
+      state: "active",
+      createdAt: "2026-09-21T00:00:00.000Z",
+    });
+
+    const result = await runCli(application, [
+      "credentials",
+      "import",
+      "--provider",
+      "vsllm",
+      "--purpose",
+      "provider-api",
+      "--file",
+      source,
+      "--activate",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(add).toHaveBeenCalledWith({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "actual-secret-value",
+      activate: true,
+    });
+    expect(result.stdout.join("\n")).not.toContain("actual-secret-value");
+  });
+
+  it("uses the injected hidden-passphrase reader for backup and restore", async () => {
+    const application = createApplication();
+    const backup = join(await mkdtemp(join(tmpdir(), "provider-dock-credential-backup-")), "backup.pdv");
+    const create = vi.spyOn(application, "createCredentialBackup").mockResolvedValue(undefined);
+    const restore = vi.spyOn(application, "restoreCredentialBackup").mockResolvedValue({
+      restored: 1,
+      skipped: 0,
+      credentialIds: ["00000000-0000-4000-8000-000000000003"],
+    });
+    const passphraseReader = vi.fn(async () => "operator-passphrase");
+
+    expect((await runCli(application, ["credentials", "backup", "--file", backup], {}, passphraseReader)).code).toBe(0);
+    expect((await runCli(application, ["credentials", "restore", "--file", backup], {}, passphraseReader)).code).toBe(0);
+    expect(create).toHaveBeenCalledWith(backup, "operator-passphrase");
+    expect(restore).toHaveBeenCalledWith(backup, "operator-passphrase");
+    expect(passphraseReader).toHaveBeenCalledTimes(2);
+  });
+});
+
 function createApplication(fetchImpl: typeof fetch = vi.fn<typeof fetch>()): ProviderDockApplication {
   const secrets = new MemorySecretStore();
   const adapters = new ProviderAdapterRegistry().register(
@@ -523,10 +832,16 @@ async function runCli(
   application: ProviderDockApplication,
   argv: string[],
   environment: NodeJS.ProcessEnv = {},
+  credentialPassphraseReader?: () => Promise<string>,
 ) {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const io: CliIo = { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) };
-  const code = await runProviderDockCli(argv, { application, io, environment });
+  const code = await runProviderDockCli(argv, {
+    application,
+    io,
+    environment,
+    ...(credentialPassphraseReader === undefined ? {} : { credentialPassphraseReader }),
+  });
   return { code, stdout, stderr };
 }
