@@ -17,7 +17,9 @@ import {
   decryptPortableSecretPayload,
   encryptPortableSecretPayload,
 } from "./portable-secret-vault.js";
-import type { SecretVault } from "./secret-store.js";
+import type { SecretStore, SecretVault } from "./secret-store.js";
+
+export type { CredentialPurpose } from "./credential-repository.js";
 
 const credentialValueLimit = 65_536;
 const backupDocumentSchema = z
@@ -65,7 +67,8 @@ export interface AddCredentialInput {
 }
 
 export interface CredentialManagerOptions {
-  readonly secrets: SecretVault;
+  readonly secrets: SecretStore;
+  readonly vault?: SecretVault;
   readonly metadata: CredentialMetadataRepository;
   readonly bindings?: CredentialBindingAdapter;
   readonly now?: () => Date;
@@ -159,11 +162,11 @@ export class CredentialManager {
       state: "available",
       createdAt: this.now().toISOString(),
     };
-    await this.options.secrets.set(secretRef, input.value);
+    await this.requireVault().set(secretRef, input.value);
     try {
       await this.options.metadata.upsert(record);
     } catch (error) {
-      await this.options.secrets.delete(secretRef).catch(() => undefined);
+      await this.requireVault().delete(secretRef).catch(() => undefined);
       throw error;
     }
     if (input.activate === true) {
@@ -220,7 +223,7 @@ export class CredentialManager {
         "Credential is still referenced by an active binding.",
       );
     }
-    await this.options.secrets.delete(record.secretRef);
+    await this.requireVault().delete(record.secretRef);
     await this.options.metadata.delete(record.id);
   }
 
@@ -279,12 +282,12 @@ export class CredentialManager {
         lastUsedAt: undefined,
       };
       try {
-        await this.options.secrets.set(secretRef, item.value);
+        await this.requireVault().set(secretRef, item.value);
         await this.options.metadata.upsert(record);
         restored.push(id);
       } catch (error) {
         skipped += 1;
-        await this.options.secrets.delete(secretRef).catch(() => undefined);
+        await this.requireVault().delete(secretRef).catch(() => undefined);
       }
     }
     return { restored: restored.length, skipped, credentialIds: restored };
@@ -297,6 +300,19 @@ export class CredentialManager {
       if (error instanceof SecretProtectionError) return undefined;
       throw error;
     }
+  }
+
+  private requireVault(): SecretVault {
+    if (this.options.vault !== undefined) return this.options.vault;
+    const candidate = this.options.secrets as Partial<SecretVault>;
+    if (
+      typeof candidate.set === "function" &&
+      typeof candidate.delete === "function" &&
+      typeof candidate.listReferences === "function"
+    ) {
+      return this.options.secrets as SecretVault;
+    }
+    throw new CredentialManagerError("CONFLICT", "Writable credential vault is not configured.");
   }
 
   private async requireValue(record: CredentialRecord): Promise<string> {

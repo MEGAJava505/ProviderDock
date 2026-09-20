@@ -2,6 +2,7 @@ import { knownModelProtocol, type ModelProtocolResolver } from "../core/provider
 import { assertModelEnabled } from "../core/providers/model-access.js";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ProviderProbeService } from "../core/health/provider-probe-service.js";
 import { FileLogicalModelRepository } from "../core/fallback/logical-model-repository.js";
 import { FilePromptProfileRepository } from "../core/profiles/prompt-profile-repository.js";
@@ -18,6 +19,9 @@ import {
   type SecretStore,
   type SecretVault,
 } from "../core/security/secret-store.js";
+import { ApplicationCredentialBindings } from "../core/security/credential-bindings.js";
+import { CredentialManager } from "../core/security/credential-manager.js";
+import { FileCredentialMetadataRepository } from "../core/security/credential-repository.js";
 import { GenericOpenAiAdapter } from "../providers/generic-openai/generic-openai-adapter.js";
 import { GenericAnthropicAdapter } from "../providers/generic-anthropic/generic-anthropic-adapter.js";
 import { AgentRouterAdapter } from "../providers/agentrouter/agentrouter-adapter.js";
@@ -45,13 +49,29 @@ import {
   type ProviderPluginModuleImporter,
 } from "../core/plugins/provider-plugin-loader.js";
 import type { LoadedProviderPlugin } from "../core/plugins/provider-plugin-sdk.js";
-import { FilePortalRepository } from "../core/portals/portal-repository.js";
+import {
+  FilePortalRepository,
+  PortalRepositoryCorruptionError,
+} from "../core/portals/portal-repository.js";
 import { ProviderPortalService } from "../core/portals/provider-portal-service.js";
 import { ProviderPortalAdapterRegistry } from "../core/portals/portal-types.js";
 import { NewApiPortalAdapter } from "../core/portals/new-api-portal-adapter.js";
 import { NofxPortalAdapter } from "../core/portals/nofx-portal-adapter.js";
 import { HelyxPortalAdapter } from "../core/portals/helyx-portal-adapter.js";
+import { OmpRuntime, type OmpArtifact } from "../clients/omp/omp-runtime.js";
+import { OmpProcessSupervisor } from "../clients/omp/omp-process-supervisor.js";
+import { FileOmpRunRepository } from "../clients/omp/omp-run-repository.js";
+import { OmpLaunchService } from "./omp-launch-service.js";
+import { FileOmpRouteDecisionSource } from "../migration/omp-route-decisions.js";
+import { FileOmpProviderLocalSmokeEvidenceSource } from "../migration/omp-provider-evidence.js";
 
+const pinnedOmpArtifact: OmpArtifact = {
+  executable: fileURLToPath(
+    new URL("../../.provider-dock/tools/omp-0c6c981ee583/omp.exe", import.meta.url),
+  ),
+  sha256: "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  sourceCommit: "0c6c981ee5838d97700180383077eb0a3790637c",
+};
 export interface ProviderDockPaths {
   readonly dataDirectory: string;
   readonly providersFile: string;
@@ -115,10 +135,22 @@ export interface CreateDefaultApplicationOptions extends ResolveProviderDockPath
   readonly platform?: NodeJS.Platform;
 }
 
+export interface DefaultProviderDockComposition {
+  readonly application: ProviderDockApplication;
+  /** Direct OMP seam; never routes through legacy Codex/Claude launchers. */
+  readonly ompLauncher: OmpLaunchService;
+}
+
 export function createDefaultApplication(
   options: CreateDefaultApplicationOptions = {},
 ): ProviderDockApplication {
-  return assembleDefaultApplication(createDefaultApplicationRuntime(options), []);
+  return createDefaultProviderDock(options).application;
+}
+
+export function createDefaultProviderDock(
+  options: CreateDefaultApplicationOptions = {},
+): DefaultProviderDockComposition {
+  return assembleDefaultProviderDock(createDefaultApplicationRuntime(options), []);
 }
 
 export interface CreateDefaultApplicationAsyncOptions
@@ -130,6 +162,12 @@ export interface CreateDefaultApplicationAsyncOptions
 export async function createDefaultApplicationAsync(
   options: CreateDefaultApplicationAsyncOptions = {},
 ): Promise<ProviderDockApplication> {
+  return (await createDefaultProviderDockAsync(options)).application;
+}
+
+export async function createDefaultProviderDockAsync(
+  options: CreateDefaultApplicationAsyncOptions = {},
+): Promise<DefaultProviderDockComposition> {
   const runtime = createDefaultApplicationRuntime(options);
   const pluginPaths =
     options.pluginPaths ??
@@ -143,9 +181,8 @@ export async function createDefaultApplicationAsync(
       ? {}
       : { importer: options.pluginImporter }),
   });
-  return assembleDefaultApplication(runtime, providerPlugins);
+  return assembleDefaultProviderDock(runtime, providerPlugins);
 }
-
 export function resolveProviderPluginPaths(
   environment: NodeJS.ProcessEnv = process.env,
 ): readonly string[] {
@@ -165,6 +202,8 @@ interface DefaultApplicationRuntime {
   readonly usageRecords: FileUsageRepository;
   readonly secrets: SecretStore;
   readonly secretVault: SecretVault | undefined;
+  readonly credentials: CredentialManager;
+  readonly portalRecords: FilePortalRepository;
   readonly adapters: ProviderAdapterRegistry;
   readonly environment: NodeJS.ProcessEnv;
   readonly fetchImpl: typeof fetch | undefined;
@@ -184,17 +223,27 @@ function createDefaultApplicationRuntime(
   );
   const healthRecords = new FileProviderHealthRepository(paths.healthHistoryFile);
   const usageRecords = new FileUsageRepository(paths.usageHistoryFile);
+  const portalRecords = new FilePortalRepository(join(paths.dataDirectory, "portals", "accounts.json"));
   const environmentSecrets = new EnvironmentSecretStore(environment);
   const platform = options.platform ?? process.platform;
   let secretVault: SecretVault | undefined;
-  let secrets: SecretStore = environmentSecrets;
+  let protectedSecrets: SecretStore = environmentSecrets;
   if (platform === "win32") {
     secretVault = new DpapiFileSecretVault(
       paths.secretsDirectory,
       new WindowsDpapiProtector({ platform }),
     );
-    secrets = new ChainedSecretStore([secretVault, environmentSecrets]);
+    protectedSecrets = new ChainedSecretStore([secretVault, environmentSecrets]);
   }
+  const credentials = new CredentialManager({
+    secrets: protectedSecrets,
+    ...(secretVault === undefined ? {} : { vault: secretVault }),
+    metadata: new FileCredentialMetadataRepository(
+      join(paths.dataDirectory, "credentials", "registry.json"),
+    ),
+    bindings: new ApplicationCredentialBindings(profiles, portalRecords),
+  });
+  const secrets: SecretStore = credentials;
   const adapterOptions = {
     secretStore: secrets,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
@@ -215,12 +264,43 @@ function createDefaultApplicationRuntime(
     usageRecords,
     secrets,
     secretVault,
+    credentials,
+    portalRecords,
     adapters,
     environment,
     fetchImpl: options.fetchImpl,
   };
 }
 
+function assembleDefaultProviderDock(
+  runtime: DefaultApplicationRuntime,
+  providerPlugins: readonly LoadedProviderPlugin[],
+): DefaultProviderDockComposition {
+  const application = assembleDefaultApplication(runtime, providerPlugins);
+  const ompRootDirectory = join(runtime.paths.runtimeDirectory, "omp");
+  const ompRuntime = new OmpRuntime({
+    rootDirectory: ompRootDirectory,
+    artifact: pinnedOmpArtifact,
+    secretStore: runtime.secrets,
+    ambientEnvironment: runtime.environment,
+  });
+  const ompLauncher = new OmpLaunchService({
+    application,
+    runtime: ompRuntime,
+    artifact: pinnedOmpArtifact,
+    routeDecisions: new FileOmpRouteDecisionSource(
+      join(runtime.paths.dataDirectory, "migration", "omp-route-decisions.json"),
+    ),
+    evidence: new FileOmpProviderLocalSmokeEvidenceSource(
+      join(runtime.paths.dataDirectory, "migration", "omp-provider-evidence.json"),
+    ),
+    supervisor: new OmpProcessSupervisor({
+      runtime: ompRuntime,
+      runs: new FileOmpRunRepository(join(runtime.paths.runtimeDirectory, "omp-runs")),
+    }),
+  });
+  return { application, ompLauncher };
+}
 function assembleDefaultApplication(
   runtime: DefaultApplicationRuntime,
   providerPlugins: readonly LoadedProviderPlugin[],
@@ -236,6 +316,8 @@ function assembleDefaultApplication(
     usageRecords,
     secrets,
     secretVault,
+    credentials,
+    portalRecords,
     adapters,
     environment,
   } = runtime;
@@ -254,9 +336,16 @@ function assembleDefaultApplication(
     if (!profile) throw new Error("Provider was removed.");
     assertModelEnabled(profile, modelId);
   };
-  const portalRecords = new FilePortalRepository(join(paths.dataDirectory, "portals", "accounts.json"));
   const protocolResolver: ModelProtocolResolver = async (profile, modelId, client) => {
-    const [health, portal] = await Promise.all([healthRecords.get(profile.id), portalRecords.get(profile.id)]);
+    const [health, portal] = await Promise.all([
+      healthRecords.get(profile.id),
+      portalRecords.get(profile.id).catch((error: unknown) => {
+        // Portal hints are optional. Keep corruption visible in the repository,
+        // but allow health hints or normal bridge negotiation to route requests.
+        if (error instanceof PortalRepositoryCorruptionError) return undefined;
+        throw error;
+      }),
+    ]);
     return knownModelProtocol(health, portal, modelId, client);
   };
   const probes = new ProviderProbeService(adapters);
@@ -350,6 +439,7 @@ function assembleDefaultApplication(
       codexHome: paths.codexHome,
     }),
     approvalPreferences,
+    credentials,
   );
 }
 

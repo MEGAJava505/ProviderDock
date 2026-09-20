@@ -33,6 +33,13 @@ import type { ProviderProfileRepository } from "../core/providers/provider-profi
 import type { ProviderAdapterRegistry } from "../core/providers/provider-adapter-registry.js";
 import type { SecretVault } from "../core/security/secret-store.js";
 import { secretReferenceSchema } from "../core/providers/provider-profile.js";
+import type {
+  AddCredentialInput,
+  CredentialManager,
+  CredentialPurpose,
+  CredentialRestoreReport,
+  CredentialSummary,
+} from "../core/security/credential-manager.js";
 import {
   parsePromptProfile,
   type PromptProfile,
@@ -312,6 +319,7 @@ export class ProviderDockApplication {
     private readonly portals?: ProviderPortalService,
     private readonly agentSessions?: AgentSessionHistory,
     private readonly approvalPreferences?: AgentApprovalPreferenceRepository,
+    private readonly credentials?: CredentialManager,
   ) {
     // Keep provider model catalogs current without requiring a manual probe.
     // The timer is intentionally unref'ed so it never keeps short-lived CLI/tests alive.
@@ -733,6 +741,37 @@ export class ProviderDockApplication {
     return report;
   }
 
+  async listCredentials(
+    providerId?: string,
+    purpose?: CredentialPurpose,
+  ): Promise<readonly CredentialSummary[]> {
+    return this.requireCredentialManager().list(providerId, purpose);
+  }
+
+  async addCredential(input: AddCredentialInput): Promise<CredentialSummary> {
+    return this.requireCredentialManager().add(input);
+  }
+
+  async activateCredential(
+    providerId: string,
+    purpose: CredentialPurpose,
+    credentialId: string,
+  ): Promise<CredentialSummary> {
+    return this.requireCredentialManager().activate(providerId, purpose, credentialId);
+  }
+
+  async removeCredential(providerId: string, credentialId: string): Promise<void> {
+    await this.requireCredentialManager().remove(providerId, credentialId);
+  }
+
+  async createCredentialBackup(destination: string, passphrase: string): Promise<void> {
+    await this.requireCredentialManager().createBackup(destination, passphrase);
+  }
+
+  async restoreCredentialBackup(source: string, passphrase: string): Promise<CredentialRestoreReport> {
+    return this.requireCredentialManager().restoreBackup(source, passphrase);
+  }
+
   async setSecret(reference: string, value: string): Promise<void> {
     await this.requireSecretVault().set(secretReferenceSchema.parse(reference), value);
     await this.portals?.invalidateSecret(reference);
@@ -777,7 +816,7 @@ export class ProviderDockApplication {
     const profile = await this.getProvider(providerId);
     assertModelEnabled(profile, input.modelId);
     const modelCatalog = await this.modelCatalogFor(profile);
-    if (modelCatalog.authoritative) {
+    if (modelCatalog.hasAvailabilityEvidence) {
       assertModelAvailable(
         profile,
         input.modelId,
@@ -926,7 +965,7 @@ export class ProviderDockApplication {
     const profile = await this.getProvider(providerId);
     assertModelEnabled(profile, input.modelId);
     const modelCatalog = await this.modelCatalogFor(profile);
-    if (modelCatalog.authoritative) {
+    if (modelCatalog.hasAvailabilityEvidence) {
       assertModelAvailable(
         profile,
         input.modelId,
@@ -943,6 +982,7 @@ export class ProviderDockApplication {
   private async modelCatalogFor(profile: ProviderProfile): Promise<{
     readonly models: readonly BridgeModelDefinition[];
     readonly authoritative: boolean;
+    readonly hasAvailabilityEvidence: boolean;
   }> {
     let record = await this.healthRecords.get(profile.id);
     if (record?.latest === undefined) {
@@ -985,6 +1025,11 @@ export class ProviderDockApplication {
     return {
       models: [...byId.values()],
       authoritative: latestIsAuthoritative,
+      hasAvailabilityEvidence:
+        byId.size > 0 ||
+        (record?.latest !== undefined &&
+          record.latest.health.errorType === undefined &&
+          ["ONLINE", "DEGRADED"].includes(record.latest.health.status)),
     };
   }
 
@@ -996,6 +1041,7 @@ export class ProviderDockApplication {
       Promise<{
         readonly models: readonly BridgeModelDefinition[];
         readonly authoritative: boolean;
+        readonly hasAvailabilityEvidence: boolean;
       }>
     >();
     const available = await Promise.all(
@@ -1249,6 +1295,11 @@ export class ProviderDockApplication {
   private requireSecretVault(): SecretVault {
     if (!this.secretVault) throw new SecretVaultUnavailableError();
     return this.secretVault;
+  }
+
+  private requireCredentialManager(): CredentialManager {
+    if (!this.credentials) throw new Error("Credential manager is not configured.");
+    return this.credentials;
   }
 
   private requireApprovalPreferences(): AgentApprovalPreferenceRepository {

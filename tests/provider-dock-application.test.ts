@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   GenericOpenAiAdapter,
+  CredentialManager,
   MemoryProviderHealthRepository,
   MemoryProviderProfileRepository,
+  MemoryCredentialMetadataRepository,
   MemorySecretStore,
   ModelUnavailableError,
   LogicalModelInUseByPromptProfileError,
@@ -896,6 +898,57 @@ describe("ApplicationCredentialBindings", () => {
       { providerId: "fixture", purpose: "portal-session", secretRef: "NEW_SESSION" },
     ]));
     expect(await bindings.isReferenced("SESSION")).toBe(false);
+  });
+
+  it("exposes credential operations through the application without returning plaintext", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const portals = new MemoryPortalRepository();
+    await profiles.upsert({
+      id: "fixture",
+      displayName: "Fixture",
+      baseUrl: "https://inference.invalid/v1",
+      auth: { kind: "bearer", secretRef: "OLD_API" },
+    });
+    const secrets = new MemorySecretStore();
+    const manager = new CredentialManager({
+      secrets,
+      metadata: new MemoryCredentialMetadataRepository(),
+      bindings: new ApplicationCredentialBindings(profiles, portals),
+    });
+    const application = new ProviderDockApplication(
+      profiles,
+      new ProviderProbeService(new ProviderAdapterRegistry()),
+      secrets,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      manager,
+    );
+
+    const added = await application.addCredential({
+      providerId: "fixture",
+      purpose: "provider-api",
+      value: "fixture-api-secret",
+      activate: true,
+    });
+
+    expect(added.maskedValue).toBe("fix…cret");
+    expect(JSON.stringify(added)).not.toContain("fixture-api-secret");
+    expect((await application.getProvider("fixture")).auth).toMatchObject({
+      kind: "bearer",
+      secretRef: expect.stringMatching(/^credential-/),
+    });
   });
 });
 
