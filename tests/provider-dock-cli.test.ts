@@ -734,6 +734,23 @@ describe("ProviderDock management CLI", () => {
 });
 
 describe("credential maintenance CLI", () => {
+  it("reconciles legacy references without printing secret values", async () => {
+    const application = createApplication();
+    const summaries: CredentialSummary[] = [{
+      id: "00000000-0000-4000-8000-000000000000",
+      providerId: "vsllm",
+      purpose: "provider-api",
+      maskedValue: "leg…cret",
+      state: "unavailable",
+      createdAt: "2026-09-21T00:00:00.000Z",
+    }];
+    vi.spyOn(application, "reconcileCredentials").mockResolvedValue(summaries);
+    const result = await runCli(application, ["credentials", "reconcile", "--json"]);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout[0] ?? "[]")).toEqual(summaries);
+    expect(result.stdout.join("\n")).not.toContain("legacy-provider-secret");
+  });
+
   it("lists only masked credential summaries", async () => {
     const application = createApplication();
     const summary: CredentialSummary = {

@@ -121,6 +121,42 @@ export class CredentialManager {
     return Promise.all(records.map(async (record) => this.toSummary(record, activeRefs.has(record.secretRef))));
   }
 
+  /** Import existing profile/portal references into the registry without replacing their ciphertext. */
+  async reconcile(): Promise<readonly CredentialSummary[]> {
+    const bindings = await this.options.bindings?.list() ?? [];
+    const records = [...(await this.options.metadata.list())];
+    for (const binding of bindings) {
+      const existing = records.find(
+        (record) =>
+          record.providerId === binding.providerId &&
+          record.purpose === binding.purpose &&
+          record.secretRef === binding.secretRef,
+      );
+      let value: string | undefined;
+      try {
+        value = await this.options.secrets.get(binding.secretRef);
+      } catch (error) {
+        if (!(error instanceof SecretProtectionError)) throw error;
+      }
+      const record: CredentialRecord = existing ?? {
+        id: this.idFactory(),
+        providerId: binding.providerId,
+        purpose: binding.purpose,
+        secretRef: secretReferenceSchema.parse(binding.secretRef),
+        label: "legacy",
+        maskedValue: value === undefined ? "unavailable" : maskCredentialValue(value),
+        state: value === undefined ? "unavailable" : "active",
+        createdAt: this.now().toISOString(),
+      };
+      await this.options.metadata.upsert({
+        ...record,
+        maskedValue: value === undefined ? record.maskedValue : maskCredentialValue(value),
+        state: value === undefined ? "unavailable" : "active",
+      });
+    }
+    return this.list();
+  }
+
   async resolveActive(providerId: string, purpose: CredentialPurpose): Promise<string> {
     credentialPurposeSchema.parse(purpose);
     const bindings = await this.options.bindings?.list() ?? [];

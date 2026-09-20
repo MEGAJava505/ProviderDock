@@ -215,6 +215,34 @@ describe("CredentialManager", () => {
       expect.objectContaining({ id: added.id, state: "unavailable" }),
     ]);
   });
+
+  it("reconciles legacy bindings additively without changing their secret references", async () => {
+    const secrets = new MemorySecretStore({ LEGACY_VSLLM_KEY: "legacy-provider-secret" });
+    const bindings = new TestCredentialBindings();
+    await bindings.activate({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      secretRef: "LEGACY_VSLLM_KEY",
+    });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const manager = new CredentialManager({ secrets, metadata });
+    // Manager instances without bindings must not invent references.
+    await expect(manager.reconcile()).resolves.toEqual([]);
+
+    const reconciler = new CredentialManager({ secrets, metadata, bindings });
+    const summaries = await reconciler.reconcile();
+    expect(summaries).toEqual([
+      expect.objectContaining({
+        providerId: "vsllm",
+        purpose: "provider-api",
+        maskedValue: "leg…cret",
+        state: "active",
+      }),
+    ]);
+    const record = (await metadata.list())[0];
+    expect(record?.secretRef).toBe("LEGACY_VSLLM_KEY");
+    expect(await secrets.get("LEGACY_VSLLM_KEY")).toBe("legacy-provider-secret");
+  });
 });
 
 const windowsIt = process.platform === "win32" ? it : it.skip;

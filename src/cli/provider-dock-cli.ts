@@ -1254,6 +1254,19 @@ async function executeCredentials(
 ): Promise<number> {
   const [command, ...rest] = argv;
   switch (command) {
+    case "reconcile": {
+      const { values, positionals } = parseArgs({
+        args: [...rest],
+        options: { json: { type: "boolean", default: false } },
+        allowPositionals: true,
+        strict: true,
+      });
+      assertNoPositionals(positionals);
+      const summaries = await application.reconcileCredentials();
+      if (values.json) io.stdout(JSON.stringify(summaries, null, 2));
+      else io.stdout(`Reconciled ${summaries.length} managed credential(s).`);
+      return 0;
+    }
     case "list": {
       const { values, positionals } = parseArgs({
         args: [...rest],
@@ -1376,7 +1389,7 @@ async function executeCredentials(
     }
     default:
       throw new CliUsageError(
-        "Expected credentials subcommand: list, import, activate, remove, backup, or restore.",
+        "Expected credentials subcommand: reconcile, list, import, activate, remove, backup, or restore.",
       );
   }
 }
@@ -2278,6 +2291,7 @@ Usage:
   providerdock secrets set <reference> --from-env VARIABLE
   providerdock secrets remove <reference>
   providerdock credentials list [--provider ID] [--purpose provider-api|portal-session] [--json]
+  providerdock credentials reconcile [--json]
   providerdock credentials import --provider ID --purpose provider-api|portal-session --file FILE [--activate] [--json]
   providerdock credentials activate --provider ID --purpose provider-api|portal-session --credential ID [--json]
   providerdock credentials remove --provider ID --purpose provider-api|portal-session --credential ID

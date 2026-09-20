@@ -748,6 +748,10 @@ export class ProviderDockApplication {
     return this.requireCredentialManager().list(providerId, purpose);
   }
 
+  async reconcileCredentials(): Promise<readonly CredentialSummary[]> {
+    return this.requireCredentialManager().reconcile();
+  }
+
   async addCredential(input: AddCredentialInput): Promise<CredentialSummary> {
     return this.requireCredentialManager().add(input);
   }
