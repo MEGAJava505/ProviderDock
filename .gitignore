@@ -6,6 +6,8 @@ coverage/
 .env.*
 !.env.example
 .env-key
+*.pdv
+*.pdv.*.tmp
 *.log
 .provider-dock/
 .DS_Store
