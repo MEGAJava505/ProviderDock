@@ -35,6 +35,7 @@ import type { SecretVault } from "../core/security/secret-store.js";
 import { secretReferenceSchema } from "../core/providers/provider-profile.js";
 import type {
   AddCredentialInput,
+  CredentialBackupReport,
   CredentialManager,
   CredentialPurpose,
   CredentialRestoreReport,
@@ -772,8 +773,8 @@ export class ProviderDockApplication {
     await this.requireCredentialManager().remove(providerId, credentialId, purpose);
   }
 
-  async createCredentialBackup(destination: string, passphrase: string): Promise<void> {
-    await this.requireCredentialManager().createBackup(destination, passphrase);
+  async createCredentialBackup(destination: string, passphrase: string): Promise<CredentialBackupReport> {
+    return this.requireCredentialManager().createBackup(destination, passphrase);
   }
 
   async restoreCredentialBackup(source: string, passphrase: string): Promise<CredentialRestoreReport> {

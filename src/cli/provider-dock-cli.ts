@@ -1369,8 +1369,10 @@ async function executeCredentials(
       assertNoPositionals(positionals);
       const destination = requireString(values.file, "--file");
       const passphrase = await readCredentialPassphrase(passphraseReader);
-      await application.createCredentialBackup(destination, passphrase);
-      io.stdout(`Credential backup written to '${destination}'.`);
+      const report = await application.createCredentialBackup(destination, passphrase);
+      io.stdout(
+        `Credential backup written to '${destination}': ${report.included} included, ${report.skipped} unavailable skipped.`,
+      );
       return 0;
     }
     case "restore": {

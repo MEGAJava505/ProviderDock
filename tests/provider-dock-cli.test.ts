@@ -817,7 +817,10 @@ describe("credential maintenance CLI", () => {
   it("uses the injected hidden-passphrase reader for backup and restore", async () => {
     const application = createApplication();
     const backup = join(await mkdtemp(join(tmpdir(), "provider-dock-credential-backup-")), "backup.pdv");
-    const create = vi.spyOn(application, "createCredentialBackup").mockResolvedValue(undefined);
+    const create = vi.spyOn(application, "createCredentialBackup").mockResolvedValue({
+      included: 1,
+      skipped: 0,
+    });
     const restore = vi.spyOn(application, "restoreCredentialBackup").mockResolvedValue({
       restored: 1,
       skipped: 0,

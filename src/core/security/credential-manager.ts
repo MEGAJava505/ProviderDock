@@ -81,6 +81,11 @@ export interface CredentialRestoreReport {
   readonly credentialIds: readonly string[];
 }
 
+export interface CredentialBackupReport {
+  readonly included: number;
+  readonly skipped: number;
+}
+
 export class CredentialManagerError extends Error {
   constructor(
     readonly code:
@@ -290,16 +295,23 @@ export class CredentialManager {
     await this.options.metadata.delete(record.id);
   }
 
-  async createBackup(destination: string, passphrase: string): Promise<void> {
+  async createBackup(destination: string, passphrase: string): Promise<CredentialBackupReport> {
     await assertSafeBackupPath(destination, false);
     const records: Array<{ readonly record: CredentialRecord; readonly value: string }> = [];
+    let skipped = 0;
     for (const record of await this.options.metadata.list()) {
       try {
         const value = await this.readSecret(record.secretRef);
-        if (!value) continue;
+        if (!value) {
+          skipped += 1;
+          continue;
+        }
         records.push({ record: { ...record, state: "available" }, value });
       } catch (error) {
-        if (error instanceof SecretProtectionError) continue;
+        if (error instanceof SecretProtectionError) {
+          skipped += 1;
+          continue;
+        }
         throw error;
       }
     }
@@ -312,6 +324,7 @@ export class CredentialManager {
       mode: 0o600,
     });
     await rename(temporaryPath, destination);
+    return { included: records.length, skipped };
   }
 
   async restoreBackup(source: string, passphrase: string): Promise<CredentialRestoreReport> {
