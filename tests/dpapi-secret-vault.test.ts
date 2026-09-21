@@ -243,6 +243,64 @@ describe("CredentialManager", () => {
     expect(record?.secretRef).toBe("LEGACY_VSLLM_KEY");
     expect(await secrets.get("LEGACY_VSLLM_KEY")).toBe("legacy-provider-secret");
   });
+
+  it("keeps an explicitly unlocked restore usable when no writable vault is available", async () => {
+    const source = new MemorySecretStore();
+    const sourceBindings = new TestCredentialBindings();
+    const sourceManager = new CredentialManager({
+      secrets: source,
+      metadata: new MemoryCredentialMetadataRepository(),
+      bindings: sourceBindings,
+    });
+    const credential = await sourceManager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "portable-recovery-secret",
+    });
+    const backupPath = join(await mkdtemp(join(tmpdir(), "provider-dock-unlocked-")), "credentials.pdv");
+    await sourceManager.createBackup(backupPath, "restore-passphrase");
+
+    const restoredBindings = new TestCredentialBindings();
+    const restoredManager = new CredentialManager({
+      secrets: new ReadOnlySecretStore(),
+      metadata: new MemoryCredentialMetadataRepository(),
+      bindings: restoredBindings,
+    });
+    const report = await restoredManager.restoreBackup(backupPath, "restore-passphrase");
+    expect(report.restored).toBe(1);
+    await restoredManager.activate("vsllm", "provider-api", report.credentialIds[0] ?? credential.id);
+    await expect(restoredManager.resolveActive("vsllm", "provider-api")).resolves.toBe(
+      "portable-recovery-secret",
+    );
+  });
+
+  it("rolls registry and binding state back when activation fails after pointer mutation", async () => {
+    const secrets = new MemorySecretStore();
+    const metadata = new MemoryCredentialMetadataRepository();
+    const bindings = new FailOnceCredentialBindings();
+    const manager = new CredentialManager({ secrets, metadata, bindings });
+    const first = await manager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "first-provider-secret",
+      activate: true,
+    });
+    const second = await manager.add({
+      providerId: "vsllm",
+      purpose: "provider-api",
+      value: "second-provider-secret",
+    });
+    bindings.failNextActivation();
+
+    await expect(manager.activate("vsllm", "provider-api", second.id)).rejects.toThrow(
+      "simulated binding failure",
+    );
+    expect(await manager.list("vsllm", "provider-api")).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: first.id, state: "active" }),
+      expect.objectContaining({ id: second.id, state: "available" }),
+    ]));
+    expect((await bindings.list())[0]?.secretRef).toBe((await metadata.get(first.id))?.secretRef);
+  });
 });
 
 const windowsIt = process.platform === "win32" ? it : it.skip;
@@ -295,5 +353,36 @@ class UnavailableSecretVault {
 
   async listReferences(): Promise<readonly string[]> {
     return [];
+  }
+}
+
+class ReadOnlySecretStore {
+  async get(): Promise<string | undefined> {
+    return undefined;
+  }
+}
+
+class FailOnceCredentialBindings implements CredentialBindingAdapter {
+  private active?: CredentialBinding;
+  private failNext = false;
+
+  failNextActivation(): void {
+    this.failNext = true;
+  }
+
+  async list(): Promise<readonly CredentialBinding[]> {
+    return this.active === undefined ? [] : [this.active];
+  }
+
+  async activate(binding: CredentialBinding): Promise<void> {
+    this.active = binding;
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error("simulated binding failure");
+    }
+  }
+
+  async isReferenced(secretRef: string): Promise<boolean> {
+    return this.active?.secretRef === secretRef;
   }
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { secretReferenceSchema } from "../providers/provider-profile.js";
@@ -100,6 +100,7 @@ export class CredentialManagerError extends Error {
 export class CredentialManager {
   private readonly now: () => Date;
   private readonly idFactory: () => string;
+  private readonly unlockedValues = new Map<string, string>();
 
   constructor(private readonly options: CredentialManagerOptions) {
     this.now = options.now ?? (() => new Date());
@@ -229,19 +230,35 @@ export class CredentialManager {
     if (this.options.bindings === undefined) {
       throw new CredentialManagerError("CONFLICT", "Credential bindings are not configured.");
     }
-    await this.options.bindings.activate({ providerId, purpose, secretRef: selected.secretRef });
-    for (const record of await this.options.metadata.list()) {
-      if (record.providerId !== providerId || record.purpose !== purpose) continue;
+    const previousBinding = (await this.options.bindings.list()).find(
+      (binding) => binding.providerId === providerId && binding.purpose === purpose,
+    );
+    const previousRecords = await this.options.metadata.list();
+    const changedRecords = previousRecords.map((record) => {
+      if (record.providerId !== providerId || record.purpose !== purpose) return record;
       const state: CredentialState = record.id === credentialId
         ? "active"
         : record.state === "revoked"
           ? "revoked"
           : "available";
-      await this.options.metadata.upsert({
+      return {
         ...record,
         state,
         ...(record.id === credentialId ? { lastUsedAt: this.now().toISOString() } : {}),
-      });
+      };
+    });
+    try {
+      for (const record of changedRecords) {
+        if (record.providerId !== providerId || record.purpose !== purpose) continue;
+        await this.options.metadata.upsert(record);
+      }
+      await this.options.bindings.activate({ providerId, purpose, secretRef: selected.secretRef });
+    } catch (error) {
+      await this.restoreMetadata(previousRecords);
+      if (previousBinding !== undefined) {
+        await this.options.bindings.activate(previousBinding).catch(() => undefined);
+      }
+      throw error;
     }
     const updated = await this.options.metadata.get(credentialId);
     if (updated === undefined) throw new CredentialManagerError("NOT_FOUND", "Credential was removed during activation.");
@@ -267,15 +284,18 @@ export class CredentialManager {
         "Credential is still referenced by an active binding.",
       );
     }
-    await this.requireVault().delete(record.secretRef);
+    const vault = this.tryRequireVault();
+    if (vault !== undefined) await vault.delete(record.secretRef);
+    this.unlockedValues.delete(record.secretRef);
     await this.options.metadata.delete(record.id);
   }
 
   async createBackup(destination: string, passphrase: string): Promise<void> {
+    await assertSafeBackupPath(destination, false);
     const records: Array<{ readonly record: CredentialRecord; readonly value: string }> = [];
     for (const record of await this.options.metadata.list()) {
       try {
-        const value = await this.options.secrets.get(record.secretRef);
+        const value = await this.readSecret(record.secretRef);
         if (!value) continue;
         records.push({ record: { ...record, state: "available" }, value });
       } catch (error) {
@@ -295,6 +315,7 @@ export class CredentialManager {
   }
 
   async restoreBackup(source: string, passphrase: string): Promise<CredentialRestoreReport> {
+    await assertSafeBackupPath(source, true);
     let envelope: unknown;
     try {
       envelope = JSON.parse(await readFile(source, "utf8"));
@@ -325,13 +346,26 @@ export class CredentialManager {
         createdAt: this.now().toISOString(),
         lastUsedAt: undefined,
       };
+      let persistedToVault = false;
       try {
-        await this.requireVault().set(secretRef, item.value);
+        const vault = this.tryRequireVault();
+        if (vault === undefined) {
+          this.unlockedValues.set(secretRef, item.value);
+        } else {
+          try {
+            await vault.set(secretRef, item.value);
+            persistedToVault = true;
+          } catch (error) {
+            if (!isUnavailableVaultError(error)) throw error;
+            this.unlockedValues.set(secretRef, item.value);
+          }
+        }
         await this.options.metadata.upsert(record);
         restored.push(id);
       } catch (error) {
         skipped += 1;
-        await this.requireVault().delete(secretRef).catch(() => undefined);
+        if (persistedToVault) await this.tryRequireVault()?.delete(secretRef).catch(() => undefined);
+        this.unlockedValues.delete(secretRef);
       }
     }
     return { restored: restored.length, skipped, credentialIds: restored };
@@ -339,7 +373,7 @@ export class CredentialManager {
 
   async get(reference: string): Promise<string | undefined> {
     try {
-      return await this.options.secrets.get(secretReferenceSchema.parse(reference));
+      return await this.readSecret(secretReferenceSchema.parse(reference));
     } catch (error) {
       if (error instanceof SecretProtectionError) return undefined;
       throw error;
@@ -359,9 +393,33 @@ export class CredentialManager {
     throw new CredentialManagerError("CONFLICT", "Writable credential vault is not configured.");
   }
 
+  private tryRequireVault(): SecretVault | undefined {
+    try {
+      return this.requireVault();
+    } catch (error) {
+      if (error instanceof CredentialManagerError && error.code === "CONFLICT") return undefined;
+      throw error;
+    }
+  }
+
+  private async readSecret(reference: string): Promise<string | undefined> {
+    const unlocked = this.unlockedValues.get(reference);
+    if (unlocked !== undefined) return unlocked;
+    return this.options.secrets.get(reference);
+  }
+
+  private async restoreMetadata(records: readonly CredentialRecord[]): Promise<void> {
+    const current = await this.options.metadata.list();
+    const previousIds = new Set(records.map((record) => record.id));
+    for (const record of current) {
+      if (!previousIds.has(record.id)) await this.options.metadata.delete(record.id);
+    }
+    for (const record of records) await this.options.metadata.upsert(record);
+  }
+
   private async requireValue(record: CredentialRecord): Promise<string> {
     try {
-      const value = await this.options.secrets.get(record.secretRef);
+      const value = await this.readSecret(record.secretRef);
       if (!value) throw new Error("Missing value");
       return value;
     } catch (error) {
@@ -376,7 +434,7 @@ export class CredentialManager {
     let state = record.state;
     if (state !== "revoked") {
       try {
-        const value = await this.options.secrets.get(record.secretRef);
+        const value = await this.readSecret(record.secretRef);
         state = value ? (activeBinding ? "active" : "available") : "unavailable";
       } catch (error) {
         if (error instanceof SecretProtectionError) state = "unavailable";
@@ -406,6 +464,42 @@ export class CredentialManager {
       throw new CredentialManagerError("INVALID_INPUT", "Credential value is invalid.");
     }
   }
+}
+
+function isUnavailableVaultError(error: unknown): boolean {
+  return error instanceof SecretProtectionError ||
+    (error instanceof CredentialManagerError && error.code === "CONFLICT");
+}
+
+async function assertSafeBackupPath(path: string, mustExist: boolean): Promise<void> {
+  try {
+    const target = await lstat(path);
+    if (target.isSymbolicLink() || !target.isFile()) {
+      throw new CredentialManagerError("BACKUP_ERROR", "Credential backup path is not a safe regular file.");
+    }
+  } catch (error) {
+    if (error instanceof CredentialManagerError) throw error;
+    if (isNodeError(error) && error.code === "ENOENT") {
+      if (mustExist) throw new CredentialManagerError("BACKUP_ERROR", "Credential backup could not be read.");
+    } else {
+      throw new CredentialManagerError("BACKUP_ERROR", "Credential backup path could not be inspected.");
+    }
+  }
+  try {
+    const parent = await lstat(dirname(path));
+    if (parent.isSymbolicLink() || !parent.isDirectory()) {
+      throw new CredentialManagerError("BACKUP_ERROR", "Credential backup directory is not safe.");
+    }
+  } catch (error) {
+    if (error instanceof CredentialManagerError) throw error;
+    if (!(isNodeError(error) && error.code === "ENOENT")) {
+      throw new CredentialManagerError("BACKUP_ERROR", "Credential backup directory could not be inspected.");
+    }
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 export function maskCredentialValue(value: string): string {
