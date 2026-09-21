@@ -190,6 +190,7 @@ export class ProviderDoctor {
             status: analysis.status,
             latencyMs: this.elapsed(startedAt),
             details: analysis.details,
+            ...(analysis.errorType === undefined ? {} : { errorType: analysis.errorType }),
           },
           protocol,
         };
@@ -594,10 +595,18 @@ function toolContinuationBody(
 function analyzeInferencePayload(
   protocol: DoctorProtocol,
   payload: unknown,
-): { status: DoctorCheckStatus; details: string } {
+): { status: DoctorCheckStatus; details: string; errorType?: NormalizedErrorType } {
   if (isRecord(payload) && (payload.error != null ||
       (protocol === "openai-responses" && ["failed", "incomplete"].includes(String(payload.status))))) {
     return { status: "FAIL", details: "Provider returned an unsuccessful response." };
+  }
+  if (isProviderErrorEnvelope(payload)) {
+    const code = safeProviderErrorCode(payload.code);
+    return {
+      status: "FAIL",
+      details: `Provider returned an unsuccessful response (${code}).`,
+      errorType: normalizeProviderErrorCode(payload.code),
+    };
   }
   const text = extractOutputText(protocol, payload);
   if (text === undefined) {
@@ -612,6 +621,26 @@ function analyzeInferencePayload(
     return { status: "DEGRADED", details: `Text received but ${degraded.join(", ")}.` };
   }
   return { status: "PASS", details: `Model answered ('${text.trim().slice(0, 40)}').` };
+}
+
+function isProviderErrorEnvelope(value: unknown): value is { readonly code: string; readonly message: string } {
+  if (!isRecord(value) || typeof value.code !== "string" || typeof value.message !== "string") return false;
+  return !["output", "choices", "content"].some((key) => key in value);
+}
+
+function safeProviderErrorCode(code: string): string {
+  const bounded = code.trim().slice(0, 128);
+  return /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(bounded) ? bounded : "provider-error";
+}
+
+function normalizeProviderErrorCode(code: string): NormalizedErrorType {
+  const lower = code.toLowerCase();
+  if (lower.includes("quota") || lower.includes("allocation")) return "QUOTA_EXCEEDED";
+  if (lower.includes("throttl") || lower.includes("rate")) return "RATE_LIMIT";
+  if (lower.includes("auth") || lower.includes("unauthor")) return "AUTH_ERROR";
+  if (lower.includes("permission") || lower.includes("forbidden")) return "PERMISSION_ERROR";
+  if (lower.includes("model") && (lower.includes("not") || lower.includes("found"))) return "MODEL_NOT_FOUND";
+  return "UNKNOWN";
 }
 
 function hasFinishSignal(protocol: DoctorProtocol, payload: unknown): boolean {

@@ -110,6 +110,28 @@ describe("ProviderDoctor", () => {
     expect(report.checks.slice(1).every((check) => check.status === "SKIPPED")).toBe(true);
   });
 
+  it("classifies a successful-HTTP provider error envelope without retaining its message", async () => {
+    const secretMarker = "provider-secret-marker";
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/models")) return json({ data: [{ id: "gpt-x" }] });
+      return json({
+        code: "Throttling.AllocationQuota",
+        message: `quota exhausted ${secretMarker}`,
+        request_id: "request-1",
+      });
+    });
+
+    const report = await doctorWith(fetchMock).run(profile, { level: 1 });
+    const inference = report.checks.find((check) => check.name === "inference");
+    expect(inference).toMatchObject({
+      status: "FAIL",
+      errorType: "QUOTA_EXCEEDED",
+      details: expect.stringContaining("Throttling.AllocationQuota"),
+    });
+    expect(inference?.details).not.toContain(secretMarker);
+  });
+
   it("marks streaming FAIL when the stream ends without a terminal event", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
       const url = String(input);
