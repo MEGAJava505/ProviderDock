@@ -831,6 +831,26 @@ describe("credential maintenance CLI", () => {
     expect(restore).toHaveBeenCalledWith(backup, "operator-passphrase");
     expect(passphraseReader).toHaveBeenCalledTimes(2);
   });
+
+  it("reports hidden-passphrase input failures without a stack trace", async () => {
+    const application = createApplication();
+    const backup = join(await mkdtemp(join(tmpdir(), "provider-dock-credential-backup-")), "backup.pdv");
+    const passphraseReader = vi.fn(async () => {
+      throw new Error("Hidden passphrase input requires an interactive TTY.");
+    });
+
+    const result = await runCli(
+      application,
+      ["credentials", "backup", "--file", backup],
+      {},
+      passphraseReader,
+    );
+    expect(result.code).toBe(1);
+    expect(result.stderr).toEqual([
+      "Error: Hidden passphrase input requires an interactive TTY.",
+    ]);
+    expect(result.stderr.join("\n")).not.toContain("at readHiddenSecret");
+  });
 });
 
 function createApplication(fetchImpl: typeof fetch = vi.fn<typeof fetch>()): ProviderDockApplication {

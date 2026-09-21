@@ -1432,7 +1432,15 @@ async function readSingleCredentialFile(source: string): Promise<string> {
 async function readCredentialPassphrase(
   reader: (() => Promise<string>) | undefined,
 ): Promise<string> {
-  const passphrase = await (reader ?? (() => readHiddenSecret("Credential backup passphrase: ")))();
+  let passphrase: string;
+  try {
+    passphrase = await (reader ?? (() => readHiddenSecret("Credential backup passphrase: ")))();
+  } catch (error) {
+    if (error instanceof CliUsageError) throw error;
+    throw new CliUsageError(
+      error instanceof Error ? error.message : "Unable to read credential backup passphrase.",
+    );
+  }
   if (passphrase.length === 0) throw new CliUsageError("Credential backup passphrase must not be empty.");
   return passphrase;
 }
