@@ -23,20 +23,24 @@ const connection = {
   providerId: "one", adapterId: "new-api", siteUrl: "https://one.invalid",
   auth: { kind: "bearer", secretRef: "ACCOUNT_TOKEN" }, userId: 42,
 };
+const fixtureCorruptByteLength = 257;
 const backup = {
   version: 2,
   records: [{ connection, revision: "76d2fe1c-5766-4413-afce-fab0239f609b", failures: 3,
     nextRefreshAt: "2026-09-15T01:00:00.000Z" }],
 };
 
-async function fixture() {
+async function fixture(options: { readonly nulBackupByteLength?: number } = {}) {
   const base = await mkdtemp(join(tmpdir(), "portal-recovery-"));
   temporaryRoots.push(base);
   const root = join(base, "source");
   await mkdir(root);
-  await writeFile(join(root, "accounts.json"), Buffer.alloc(280_047));
+  await writeFile(join(root, "accounts.json"), Buffer.alloc(fixtureCorruptByteLength));
   await writeFile(join(root, "backup.json"), JSON.stringify(backup));
-  await writeFile(join(root, "nul-backup.json"), Buffer.alloc(280_047));
+  await writeFile(
+    join(root, "nul-backup.json"),
+    Buffer.alloc(options.nulBackupByteLength ?? fixtureCorruptByteLength),
+  );
   await writeFile(join(root, "providers.json"), JSON.stringify([
     { id: "one", displayName: "One", baseUrl: "https://one.invalid" },
   ]));
@@ -61,7 +65,7 @@ async function fixture() {
 
 describe("portal recovery dry-run", () => {
   it("accepts a verified valid backup but rejects a 280047-byte NUL backup, missing backup or active-file alias", async () => {
-    const { input } = await fixture();
+    const { input } = await fixture({ nulBackupByteLength: 280_047 });
     expect(await dryRunPortalRecovery({
       ...input, recovery: { kind: "backup", relativePath: "backup.json" },
     })).toMatchObject({ status: "ready", source: "backup", connectionCount: 1 });
@@ -117,7 +121,7 @@ describe("portal recovery dry-run", () => {
     expect(report.status).toBe("blocked");
     expect(report.issues).toContainEqual({ code, severity: "error", recordIndex: 0 });
     expect(JSON.stringify(report)).not.toContain("DO-NOT-REPORT");
-    expect(await readFile(join(root, "accounts.json"))).toEqual(Buffer.alloc(280_047));
+    expect(await readFile(join(root, "accounts.json"))).toEqual(Buffer.alloc(fixtureCorruptByteLength));
   });
 
   it("reports an unknown optional userId rather than inventing an account identity", async () => {
@@ -171,7 +175,7 @@ describe("portal recovery dry-run", () => {
       requiresOperatorAcceptance: true, activeReplaced: false, refreshDisabled: true,
     });
     expect(await readdir(root)).toEqual(names);
-    expect(await readFile(join(root, "accounts.json"))).toEqual(Buffer.alloc(280_047));
+    expect(await readFile(join(root, "accounts.json"))).toEqual(Buffer.alloc(fixtureCorruptByteLength));
     expect(await readFile(join(root, "protected.bin"), "utf8")).toBe("synthetic-protected-bytes");
   });
 });
@@ -188,7 +192,7 @@ describe("portal recovery staging", () => {
       ...input, recovery: { kind: "backup", relativePath: "nul-backup.json" },
     }, destination)).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
     expect(await readdir(base)).toEqual(["source"]);
-    expect(await readFile(join(root, "accounts.json"))).toEqual(Buffer.alloc(280_047));
+    expect(await readFile(join(root, "accounts.json"))).toEqual(Buffer.alloc(fixtureCorruptByteLength));
   });
 
   it("exclusively creates the staged file, allowing only one of two simultaneous writers", async () => {
@@ -387,7 +391,7 @@ describe("portal recovery acceptance", () => {
     await pending;
 
     expect(await readFile(join(acceptedBackup, "accounts.json")))
-      .toEqual(Buffer.alloc(280_047));
+      .toEqual(Buffer.alloc(fixtureCorruptByteLength));
     expect(await readdir(base)).not.toContain("substituted-backup");
   });
 });
