@@ -4,11 +4,13 @@ import type { ProviderProfile } from "../src/core/providers/provider-profile.js"
 import type { ProviderDashboardApplication } from "../src/ui/provider-dashboard-server.js";
 import { ProviderDashboardServer } from "../src/ui/provider-dashboard-server.js";
 import { PortalRepositoryCorruptionError } from "../src/core/portals/portal-repository.js";
+import { CredentialManagerError } from "../src/core/security/credential-manager.js";
 import {
   providerDashboardCss,
   providerDashboardHtml,
   providerDashboardJavaScript,
 } from "../src/ui/provider-dashboard-page.js";
+import { providerConfigurationFingerprint } from "../src/core/health/provider-health-repository.js";
 
 const profile: ProviderProfile = {
   id: "provider-a",
@@ -116,6 +118,83 @@ describe("ProviderDashboardServer", () => {
     });
     expect(JSON.stringify(snapshot)).toContain("dashboard-session");
     expect(JSON.stringify(snapshot)).not.toContain("actual-provider-secret");
+  });
+
+  it("exposes the four compatibility surfaces in the provider snapshot and dashboard asset", async () => {
+    const server = createServer(createApplication());
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/snapshot`);
+    const snapshot = (await response.json()) as {
+      health: readonly [{
+        surfaceOverview: {
+          surfaces: readonly { surface: string; outcome: string }[];
+          recommendedSurface?: string;
+        };
+      }];
+    };
+
+    expect(snapshot.health[0]?.surfaceOverview).toMatchObject({
+      recommendedSurface: "openai-api",
+      surfaces: [
+        { surface: "openai-api", outcome: "passed" },
+        { surface: "anthropic-api", outcome: "passed" },
+        { surface: "codex-cli", outcome: "passed" },
+        { surface: "claude-code", outcome: "passed" },
+      ],
+    });
+    expect(providerDashboardJavaScript).toContain("openai-api");
+    expect(providerDashboardJavaScript).toContain("anthropic-api");
+    expect(providerDashboardJavaScript).toContain("codex-cli");
+    expect(providerDashboardJavaScript).toContain("claude-code");
+  });
+
+  it("shows managed credential masks in the snapshot without exposing their values", async () => {
+    const application = createApplication({
+      listCredentials: vi.fn(async () => [{
+        id: "00000000-0000-4000-8000-000000000001",
+        providerId: "provider-a",
+        purpose: "provider-api" as const,
+        maskedValue: "fix…cret",
+        state: "active" as const,
+        createdAt: "2026-08-30T12:00:00.000Z",
+      }]),
+      listManagedSecretReferences: vi.fn(async () => ["credential-00000000-0000-4000-8000-000000000001"]),
+      listSecretReferences: vi.fn(async () => ["credential-00000000-0000-4000-8000-000000000001"]),
+    });
+    const server = createServer(application);
+    const response = await fetch(`${(await server.start()).url}api/snapshot`);
+    const snapshot = await response.json() as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(snapshot.credentials).toEqual([expect.objectContaining({
+      providerId: "provider-a",
+      maskedValue: "fix…cret",
+      state: "active",
+    })]);
+    expect(snapshot.managedSecretReferences).toEqual([
+      "credential-00000000-0000-4000-8000-000000000001",
+    ]);
+    expect(JSON.stringify(snapshot)).not.toContain("fixture-api-secret");
+  });
+
+  it("keeps the dashboard snapshot usable when credential metadata cannot be read", async () => {
+    const application = createApplication({
+      listCredentials: vi.fn(async () => { throw new Error("private-registry-canary"); }),
+      listManagedSecretReferences: vi.fn(async () => ["credential-private"]),
+    });
+    const server = createServer(application);
+    const response = await fetch(`${(await server.start()).url}api/snapshot`);
+    const snapshot = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(snapshot.providers).toHaveLength(1);
+    expect(snapshot.credentials).toEqual([]);
+    expect(snapshot.managedSecretReferences).toEqual([]);
+    expect(snapshot.credentialDiagnostic).toMatchObject({
+      stage: "credentials", code: "CREDENTIAL_REGISTRY_UNAVAILABLE",
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("private-registry-canary");
   });
 
   it("does not expose the local portal recovery backup path", async () => {
@@ -302,6 +381,35 @@ describe("ProviderDashboardServer", () => {
     );
     expect(deleteSecret.status).toBe(200);
     expect(application.removeSecret).toHaveBeenCalledWith("PROVIDER_A_KEY");
+  });
+
+  it("reports managed-secret write and delete conflicts without exposing a submitted key", async () => {
+    const conflict = new CredentialManagerError(
+      "CONFLICT",
+      "Managed credentials must be rotated or removed with credential commands.",
+    );
+    const application = createApplication({
+      setSecret: vi.fn(async () => { throw conflict; }),
+      removeSecret: vi.fn(async () => { throw conflict; }),
+    });
+    const server = createServer(application);
+    const address = await server.start();
+
+    const put = await fetch(`${address.url}api/secrets/credential-managed`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: "secret-submit-canary" }),
+    });
+    const remove = await fetch(`${address.url}api/secrets/credential-managed`, {
+      method: "DELETE",
+    });
+
+    expect(put.status).toBe(409);
+    expect(remove.status).toBe(409);
+    const putBody = await put.json();
+    expect(putBody.code).toBe("CREDENTIAL_CONFLICT");
+    expect(JSON.stringify(putBody)).not.toContain("secret-submit-canary");
+    expect((await remove.json()).code).toBe("CREDENTIAL_CONFLICT");
   });
 
   it("returns a native folder selection for Launch workspace", async () => {
@@ -655,6 +763,7 @@ function createApplication(
       },
     ],
   };
+  const configurationFingerprint = providerConfigurationFingerprint(profile);
   const base = {
     listProviders: vi.fn(async () => [profile]),
     listProviderPortals: vi.fn(async () => []),
@@ -695,6 +804,52 @@ function createApplication(
             requestId: "dashboard-request",
             outcome: "completed" as const,
             healthStatus: "ONLINE" as const,
+          },
+        ],
+        surfaceChecks: [
+          {
+            providerId: profile.id,
+            modelId: "model-a",
+            surface: "openai-api" as const,
+            configurationFingerprint,
+            checkedAt: "2026-08-30T11:55:00.000Z",
+            durationMs: 15,
+            outcome: "passed" as const,
+            client: "providerdock" as const,
+            protocol: "openai-responses" as const,
+          },
+          {
+            providerId: profile.id,
+            modelId: "model-a",
+            surface: "anthropic-api" as const,
+            configurationFingerprint,
+            checkedAt: "2026-08-30T11:56:00.000Z",
+            durationMs: 16,
+            outcome: "passed" as const,
+            client: "providerdock" as const,
+            protocol: "anthropic-messages" as const,
+          },
+          {
+            providerId: profile.id,
+            modelId: "model-a",
+            surface: "codex-cli" as const,
+            configurationFingerprint,
+            checkedAt: "2026-08-30T11:57:00.000Z",
+            durationMs: 17,
+            outcome: "passed" as const,
+            client: "codex" as const,
+            protocol: "openai-responses" as const,
+          },
+          {
+            providerId: profile.id,
+            modelId: "model-a",
+            surface: "claude-code" as const,
+            configurationFingerprint,
+            checkedAt: "2026-08-30T11:58:00.000Z",
+            durationMs: 18,
+            outcome: "passed" as const,
+            client: "claude-code" as const,
+            protocol: "anthropic-messages" as const,
           },
         ],
       },

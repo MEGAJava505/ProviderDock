@@ -17,16 +17,13 @@ import {
   ProviderAdapterRegistry,
   ProviderDockApplication,
   ProviderProbeService,
-  runProviderDockCli,
   type ClaudeBridgeFactory,
-  type ClaudeProcessRunner,
   type ClaudeProcessStartRequest,
-  type CliIo,
   type CodexBridgeFactory,
-  type CodexProcessRunner,
   type CodexProcessStartRequest,
   type CreateClaudeBridgeInput,
 } from "../src/index.js";
+import { RecordingProcessRunner, runCli } from "./support/cli-harness.js";
 
 const sessionId = "33333333333333333333333333333333";
 
@@ -231,8 +228,8 @@ async function createFixture() {
   const codexHome = join(root, "codex-home");
   await Promise.all([mkdir(projectDirectory), mkdir(codexHome)]);
   const secrets = new MemorySecretStore();
-  const codexRunner = new RecordingCodexRunner();
-  const claudeRunner = new RecordingClaudeRunner();
+  const codexRunner = new RecordingProcessRunner<CodexProcessStartRequest>(7654);
+  const claudeRunner = new RecordingProcessRunner<ClaudeProcessStartRequest>(7655);
   const claudeBridges = new RecordingClaudeBridgeFactory();
   const health = new MemoryProviderHealthRepository();
   const codexLauncher = new CodexLauncher(
@@ -272,42 +269,6 @@ async function createFixture() {
     health,
     projectDirectory,
   };
-}
-
-async function runCli(
-  application: ProviderDockApplication,
-  argv: string[],
-) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const io: CliIo = {
-    stdout: (message) => stdout.push(message),
-    stderr: (message) => stderr.push(message),
-  };
-  const code = await runProviderDockCli(argv, {
-    application,
-    io,
-    environment: {},
-  });
-  return { code, stdout, stderr };
-}
-
-class RecordingCodexRunner implements CodexProcessRunner {
-  request: CodexProcessStartRequest | undefined;
-
-  async start(request: CodexProcessStartRequest) {
-    this.request = request;
-    return { pid: 7654, wait: async () => ({ exitCode: 0, signal: null }) };
-  }
-}
-
-class RecordingClaudeRunner implements ClaudeProcessRunner {
-  request: ClaudeProcessStartRequest | undefined;
-
-  async start(request: ClaudeProcessStartRequest) {
-    this.request = request;
-    return { pid: 7655, wait: async () => ({ exitCode: 0, signal: null }) };
-  }
 }
 
 class NoopCodexBridgeFactory implements CodexBridgeFactory {

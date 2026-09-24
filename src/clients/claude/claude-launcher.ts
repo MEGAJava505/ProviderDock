@@ -159,6 +159,8 @@ export class ClaudeLauncher {
         executable: input.executable ?? "claude",
         args: [
           ...claudeApprovalArgs(input.approvalLevel),
+          "--model",
+          input.modelId,
           ...resumeArgs,
           ...(input.additionalArgs ?? []),
         ],

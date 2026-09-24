@@ -115,7 +115,7 @@ describe("default OMP composition", () => {
     const migrationDirectory = join(root, "migration");
     await mkdir(migrationDirectory, { recursive: true });
     await writeFile(join(migrationDirectory, "omp-route-decisions.json"), JSON.stringify({
-      version: 1,
+      version: 2,
       decisions: [{
         providerId: profile.id,
         profileSha256: fingerprintOmpProviderProfile(profile),
@@ -124,6 +124,12 @@ describe("default OMP composition", () => {
         origin: new URL(profile.baseUrl).origin,
         modelId: "model-a",
         protocol: "openai-responses",
+        capabilities: { text: "supported", streaming: "supported", tools: "supported" },
+        realPilot: {
+          status: "passed", doctorLevel: 3, protocol: "openai-responses",
+          checkedAt: "2026-09-22T20:44:45.061Z",
+          doctorSnapshotSha256: "f".repeat(64),
+        },
         status: "accepted-for-pilot",
         localSmoke: {
           status: "passed",

@@ -25,9 +25,9 @@ async function run(protocol: DoctorProtocol, outcome: "correct" | "wrong" | "rep
     const body = JSON.parse(String(init?.body));
     if (body.stream) {
       const streamEvents = protocol === "openai-responses"
-        ? [{ type: `response.${terminal}`, response: { ...textResponse(protocol, "OK"), status: terminal } }]
+        ? [{ type: "response.output_text.delta", delta: "OK" }, { type: `response.${terminal}`, response: { ...textResponse(protocol, "OK"), status: terminal } }]
         : protocol === "anthropic-messages"
-          ? [{ type: "message_delta", delta: { stop_reason: "end_turn" } }, { type: "message_stop" }]
+          ? [{ type: "content_block_delta", delta: { type: "text_delta", text: "OK" } }, { type: "message_delta", delta: { stop_reason: "end_turn" } }, { type: "message_stop" }]
           : [{ choices: [{ delta: { content: "OK" }, finish_reason: "stop" }] }];
       return new Response(streamEvents.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } });
     }

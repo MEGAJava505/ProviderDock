@@ -11,9 +11,9 @@ import {
   ProviderDockApplication,
   ProviderProbeService,
   runProviderDockCli,
-  type CliIo,
   type CredentialSummary,
 } from "../src/index.js";
+import { runCli } from "./support/cli-harness.js";
 import { createServer } from "node:net";
 import { openDashboardInBrowser } from "../src/ui/open-dashboard-browser.js";
 import type { OmpLaunchInput } from "../src/application/omp-launch-service.js"
@@ -866,22 +866,4 @@ function createApplication(fetchImpl: typeof fetch = vi.fn<typeof fetch>()): Pro
     new ProviderProbeService(adapters),
     secrets,
   );
-}
-
-async function runCli(
-  application: ProviderDockApplication,
-  argv: string[],
-  environment: NodeJS.ProcessEnv = {},
-  credentialPassphraseReader?: () => Promise<string>,
-) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const io: CliIo = { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) };
-  const code = await runProviderDockCli(argv, {
-    application,
-    io,
-    environment,
-    ...(credentialPassphraseReader === undefined ? {} : { credentialPassphraseReader }),
-  });
-  return { code, stdout, stderr };
 }

@@ -32,6 +32,33 @@ function json(body: unknown): Response {
 }
 
 describe("ProviderDoctor", () => {
+  it("records the configuration and credential reference used for a Doctor run", async () => {
+    const doctor = doctorWith(async () => json({ data: [{ id: "gpt-x" }] }));
+    const first = await doctor.run(profile, { level: 0 });
+    const changed = await doctor.run({
+      ...profile, auth: { kind: "bearer", secretRef: "different-key" },
+    }, { level: 0 });
+    expect(first.configurationFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(changed.configurationFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(changed.configurationFingerprint).not.toBe(first.configurationFingerprint);
+  });
+
+  it("does not certify a run whose secret changed during inference", async () => {
+    const secrets = new MemorySecretStore({ "api.key": "old-secret" });
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      if (String(input).includes("/models")) return json({ data: [{ id: "gpt-x" }] });
+      await secrets.set("api.key", "new-secret");
+      return json({ id: "r", status: "completed", output: [
+        { type: "message", role: "assistant", content: [{ type: "output_text", text: "OK" }] },
+      ] });
+    });
+    const registry = new ProviderAdapterRegistry().register(new GenericOpenAiAdapter({ secretStore: secrets, fetchImpl: fetchMock }));
+    const report = await new ProviderDoctor({ secretStore: secrets, adapterRegistry: registry, fetchImpl: fetchMock })
+      .run({ ...profile, auth: { kind: "bearer", secretRef: "api.key" } }, { level: 1 });
+    expect(report.verdict).toBe("FAIL");
+    expect(report.credentialFingerprint).toBeUndefined();
+  });
+
   it("runs level 3 diagnostics against a healthy Responses provider", async () => {
     const completedText = {
       id: "resp-1",
@@ -53,7 +80,8 @@ describe("ProviderDoctor", () => {
     };
     const streamSource = [
       'event: response.created\ndata: {"type":"response.created","sequence_number":0,"response":{"id":"resp-3"}}\n\n',
-      'event: response.completed\ndata: {"type":"response.completed","sequence_number":1,"response":{"id":"resp-3","status":"completed","output":[]}}\n\n',
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","sequence_number":1,"delta":"OK"}\n\n',
+      'event: response.completed\ndata: {"type":"response.completed","sequence_number":2,"response":{"id":"resp-3","status":"completed","output":[]}}\n\n',
       "data: [DONE]\n\n",
     ].join("");
 
@@ -90,6 +118,23 @@ describe("ProviderDoctor", () => {
       ["streaming", "PASS"],
       ["tools", "PASS"],
     ]);
+  });
+
+  it("does not certify streaming when Responses emits only a terminal event", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      if (String(input).includes("/models")) return json({ data: [{ id: "gpt-x" }] });
+      const body = JSON.parse(String(init?.body ?? "{}")) as { stream?: boolean };
+      if (body.stream) return new Response(
+        'data: {"type":"response.completed","response":{"id":"r","status":"completed","output":[]}}\n\n',
+        { headers: { "content-type": "text/event-stream" } },
+      );
+      return json({ id: "r", status: "completed", output: [
+        { type: "message", role: "assistant", content: [{ type: "output_text", text: "OK" }] },
+      ] });
+    });
+    const report = await doctorWith(fetchMock).run(profile, { level: 2 });
+    expect(report.checks.find((check) => check.name === "streaming")?.status).toBe("DEGRADED");
+    expect(report.verdict).toBe("DEGRADED");
   });
 
   it("stops at level 0 for auth failures and never sends inference", async () => {
@@ -181,6 +226,7 @@ describe("ProviderDoctor", () => {
         return new Response(
           [
             'event: message_start\ndata: {"type":"message_start","message":{"id":"msg-stream","type":"message","role":"assistant","content":[]}}\n\n',
+            'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"OK"}}\n\n',
             'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":1}}\n\n',
             'event: message_stop\ndata: {"type":"message_stop"}\n\n',
           ].join(""),

@@ -169,6 +169,7 @@ export class AnthropicBridgeServer {
   private readonly healthSignalSink: ProviderRuntimeHealthSignalSink | undefined;
   private readonly models: readonly BridgeModelDefinition[];
   private readonly pendingHealthSignals = new Set<Promise<void>>();
+  private readonly activeRequestHandlers = new Set<Promise<void>>();
   private readonly nativeMessagesSupport = new Map<string, boolean>();
   private lastFallback: FallbackNotification | undefined;
   private readonly activeUpstreamRequests = new Set<AbortController>();
@@ -278,9 +279,14 @@ export class AnthropicBridgeServer {
   private async listen(): Promise<AnthropicBridgeAddress> {
     await this.turnLedger.initialize();
     const server = createServer((request, response) => {
-      void this.handleRequest(request, response).catch((error: unknown) => {
+      const handler = this.handleRequest(request, response).catch((error: unknown) => {
         this.handleUnexpectedError(response, error);
       });
+      this.activeRequestHandlers.add(handler);
+      void handler.then(
+        () => this.activeRequestHandlers.delete(handler),
+        () => this.activeRequestHandlers.delete(handler),
+      );
     });
     server.on("clientError", (_error, socket) => {
       if (socket.writable) socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
@@ -323,6 +329,7 @@ export class AnthropicBridgeServer {
       server.close((error) => (error ? reject(error) : resolve()));
       server.closeAllConnections?.();
     });
+    await Promise.all([...this.activeRequestHandlers]);
     await this.flushHealthSignals();
   }
 
@@ -371,6 +378,25 @@ export class AnthropicBridgeServer {
       return;
     }
     if (requestUrl.pathname === "/v1/models") {
+      if (request.method !== "GET") {
+        sendAnthropicError(
+          response,
+          405,
+          "INVALID_REQUEST",
+          "HTTP method is not allowed.",
+          new Headers({ allow: "GET" }),
+        );
+        return;
+      }
+      if (!hasValidClientToken(request, this.clientToken)) {
+        sendAnthropicError(
+          response,
+          401,
+          "AUTH_ERROR",
+          "The managed Anthropic bridge rejected the loopback client token.",
+        );
+        return;
+      }
       sendJson(response, 200, {
         object: "list",
         data: this.models.map((model) => ({
@@ -435,13 +461,16 @@ export class AnthropicBridgeServer {
             sensitiveValues: selected.redactionValues,
           });
           const headers = this.routeHeaders(safeHeaders(upstream), selected);
+          if (shouldDisallowUpstreamClientRetry(upstream.status, sanitizedDetail)) {
+            headers.set("x-should-retry", "false");
+          }
           if (selected.fallbackBlock !== undefined) {
             headers.set("x-providerdock-fallback-block", selected.fallbackBlock.code);
           }
           sendAnthropicError(
             response,
             upstream.status,
-            normalizeHttpStatus(upstream.status),
+            classifyAnthropicUpstreamErrorType(upstream.status, sanitizedDetail),
             `Provider '${selected.route.profile.displayName}' returned HTTP ${upstream.status}.${sanitizedDetail === undefined ? "" : ` ${sanitizedDetail}`}`,
             headers,
           );
@@ -456,7 +485,12 @@ export class AnthropicBridgeServer {
             502,
             "PROTOCOL_ERROR",
             "Provider returned SSE for a non-streaming Messages request.",
-            { headers: this.routeHeaders(new Headers(), selected) },
+            {
+              headers: this.routeHeaders(
+                nonRetryableProviderHeaders(),
+                selected,
+              ),
+            },
           );
         }
 
@@ -555,7 +589,7 @@ export class AnthropicBridgeServer {
           mode: opened.effectiveMode,
         };
         if (!opened.upstream.ok) {
-          const errorType = normalizeHttpStatus(opened.upstream.status);
+          const errorType = await upstreamErrorType(opened.upstream);
           await this.recordRuntimeHealth(
             effectiveRoute,
             anthropicProtocolForRoute(effectiveRoute),
@@ -586,7 +620,13 @@ export class AnthropicBridgeServer {
             providerErrorStatus(error.type),
             error.type,
             error.message,
-            { cause: error },
+            {
+              cause: error,
+              headers:
+                error.phase === "connection-failed"
+                  ? new Headers()
+                  : nonRetryableProviderHeaders(),
+            },
           );
         }
         throw error;
@@ -648,7 +688,7 @@ export class AnthropicBridgeServer {
           };
         }
 
-        const errorType = normalizeHttpStatus(opened.upstream.status);
+        const errorType = await upstreamErrorType(opened.upstream);
         const failure: FallbackFailure & { readonly httpStatus: number } = {
           errorType,
           phase: fallbackFailurePhaseForHttpStatus(opened.upstream.status),
@@ -704,6 +744,9 @@ export class AnthropicBridgeServer {
             : { notification: latestNotification }),
         });
         headers.set("x-providerdock-fallback-block", failed.code);
+        if (shouldDisallowClientRetry(failure, failed.code)) {
+          headers.set("x-should-retry", "false");
+        }
         throw new BridgeRequestError(
           providerErrorStatus(failure.errorType),
           failure.errorType,
@@ -971,7 +1014,12 @@ export class AnthropicBridgeServer {
   ): Promise<"complete" | "incomplete"> {
     if (wantsStream && isEventStream) {
       if (upstream.body === null) {
-        throw new BridgeRequestError(502, "STREAM_ERROR", "Provider returned an empty stream body.");
+        throw new BridgeRequestError(
+          502,
+          "STREAM_ERROR",
+          "Provider returned an empty stream body.",
+          { headers: nonRetryableProviderHeaders() },
+        );
       }
       response.writeHead(
         200,
@@ -1024,6 +1072,7 @@ export class AnthropicBridgeServer {
         502,
         "PROTOCOL_ERROR",
         "Provider returned an invalid Anthropic Messages payload.",
+        { headers: nonRetryableProviderHeaders() },
       );
     }
     const outcome = nativeMessageOutcome(payload);
@@ -1082,6 +1131,7 @@ export class AnthropicBridgeServer {
           502,
           "STREAM_ERROR",
           "Chat provider returned an empty stream body.",
+          { headers: nonRetryableProviderHeaders() },
         );
       }
       response.writeHead(
@@ -1423,7 +1473,13 @@ export class AnthropicBridgeServer {
     }
     if (error instanceof AnthropicTranslationError) {
       const status = error.type === "INVALID_REQUEST" || error.type === "UNSUPPORTED_FEATURE" ? 400 : 502;
-      sendAnthropicError(response, status, error.type, error.message);
+      sendAnthropicError(
+        response,
+        status,
+        error.type,
+        error.message,
+        nonRetryableProviderHeaders(),
+      );
       return;
     }
     if (error instanceof TurnLedgerViolationError) {
@@ -1451,6 +1507,7 @@ export class AnthropicBridgeServer {
         providerErrorStatus(error.type),
         error.type,
         error.message,
+        nonRetryableProviderHeaders(),
       );
       return;
     }
@@ -1535,7 +1592,76 @@ function anthropicProtocolForRoute(route: ResolvedAnthropicRoute): UsageProtocol
 }
 
 function fallbackBlockHeaders(code: string): Headers {
-  return new Headers({ "x-providerdock-fallback-block": code });
+  const headers = nonRetryableProviderHeaders();
+  headers.set("x-providerdock-fallback-block", code);
+  return headers;
+}
+
+function nonRetryableProviderHeaders(): Headers {
+  return new Headers({ "x-should-retry": "false" });
+}
+
+function shouldDisallowUpstreamClientRetry(
+  status: number,
+  sanitizedDetail: string | undefined,
+): boolean {
+  if (shouldDisallowClientRetry(status)) return true;
+  return classifyAnthropicUpstreamErrorType(status, sanitizedDetail) === "MODEL_NOT_FOUND";
+}
+
+async function upstreamErrorType(upstream: Response): Promise<NormalizedErrorType> {
+  try {
+    const detail = sanitizeProviderErrorBody(
+      await readUpstreamText(upstream.clone(), 64 * 1024),
+    );
+    return classifyAnthropicUpstreamErrorType(upstream.status, detail);
+  } catch {
+    return normalizeHttpStatus(upstream.status);
+  }
+}
+
+function classifyAnthropicUpstreamErrorType(
+  status: number,
+  sanitizedDetail: string | undefined,
+): NormalizedErrorType {
+  if (
+    status === 503 &&
+    sanitizedDetail !== undefined &&
+    (/\bmodel_not_found\b/i.test(sanitizedDetail) ||
+      /\bno available channel for model\b/i.test(sanitizedDetail))
+  ) {
+    return "MODEL_NOT_FOUND";
+  }
+  return normalizeHttpStatus(status);
+}
+
+function shouldDisallowClientRetry(
+  statusOrFailure: number | Pick<FallbackFailure, "errorType" | "phase">,
+  fallbackBlockCode?: string,
+): boolean {
+  if (
+    fallbackBlockCode === "FAILURE_NOT_RETRYABLE" ||
+    fallbackBlockCode === "FALLBACK_AFTER_OUTPUT_BLOCKED" ||
+    fallbackBlockCode === "FALLBACK_AFTER_TOOL_CALL_BLOCKED" ||
+    fallbackBlockCode === "FALLBACK_STATE_AMBIGUOUS" ||
+    fallbackBlockCode === "STALE_ATTEMPT"
+  ) {
+    return true;
+  }
+  if (typeof statusOrFailure === "number") {
+    return fallbackFailurePhaseForHttpStatus(statusOrFailure) === "unknown";
+  }
+  return (
+    statusOrFailure.phase === "unknown" ||
+    statusOrFailure.phase === "after-output" ||
+    statusOrFailure.phase === "after-tool-call" ||
+    statusOrFailure.errorType === "INVALID_REQUEST" ||
+    statusOrFailure.errorType === "RESOURCE_SCOPE_MISMATCH" ||
+    statusOrFailure.errorType === "UNSUPPORTED_FEATURE" ||
+    statusOrFailure.errorType === "PROTOCOL_ERROR" ||
+    statusOrFailure.errorType === "STREAM_ERROR" ||
+    statusOrFailure.errorType === "INCOMPLETE_RESPONSE"
+  );
 }
 
 function resolveBridgeMode(profile: ProviderProfile): BridgeMode {
@@ -1907,6 +2033,7 @@ async function readUpstreamJson(response: Response, limitBytes: number): Promise
   } catch (error) {
     throw new BridgeRequestError(502, "PROTOCOL_ERROR", "Provider returned invalid JSON.", {
       cause: error,
+      headers: nonRetryableProviderHeaders(),
     });
   }
 }
@@ -1927,6 +2054,13 @@ async function readUpstreamText(response: Response, limitBytes: number): Promise
       }
       chunks.push(chunk.value);
     }
+  } catch (error) {
+    throw new BridgeRequestError(
+      502,
+      "PROTOCOL_ERROR",
+      "Provider response body could not be read.",
+      { cause: error, headers: nonRetryableProviderHeaders() },
+    );
   } finally {
     reader.releaseLock();
   }

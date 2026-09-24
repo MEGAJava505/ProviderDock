@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { SecretStore } from "../security/secret-store.js";
 import { normalizeNewApiCatalog, normalizeNewApiPerformance } from "./new-api-catalog.js";
 import { normalizeSubscriptions, normalizeVessaRewards, normalizeVyceWallet, normalizeVyceSubscriptions, normalizeVyceCatalog } from "./portal-account-data.js";
-import { portalSnapshotSchema, type PortalConnection, type PortalErrorCode, type PortalObservation,
+import { portalConnectionSchema, portalSnapshotSchema, type PortalConnection, type PortalErrorCode, type PortalObservation,
   type PortalSnapshot, type PortalSiteInfo, type PortalCheckIn, type PortalWallet, type ProviderPortalAdapter } from "./portal-types.js";
 
 type JsonRecord = Record<string, unknown>;
@@ -26,15 +26,19 @@ export class NewApiPortalAdapter implements ProviderPortalAdapter {
     // Resolve once so both private reads use the same account credential.
     const credential = connection.auth.kind !== "none"
       ? await this.secrets.get(connection.auth.secretRef).catch(() => undefined) : undefined;
+    // A cookie session can identify the New API user from /self. Keep this
+    // local binding in-memory for the rest of this read; the portal service
+    // persists it only after the complete snapshot validates.
+    let activeConnection = connection;
     const observe = async <T>(path: string, privateRead: boolean, normalize: (data: JsonRecord) => T,
       envelope: boolean | "plain" = false, optionalAuth = false): Promise<PortalObservation<T>> => {
-      const sourceUrl = new URL(path, connection.siteUrl).href;
-      const base = { sourceUrl, observedAt: now.toISOString(), expiresAt: new Date(now.valueOf() + connection.refreshIntervalMs).toISOString() };
+      const sourceUrl = new URL(path, activeConnection.siteUrl).href;
+      const base = { sourceUrl, observedAt: now.toISOString(), expiresAt: new Date(now.valueOf() + activeConnection.refreshIntervalMs).toISOString() };
       try {
-        if (privateRead && !credential) throw new PortalReadError(connection.auth.kind === "none" ? "AUTH_REQUIRED" : "MISSING_SECRET");
+        if (privateRead && !credential) throw new PortalReadError(activeConnection.auth.kind === "none" ? "AUTH_REQUIRED" : "MISSING_SECRET");
         const data = await this.getJson(sourceUrl, privateRead || optionalAuth ? credential : undefined,
-          (privateRead || optionalAuth) && credential ? connection.userId : undefined, now, envelope, connection.auth.kind,
-          connection.userAgent);
+          (privateRead || optionalAuth) && credential ? activeConnection.userId : undefined, now, envelope, activeConnection.auth.kind,
+          activeConnection.userAgent);
         const value = normalize(data);
         if (credential && JSON.stringify(value).includes(credential)) throw new PortalReadError("INVALID_RESPONSE");
         return { ...base, status: "ok", value };
@@ -65,9 +69,14 @@ export class NewApiPortalAdapter implements ProviderPortalAdapter {
         catalog: project(normalizeVyceCatalog) });
     }
     const vessa = ["vsllm.cc", "vsllm.com", "www.vsllm.cc", "www.vsllm.com"].includes(hostname);
-    const [site, walletRaw, checkInRaw, catalogRaw, performanceRaw] = await Promise.all([
+    const [site, walletRaw] = await Promise.all([
       observe("/api/status", false, normalizeSite),
-      observe("/api/user/self", true, (data) => normalizeWallet(data, connection, credential)),
+      observe("/api/user/self", true, (data) => normalizeWallet(data, activeConnection, credential)),
+    ]);
+    if (activeConnection.userId === undefined && walletRaw.value?.userId !== undefined) {
+      activeConnection = portalConnectionSchema.parse({ ...activeConnection, userId: walletRaw.value.userId });
+    }
+    const [checkInRaw, catalogRaw, performanceRaw] = await Promise.all([
       observe("/api/user/checkin", true, normalizeCheckIn),
       observe("/api/pricing", false, normalizeNewApiCatalog, true, true),
       observe("/api/perf-metrics/summary", false, normalizeNewApiPerformance, false, true),
@@ -188,7 +197,7 @@ function normalizeWallet(data: JsonRecord, connection: PortalConnection, credent
   if (!integer(data.id) || data.id < 1 || !integer(data.quota)) throw new PortalReadError("INVALID_RESPONSE");
   if (connection.userId !== undefined && data.id !== connection.userId) throw new PortalReadError("ACCOUNT_MISMATCH");
   const group = typeof data.group === "string" && data.group.length <= 128 && (!credential || !data.group.includes(credential)) ? data.group : null;
-  return { accountFingerprint: createHash("sha256").update(connection.siteUrl + "\0" + data.id).digest("hex"),
+  return { userId: data.id, accountFingerprint: createHash("sha256").update(connection.siteUrl + "\0" + data.id).digest("hex"),
     group, remainingQuota: data.quota, usedQuota: count(data.used_quota), displayBalance: null };
 }
 function disabledCheckIn(): PortalCheckIn {

@@ -14,12 +14,11 @@ import {
   ProviderAdapterRegistry,
   ProviderDockApplication,
   ProviderProbeService,
-  runProviderDockCli,
-  type CliIo,
   type ProviderProfile,
   type ProviderProfileInput,
   type ProviderProfileRepository,
 } from "../src/index.js";
+import { runCli } from "./support/cli-harness.js";
 
 describe("profile bundles", () => {
   it("round-trips all configuration profiles without exporting secret values", async () => {
@@ -199,24 +198,6 @@ function createApplication(
     new MemoryPromptProfileRepository(),
     new MemoryProjectProfileRepository(),
   );
-}
-
-async function runCli(
-  application: ProviderDockApplication,
-  argv: string[],
-) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const io: CliIo = {
-    stdout: (message) => stdout.push(message),
-    stderr: (message) => stderr.push(message),
-  };
-  const code = await runProviderDockCli(argv, {
-    application,
-    io,
-    environment: {},
-  });
-  return { code, stdout, stderr };
 }
 
 class FailingProviderProfileRepository implements ProviderProfileRepository {

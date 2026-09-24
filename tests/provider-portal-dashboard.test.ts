@@ -6,6 +6,9 @@ import { ProviderAdapterRegistry } from "../src/core/providers/provider-adapter-
 import { ProviderProbeService } from "../src/core/health/provider-probe-service.js";
 import { MemorySecretStore } from "../src/core/security/secret-store.js";
 import { MemoryPortalRepository } from "../src/core/portals/portal-repository.js";
+import { ApplicationCredentialBindings } from "../src/core/security/credential-bindings.js";
+import { CredentialManager } from "../src/core/security/credential-manager.js";
+import { MemoryCredentialMetadataRepository } from "../src/core/security/credential-repository.js";
 import { ProviderPortalService } from "../src/core/portals/provider-portal-service.js";
 import { portalSnapshotSchema, ProviderPortalAdapterRegistry } from "../src/core/portals/portal-types.js";
 import { NewApiPortalAdapter } from "../src/core/portals/new-api-portal-adapter.js";
@@ -14,6 +17,8 @@ const servers: ProviderDashboardServer[] = [];
 afterEach(async () => { await Promise.all(servers.splice(0).map((server) => server.stop())); });
 async function setup() {
   const secrets = new MemorySecretStore();
+  const profiles = new MemoryProviderProfileRepository();
+  const portalRecords = new MemoryPortalRepository();
   const calls: string[] = [];
   const routedAdapters: string[] = [];
   const adapter = new NewApiPortalAdapter(secrets, { fetchImpl: async (url, init) => {
@@ -25,7 +30,10 @@ async function setup() {
       const headers = new Headers(init?.headers);
       if (headers.has("cookie")) {
         expect(headers.get("cookie")).toBe("session=browser-secret");
-        expect(headers.get("new-api-user")).toBe("1");
+        // A cookie-only import discovers the user ID from /self first; all
+        // subsequent private reads must carry the bound New-Api-User header.
+        if (!String(url).endsWith("/self")) expect(headers.get("new-api-user")).toBe("1");
+        else expect([null, "1"]).toContain(headers.get("new-api-user"));
       } else {
         expect(headers.get("authorization")).toBe("Bearer account-secret");
       }
@@ -52,9 +60,14 @@ async function setup() {
     .register(adapter)
     .register(routedAdapter("nofx"))
     .register(routedAdapter("helyx"));
-  const portals = new ProviderPortalService(new MemoryPortalRepository(), portalAdapters);
-  const application = new ProviderDockApplication(new MemoryProviderProfileRepository(), new ProviderProbeService(new ProviderAdapterRegistry()),
-    secrets, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, portals);
+  const portals = new ProviderPortalService(portalRecords, portalAdapters);
+  const credentials = new CredentialManager({
+    secrets,
+    metadata: new MemoryCredentialMetadataRepository(),
+    bindings: new ApplicationCredentialBindings(profiles, portalRecords),
+  });
+  const application = new ProviderDockApplication(profiles, new ProviderProbeService(new ProviderAdapterRegistry()),
+    secrets, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, portals, undefined, undefined, credentials);
   await application.setProvider({ id: "fixture", displayName: "Fixture", baseUrl: "https://inference.invalid/v1" });
   const server = new ProviderDashboardServer({ application, healthMonitorIntervalMs: 0 });
   servers.push(server);
@@ -107,6 +120,148 @@ describe("portal dashboard integration", () => {
     expect((await request("api/providers/missing/portal", "PUT", { siteUrl: "https://account.invalid" })).status).toBe(404);
     expect((await request("api/providers/fixture/portal", "PUT", { siteUrl: "https://user:secret@account.invalid" })).status).toBe(400);
     expect(calls).toEqual([]);
+  });
+
+  it("rotates a managed portal token through import without overwriting its previous ciphertext", async () => {
+    const { application, request, secrets } = await setup();
+    await application.setSecret("PORTAL_LEGACY", "old-secret");
+    await application.setProviderPortal({
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      auth: { kind: "bearer", secretRef: "PORTAL_LEGACY" },
+    });
+    await application.reconcileCredentials();
+
+    const response = await request("api/portals/import", "POST", {
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      adapterId: "new-api", authKind: "bearer", raw: "account-secret",
+    });
+    const current = (await application.listProviderPortals())[0];
+    if (!current || current.connection.auth.kind === "none") throw new Error("Expected portal auth.");
+
+    expect(response.status).toBe(200);
+    expect(current.connection.auth.secretRef).not.toBe("PORTAL_LEGACY");
+    expect(await secrets.get("PORTAL_LEGACY")).toBe("old-secret");
+    expect(await secrets.get(current.connection.auth.secretRef)).toBe("account-secret");
+    const summaries = await application.listCredentials("fixture", "portal-session");
+    expect(summaries).toHaveLength(2);
+    expect(summaries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ state: "active", maskedValue: "acc…cret" }),
+      expect.objectContaining({ state: "available", maskedValue: "old…cret" }),
+    ]));
+  });
+
+  it("does not activate a new managed session if portal configuration fails", async () => {
+    const { application, request, secrets } = await setup();
+    await application.setSecret("PORTAL_LEGACY", "old-secret");
+    await application.setProviderPortal({
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      auth: { kind: "bearer", secretRef: "PORTAL_LEGACY" },
+    });
+    await application.reconcileCredentials();
+    application.setProviderPortal = async () => { throw new Error("private-configuration-canary"); };
+
+    const response = await request("api/portals/import", "POST", {
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      adapterId: "new-api", authKind: "bearer", raw: "account-secret",
+    });
+    const current = (await application.listProviderPortals())[0];
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain("private-configuration-canary");
+    expect(current?.connection.auth).toEqual({ kind: "bearer", secretRef: "PORTAL_LEGACY" });
+    expect(await secrets.get("PORTAL_LEGACY")).toBe("old-secret");
+    expect(await application.listCredentials("fixture", "portal-session")).toHaveLength(1);
+  });
+
+  it("restores the previous portal record if adding a managed replacement fails", async () => {
+    const { application, request, secrets } = await setup();
+    await application.setSecret("PORTAL_LEGACY", "account-secret");
+    await application.setProviderPortal({
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      auth: { kind: "bearer", secretRef: "PORTAL_LEGACY" },
+    });
+    await application.refreshProviderPortal("fixture");
+    await application.reconcileCredentials();
+    const previous = (await application.listProviderPortals())[0];
+    expect(previous?.lastWallet).toBeDefined();
+    application.addCredential = async () => { throw new Error("credential-write-failed"); };
+
+    const response = await request("api/portals/import", "POST", {
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      adapterId: "new-api", authKind: "bearer", raw: "replacement-token",
+      userId: 2, autoRefresh: false,
+    });
+
+    expect(response.status).toBe(500);
+    expect(await application.listProviderPortals()).toEqual([previous]);
+    expect(await secrets.get("PORTAL_LEGACY")).toBe("account-secret");
+    expect(await application.listCredentials("fixture", "portal-session")).toHaveLength(1);
+  });
+
+  it("fails closed when a managed import aborts after the binding was already switched", async () => {
+    const { application, request, secrets } = await setup();
+    await application.setSecret("PORTAL_LEGACY", "account-secret");
+    await application.setProviderPortal({
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      auth: { kind: "bearer", secretRef: "PORTAL_LEGACY" },
+    });
+    await application.refreshProviderPortal("fixture");
+    await application.reconcileCredentials();
+    // The credential write switches the live binding to a new reference — as a
+    // real activation would — and only then fails. The staged record no longer
+    // matches, so a silent rollback is impossible and the import must fail closed.
+    application.addCredential = async () => {
+      await application.setProviderPortal({
+        providerId: "fixture", siteUrl: "https://account.invalid",
+        auth: { kind: "bearer", secretRef: "PORTAL_SWITCHED" },
+      });
+      throw new Error("credential-write-failed-late");
+    };
+
+    const response = await request("api/portals/import", "POST", {
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      adapterId: "new-api", authKind: "bearer", raw: "replacement-token",
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.code).toBe("PORTAL_IMPORT_RECOVERY_REQUIRED");
+    // Fail-closed with a precise diagnostic — never a partial success, and the
+    // legacy ciphertext is left intact for explicit operator recovery.
+    expect(JSON.stringify(body)).not.toContain("credential-write-failed-late");
+    expect(await secrets.get("PORTAL_LEGACY")).toBe("account-secret");
+  });
+
+  it("does not clobber a concurrent cabinet update when a managed import rolls back", async () => {
+    const { application, request, secrets } = await setup();
+    await application.setSecret("PORTAL_LEGACY", "account-secret");
+    await application.setProviderPortal({
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      auth: { kind: "bearer", secretRef: "PORTAL_LEGACY" },
+    });
+    await application.reconcileCredentials();
+    // A concurrent writer updates the cabinet (userId) after staging but before
+    // the failing credential write; the compensating rollback must preserve it
+    // rather than overwrite it with the staged snapshot.
+    application.addCredential = async () => {
+      await application.setProviderPortal({
+        providerId: "fixture", siteUrl: "https://account.invalid",
+        auth: { kind: "bearer", secretRef: "PORTAL_LEGACY" }, userId: 99,
+      });
+      throw new Error("credential-write-failed");
+    };
+
+    const response = await request("api/portals/import", "POST", {
+      providerId: "fixture", siteUrl: "https://account.invalid",
+      adapterId: "new-api", authKind: "bearer", raw: "replacement-token",
+    });
+    const body = await response.json();
+    const current = (await application.listProviderPortals())[0];
+
+    expect(response.status).toBe(500);
+    expect(body.code).toBe("PORTAL_IMPORT_RECOVERY_REQUIRED");
+    expect(current?.connection.userId).toBe(99);
+    expect(await secrets.get("PORTAL_LEGACY")).toBe("account-secret");
   });
 
   it("imports Cookie-Editor data for one selected provider, keeps it secret, and refreshes the balance", async () => {
@@ -164,6 +319,23 @@ describe("portal dashboard integration", () => {
     if (!portal || portal.connection.auth.kind === "none") throw new Error("Expected token auth.");
     expect(await secrets.get(portal.connection.auth.secretRef)).toBe("account-secret");
     expect(portal.latest?.wallet.status).toBe("ok");
+  });
+
+  it("discovers and persists the New API user ID from a cookie session", async () => {
+    const { application, request, secrets } = await setup();
+    const response = await request("api/portals/import", "POST", {
+      providerId: "fixture", siteUrl: "https://account.invalid/profile", adapterId: "new-api",
+      authKind: "cookie", autoRefresh: true, refreshIntervalMs: 300000,
+      raw: JSON.stringify([{ domain: ".account.invalid", path: "/", name: "session", value: "browser-secret" }]),
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(await response.json())).not.toContain("browser-secret");
+    const portal = (await application.listProviderPortals())[0];
+    expect(portal?.connection).toMatchObject({ siteUrl: "https://account.invalid", userId: 1, auth: { kind: "cookie" } });
+    expect(portal?.latest?.wallet.value).toMatchObject({ userId: 1 });
+    if (!portal || portal.connection.auth.kind === "none") throw new Error("Expected a stored browser session.");
+    expect(await secrets.get(portal.connection.auth.secretRef)).toBe("session=browser-secret");
   });
 
   it("overrides the generic adapter for NoFX and Helyx imports by hostname", async () => {

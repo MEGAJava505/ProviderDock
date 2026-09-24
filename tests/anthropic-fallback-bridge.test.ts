@@ -127,6 +127,7 @@ describe("Anthropic bridge safe fallback", () => {
       expect(response.headers.get("x-providerdock-fallback-block")).toBe(
         "FALLBACK_STATE_AMBIGUOUS",
       );
+      expect(response.headers.get("x-should-retry")).toBe("false");
       expect(ambiguousFetch).toHaveBeenCalledTimes(1);
     } finally {
       await ambiguousBridge.stop();
@@ -197,6 +198,7 @@ describe("Anthropic bridge safe fallback", () => {
       expect(response.headers.get("x-providerdock-fallback-block")).toBe(
         "FALLBACK_STATE_AMBIGUOUS",
       );
+      expect(response.headers.get("x-should-retry")).toBe("false");
       expect(ambiguousFetch).toHaveBeenCalledTimes(2);
     } finally {
       await ambiguousBridge.stop();

@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { ensureWorkerBuild } from "./support/worker-build.js";
 import { MemorySecretStore } from "../src/core/security/secret-store.js";
 import { NewApiPortalAdapter } from "../src/core/portals/new-api-portal-adapter.js";
-import { FilePortalRepository, MemoryPortalRepository } from "../src/core/portals/portal-repository.js";
+import { FilePortalRepository, MemoryPortalRepository, PortalRepositoryLockError } from "../src/core/portals/portal-repository.js";
 import { ProviderPortalService } from "../src/core/portals/provider-portal-service.js";
 import { portalConnectionSchema, portalSnapshotSchema, ProviderPortalAdapterRegistry } from "../src/core/portals/portal-types.js";
+import type { PortalRecord } from "../src/core/portals/portal-types.js";
 
 const now = new Date("2026-09-07T12:00:00Z");
 const profile = portalConnectionSchema.parse({ providerId: "one", siteUrl: "https://one.invalid/profile",
@@ -19,6 +24,16 @@ const checkIn = { enabled: true, min_quota: 500000, max_quota: 1000000,
 const json = (data: unknown) => new Response(JSON.stringify({ success: true, data }), { headers: { "content-type": "application/json" } });
 const bodyFor = (url: string | URL | Request) => String(url).endsWith("/pricing") ? [] : String(url).endsWith("/summary") ? { models: [] } : String(url).endsWith("/status") ? site : String(url).endsWith("/self") ? wallet : checkIn;
 const secrets = () => new MemorySecretStore({ ACCOUNT_TOKEN: "account-secret" });
+
+// Spawn a portal-writer worker in its own OS process; resolve on exit 0, reject
+// with captured stderr otherwise.
+const runWorker = (worker: string, args: readonly string[]) => new Promise<void>((resolve, reject) => {
+  const child = spawn(process.execPath, [worker, ...args], { stdio: ["ignore", "ignore", "pipe"] });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => { stderr += String(chunk); });
+  child.on("error", reject);
+  child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`worker ${args[1]} exited ${code}: ${stderr}`)));
+});
 
 describe("New API portal", () => {
   it("reads an account using only GET and returns wallet/check-in without private profile fields", async () => {
@@ -224,6 +239,148 @@ describe("portal state and polling", () => {
       await service.refreshDue(["one", "two"]);
       expect(await new FilePortalRepository(path).list()).toHaveLength(2);
       expect(await readFile(path, "utf8")).not.toMatch(/account-secret|private@example|do-not-serialize/);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("does not lose a concurrent update from an independent writer on the same file", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "providerdock-portals-cross-"));
+    try {
+      const path = join(directory, "accounts.json");
+      // Independent instances model separate processes: each has its own
+      // in-process queue, so only a cross-process lock can serialize them.
+      const writerA = new FilePortalRepository(path);
+      const writerB = new FilePortalRepository(path);
+      const record = (providerId: string, siteUrl: string): PortalRecord => ({
+        connection: portalConnectionSchema.parse({ ...profile, providerId, siteUrl }),
+        revision: randomUUID(),
+        failures: 0,
+      });
+      await Promise.all([
+        writerA.update("one", () => record("one", "https://one.invalid/profile")),
+        writerB.update("two", () => record("two", "https://two.invalid")),
+      ]);
+      const ids = (await new FilePortalRepository(path).list())
+        .map((entry) => entry.connection.providerId)
+        .sort();
+      expect(ids).toEqual(["one", "two"]);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("serializes two real OS processes writing one accounts file without losing an update", async () => {
+    // The in-process test above uses two repository instances in one process;
+    // this one proves the on-disk lock across genuinely separate OS processes,
+    // the case src/cli.ts actually produces (a fresh application per invocation).
+    const root = dirname(dirname(fileURLToPath(import.meta.url)));
+    const worker = join(root, "tests", "support", "portal-writer-process.mjs");
+    const dist = join(root, "dist", "core", "portals");
+    // The child imports the compiled build and `vitest run` does not build.
+    // Rebuild if any required artifact is missing or older than ANY source file
+    // (a dependency change, not just portal-repository.ts, must invalidate it).
+    await ensureWorkerBuild(root, [
+      join(dist, "portal-repository.js"),
+      join(dist, "portal-types.js"),
+    ]);
+    const directory = await mkdtemp(join(tmpdir(), "providerdock-portals-procs-"));
+    try {
+      const path = join(directory, "accounts.json");
+      const perWriter = 12;
+      await Promise.all([
+        runWorker(worker, [path, "a-", String(perWriter)]),
+        runWorker(worker, [path, "b-", String(perWriter)]),
+      ]);
+
+      const ids = (await new FilePortalRepository(path).list())
+        .map((entry) => entry.connection.providerId)
+        .sort();
+      const expected = Array.from({ length: perWriter }, (_, index) => [`a-${index}`, `b-${index}`]).flat().sort();
+      // Every update from both processes survives: no last-rename-wins loss.
+      expect(ids).toEqual(expected);
+      expect(new Set(ids).size).toBe(expected.length);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it("loses an update across two real processes WITHOUT the lock — the negative control the lock exists to prevent", async () => {
+    // Same two-real-process race as above, but the worker's nolock mode does a
+    // RAW read-modify-write with no cross-process lock. A rendezvous makes both
+    // processes read the identical base before either writes, so last-rename-wins
+    // is deterministic: exactly one of the two records survives. This is the RED
+    // state; the locked test above is GREEN. No production code is bypassed and
+    // nothing temporary is left behind — the failure mode lives only in the
+    // .mjs worker's nolock branch.
+    const root = dirname(dirname(fileURLToPath(import.meta.url)));
+    const worker = join(root, "tests", "support", "portal-writer-process.mjs");
+    const dist = join(root, "dist", "core", "portals");
+    await ensureWorkerBuild(root, [join(dist, "portal-repository.js"), join(dist, "portal-types.js")]);
+    const directory = await mkdtemp(join(tmpdir(), "providerdock-portals-nolock-"));
+    try {
+      const path = join(directory, "accounts.json");
+      const rendezvous = join(directory, "rendezvous");
+      await import("node:fs/promises").then(({ mkdir }) => mkdir(rendezvous));
+      await Promise.all([
+        runWorker(worker, [path, "a-", "1", "nolock", rendezvous]),
+        runWorker(worker, [path, "b-", "1", "nolock", rendezvous]),
+      ]);
+      const ids = (await new FilePortalRepository(path).list()).map((entry) => entry.connection.providerId);
+      // Without the lock exactly one writer's record survives — an update is lost.
+      expect(ids).toHaveLength(1);
+      expect(["a-0", "b-0"]).toContain(ids[0]);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it("fails a busy write closed with a secret-free, exact-path recovery message and no store change", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "providerdock-portals-busy-"));
+    try {
+      const path = join(directory, "accounts.json");
+      const lockPath = `${path}.lock`;
+      // Seed one record, then hold the lock as a concurrent writer would.
+      const seed = new FilePortalRepository(path);
+      await seed.update("kept", () => ({
+        connection: portalConnectionSchema.parse({ providerId: "kept", siteUrl: "https://kept.invalid",
+          auth: { kind: "bearer", secretRef: "TOP-SECRET-REF" } }),
+        revision: randomUUID(), failures: 0,
+      }));
+      await writeFile(lockPath, "");
+
+      const blocked = new FilePortalRepository(path, { busyTimeoutMs: 120, retryIntervalMs: 10 });
+      const attempt = blocked.update("added", () => ({
+        connection: portalConnectionSchema.parse({ providerId: "added", siteUrl: "https://added.invalid",
+          auth: { kind: "bearer", secretRef: "TOP-SECRET-REF" } }),
+        revision: randomUUID(), failures: 0,
+      }));
+      const error = await attempt.then(() => undefined, (reason) => reason);
+      expect(error).toBeInstanceOf(PortalRepositoryLockError);
+      const message = (error as Error).message;
+      expect(message).toContain(lockPath);                       // exact lock path
+      expect(message).toContain("No changes were made.");
+      expect(message).toMatch(/if no ProviderDock process is running/); // deletion advice is CONDITIONAL, never for a live lock
+      expect(message).not.toMatch(/TOP-SECRET-REF|account-secret/);     // no secret leaks
+      // The held lock and the seeded store are untouched by the failed write.
+      await expect(readFile(lockPath, "utf8")).resolves.toBe("");
+      const ids = (await seed.list()).map((entry) => entry.connection.providerId).sort();
+      expect(ids).toEqual(["kept"]);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("refuses to overwrite a newer revision when compensating a failed managed import", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "providerdock-portals-compensate-"));
+    try {
+      const path = join(directory, "accounts.json");
+      const registry = new ProviderPortalAdapterRegistry().register(new NewApiPortalAdapter(secrets(), { fetchImpl: async (url) => json(bodyFor(url)) }));
+      const serviceA = new ProviderPortalService(new FilePortalRepository(path), registry, () => now);
+      const serviceB = new ProviderPortalService(new FilePortalRepository(path), registry, () => now);
+      const previous = await serviceA.configure(profile);
+      const staged = await serviceA.configure(profile);
+      // An independent writer commits a newer revision before A compensates.
+      const newer = await serviceB.configure(profile);
+
+      const restored = await serviceA.restoreIfUnchanged(staged, previous);
+
+      // Compensation is a no-op — the response must signal recovery, not a
+      // partial success, and the newer revision must survive untouched.
+      expect(restored).toBe(false);
+      const currentNow = await new FilePortalRepository(path).get("one");
+      expect(currentNow?.revision).toBe(newer.revision);
+      expect(currentNow?.revision).not.toBe(previous.revision);
     } finally { await rm(directory, { recursive: true, force: true }); }
   });
 

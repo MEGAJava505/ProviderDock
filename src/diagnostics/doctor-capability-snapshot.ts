@@ -61,6 +61,12 @@ export function doctorReportToCapabilitySnapshot(
 
   return {
     providerId: report.providerId,
+    ...(report.configurationFingerprint === undefined ? {} : {
+      configurationFingerprint: report.configurationFingerprint,
+    }),
+    ...(report.credentialFingerprint === undefined ? {} : {
+      credentialFingerprint: report.credentialFingerprint,
+    }),
     modelId: report.modelId,
     checkedAt: report.checkedAt,
     doctorLevel: report.level,

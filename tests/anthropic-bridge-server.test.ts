@@ -11,8 +11,67 @@ import {
   type ProviderRuntimeHealthSignal,
   type UsageTelemetryEvent,
 } from "../src/index.js";
+import { jsonResponse, sseResponse } from "./support/bridge-sse.js";
 
 describe("AnthropicBridgeServer", () => {
+  it("waits for an active request handler before resolving stop", async () => {
+    let saveCount = 0;
+    let releaseFinalSave!: () => void;
+    let finalSaveStarted!: () => void;
+    const finalSaveStartedPromise = new Promise<void>((resolve) => {
+      finalSaveStarted = resolve;
+    });
+    const finalSaveRelease = new Promise<void>((resolve) => {
+      releaseFinalSave = resolve;
+    });
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: "msg-stop",
+        type: "message",
+        role: "assistant",
+        model: "claude-x",
+        content: [{ type: "text", text: "OK" }],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+      }),
+    );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "stop-secret" }),
+      fetchImpl: fetchMock,
+      turnLedgerStore: {
+        load: async () => undefined,
+        save: async () => {
+          saveCount += 1;
+          if (saveCount === 3) {
+            finalSaveStarted();
+            await finalSaveRelease;
+          }
+        },
+      },
+    });
+    const address = await bridge.start();
+    const response = await postJson(`${address.url}/v1/messages`, {
+      model: "claude-x",
+      max_tokens: 16,
+      messages: [{ role: "user", content: "stop after response" }],
+    });
+    expect(response.status).toBe(200);
+    await response.json();
+    await finalSaveStartedPromise;
+
+    let stopSettled = false;
+    const stop = bridge.stop().finally(() => {
+      stopSettled = true;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(stopSettled).toBe(false);
+
+    releaseFinalSave();
+    await stop;
+    expect(stopSettled).toBe(true);
+  });
+
   it("aggregates native streaming usage and records configured cost", async () => {
     const events: UsageTelemetryEvent[] = [];
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
@@ -316,6 +375,51 @@ describe("AnthropicBridgeServer", () => {
     }
   });
 
+  it("protects the managed models catalog with the loopback client token", async () => {
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "real-secret" }),
+      clientToken: "fake-child-token",
+      models: [{ modelId: "claude-x" }, { modelId: "claude-y" }],
+    });
+    const address = await bridge.start();
+    try {
+      const unauthorized = await fetch(`${address.url}/v1/models`);
+      expect(unauthorized.status).toBe(401);
+
+      const wrongMethod = await fetch(`${address.url}/v1/models`, {
+        method: "POST",
+        headers: { authorization: "Bearer fake-child-token" },
+      });
+      expect(wrongMethod.status).toBe(405);
+      expect(wrongMethod.headers.get("allow")).toBe("GET");
+
+      const authorized = await fetch(`${address.url}/v1/models`, {
+        headers: { "x-api-key": "fake-child-token" },
+      });
+      expect(authorized.status).toBe(200);
+      expect(await authorized.json()).toEqual({
+        object: "list",
+        data: [
+          {
+            id: "claude-x",
+            object: "model",
+            created: 0,
+            owned_by: "anthropic",
+          },
+          {
+            id: "claude-y",
+            object: "model",
+            created: 0,
+            owned_by: "anthropic",
+          },
+        ],
+      });
+    } finally {
+      await bridge.stop();
+    }
+  });
+
   it("uses GoRouter's native Messages route and preserves extended thinking", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () =>
       jsonResponse({
@@ -608,6 +712,77 @@ describe("AnthropicBridgeServer", () => {
       expect(replay.status).toBe(409);
       expect(replay.headers.get("x-providerdock-turn-block")).toBe("TOOL_LOOP_DETECTED");
       expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("blocks a conflicting Claude Edit history before a second upstream delivery", async () => {
+    const edit = {
+      file_path: "a.txt",
+      old_string: "before",
+      new_string: "after",
+    };
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: "msg-edit",
+        type: "message",
+        role: "assistant",
+        model: "claude-x",
+        content: [{ type: "tool_use", id: "toolu-edit", name: "Edit", input: edit }],
+        stop_reason: "tool_use",
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "real-secret" }),
+      fetchImpl: fetchMock,
+    });
+    const address = await bridge.start();
+
+    try {
+      const first = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "Edit the file" }],
+      });
+      expect(first.status).toBe(200);
+
+      const conflict = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [
+          { role: "user", content: "Edit the file" },
+          {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "toolu-edit",
+                name: "Edit",
+                input: { ...edit, replace_all: false, new_string: "different" },
+              },
+            ],
+          },
+          {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "toolu-edit", content: "rejected" },
+            ],
+          },
+        ],
+      });
+      expect(conflict.status).toBe(409);
+      expect(conflict.headers.get("x-providerdock-turn-block")).toBe(
+        "TOOL_CALL_CONFLICT",
+      );
+      expect(conflict.headers.get("x-should-retry")).toBe("false");
+      expect((await conflict.json()) as unknown).toMatchObject({
+        providerdock: { normalized_type: "INVALID_REQUEST" },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       await bridge.stop();
     }
@@ -941,6 +1116,7 @@ describe("AnthropicBridgeServer", () => {
       expect(payload.error.message).not.toContain("anthropic-secret");
       expect(response.headers.get("retry-after")).toBe("5");
       expect(response.headers.get("x-request-id")).toBe("anthropic-request-500");
+      expect(response.headers.get("x-should-retry")).toBe("false");
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(signals).toEqual([
         expect.objectContaining({
@@ -951,6 +1127,214 @@ describe("AnthropicBridgeServer", () => {
           executionPhase: "unknown",
         }),
       ]);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("keeps an explicit upstream HTTP 503 retryable when no fallback is configured", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: "provider unavailable" } }), {
+          status: 503,
+          headers: { "content-type": "application/json", "retry-after": "5" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: "msg-after-503",
+          type: "message",
+          role: "assistant",
+          model: "claude-x",
+          content: [{ type: "text", text: "recovered" }],
+          stop_reason: "end_turn",
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }),
+      );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "secret" }),
+      fetchImpl: fetchMock,
+    });
+    const address = await bridge.start();
+
+    try {
+      const request = {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "retry this rejection" }],
+      };
+      const first = await postJson(`${address.url}/v1/messages`, request);
+      expect(first.status).toBe(503);
+      expect(first.headers.get("retry-after")).toBe("5");
+      expect(first.headers.get("x-should-retry")).toBeNull();
+
+      const retry = await postJson(`${address.url}/v1/messages`, request);
+      expect(retry.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("stops Claude retries for a model-unavailable HTTP 503", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "model_not_found",
+            message: "No available channel for model claude-x under group default",
+          },
+        }),
+        {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "secret" }),
+      fetchImpl: fetchMock,
+    });
+    const address = await bridge.start();
+
+    try {
+      const response = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "unavailable model" }],
+      });
+      expect(response.status).toBe(503);
+      expect(response.headers.get("x-should-retry")).toBe("false");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("marks an ambiguous upstream HTTP 500 as non-retryable", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: "provider unavailable" } }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "secret" }),
+      fetchImpl: fetchMock,
+    });
+    const address = await bridge.start();
+
+    try {
+      const response = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "unavailable" }],
+      });
+      expect(response.status).toBe(500);
+      expect(response.headers.get("x-should-retry")).toBe("false");
+      expect((await response.json()) as unknown).toMatchObject({
+        providerdock: {
+          normalized_type: "PROVIDER_UNAVAILABLE",
+          http_status: 500,
+        },
+      });
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("marks upstream body-read failures as non-retryable protocol errors", async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error("upstream body disconnected"));
+      },
+    });
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(body, {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "secret" }),
+      fetchImpl: fetchMock,
+    });
+    const address = await bridge.start();
+
+    try {
+      const response = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "body failure" }],
+      });
+      expect(response.status).toBe(502);
+      expect(response.headers.get("x-should-retry")).toBe("false");
+      expect((await response.json()) as unknown).toMatchObject({
+        providerdock: { normalized_type: "PROTOCOL_ERROR" },
+      });
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("marks malformed upstream JSON as non-retryable", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("{not-json", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "secret" }),
+      fetchImpl: fetchMock,
+    });
+    const address = await bridge.start();
+
+    try {
+      const response = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "malformed" }],
+      });
+      expect(response.status).toBe(502);
+      expect(response.headers.get("x-should-retry")).toBe("false");
+      expect((await response.json()) as unknown).toMatchObject({
+        providerdock: { normalized_type: "PROTOCOL_ERROR" },
+      });
+    } finally {
+      await bridge.stop();
+    }
+  });
+
+  it("marks an invalid upstream Anthropic payload as non-retryable", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({ unexpected: true }),
+    );
+    const bridge = new AnthropicBridgeServer({
+      profile: anthropicProfile(),
+      secretStore: new MemorySecretStore({ ANTHROPIC_KEY: "secret" }),
+      fetchImpl: fetchMock,
+    });
+    const address = await bridge.start();
+
+    try {
+      const response = await postJson(`${address.url}/v1/messages`, {
+        model: "claude-x",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "invalid payload" }],
+      });
+      expect(response.status).toBe(502);
+      expect(response.headers.get("x-should-retry")).toBe("false");
+      expect((await response.json()) as unknown).toMatchObject({
+        providerdock: { normalized_type: "PROTOCOL_ERROR" },
+      });
     } finally {
       await bridge.stop();
     }
@@ -984,20 +1368,6 @@ function postJson(url: string, body: unknown): Promise<Response> {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-  });
-}
-
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-function sseResponse(source: string): Response {
-  return new Response(source, {
-    status: 200,
-    headers: { "content-type": "text/event-stream" },
   });
 }
 

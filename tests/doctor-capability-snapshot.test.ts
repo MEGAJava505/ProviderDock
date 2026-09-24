@@ -11,6 +11,7 @@ describe("doctorReportToCapabilitySnapshot", () => {
       modelId: "gpt-x",
       protocol: "openai-chat-completions",
       level: 3,
+      configurationFingerprint: "a".repeat(64),
       checkedAt: "2026-08-30T10:00:00.000Z",
       verdict: "DEGRADED",
       checks: [
@@ -25,6 +26,7 @@ describe("doctorReportToCapabilitySnapshot", () => {
       providerId: "router",
       modelId: "gpt-x",
       doctorLevel: 3,
+      configurationFingerprint: "a".repeat(64),
       capabilities: {
         model_discovery: "SUPPORTED",
         text: "SUPPORTED",

@@ -3,7 +3,7 @@ import {
   assertModelEnabled,
 } from "../core/providers/model-access.js";
 import { automaticClient } from "../core/providers/automatic-client.js";
-import { portalConnectionSchema, PortalConfigurationError } from "../core/portals/portal-types.js";
+import { portalConnectionSchema, PortalConfigurationError, type PortalRecord } from "../core/portals/portal-types.js";
 import type { ProviderPortalService } from "../core/portals/provider-portal-service.js";
 import { resolve } from "node:path";
 import type { ProviderProbeResult, ProviderProbeService } from "../core/health/provider-probe-service.js";
@@ -41,6 +41,7 @@ import type {
   CredentialRestoreReport,
   CredentialSummary,
 } from "../core/security/credential-manager.js";
+import { CredentialManagerError } from "../core/security/credential-manager.js";
 import {
   parsePromptProfile,
   type PromptProfile,
@@ -377,6 +378,10 @@ export class ProviderDockApplication {
     await this.getProvider(connection.providerId);
     if (!this.portals) throw new PortalConfigurationError("Account connections are unavailable in this runtime.");
     return this.portals.configure(connection);
+  }
+  async restoreProviderPortalIfUnchanged(staged: PortalRecord, previous: PortalRecord): Promise<boolean> {
+    if (!this.portals) throw new PortalConfigurationError("Account connections are unavailable in this runtime.");
+    return this.portals.restoreIfUnchanged(staged, previous);
   }
   async refreshProviderPortal(providerId: string) {
     await this.getProvider(providerId);
@@ -749,12 +754,22 @@ export class ProviderDockApplication {
     return this.requireCredentialManager().list(providerId, purpose);
   }
 
+  async listManagedSecretReferences(): Promise<readonly string[]> {
+    return this.requireCredentialManager().listManagedReferences();
+  }
+
   async reconcileCredentials(): Promise<readonly CredentialSummary[]> {
     return this.requireCredentialManager().reconcile();
   }
 
   async addCredential(input: AddCredentialInput): Promise<CredentialSummary> {
-    return this.requireCredentialManager().add(input);
+    const previousRef = input.activate === true && input.purpose === "provider-api"
+      ? await this.providerApiSecretRef(input.providerId) : undefined;
+    const added = await this.requireCredentialManager().add(input);
+    if (input.activate === true && input.purpose === "provider-api") {
+      await this.invalidateDiagnosticsIfApiKeyChanged(input.providerId, previousRef);
+    }
+    return added;
   }
 
   async activateCredential(
@@ -762,7 +777,25 @@ export class ProviderDockApplication {
     purpose: CredentialPurpose,
     credentialId: string,
   ): Promise<CredentialSummary> {
-    return this.requireCredentialManager().activate(providerId, purpose, credentialId);
+    const previousRef = purpose === "provider-api" ? await this.providerApiSecretRef(providerId) : undefined;
+    const activated = await this.requireCredentialManager().activate(providerId, purpose, credentialId);
+    if (purpose === "provider-api") {
+      await this.invalidateDiagnosticsIfApiKeyChanged(providerId, previousRef);
+    }
+    return activated;
+  }
+
+  private async providerApiSecretRef(providerId: string): Promise<string | undefined> {
+    const profile = await this.profiles.get(providerId);
+    return profile?.auth.kind === "none" ? undefined : profile?.auth.secretRef;
+  }
+
+  private async invalidateDiagnosticsIfApiKeyChanged(
+    providerId: string, previousRef: string | undefined,
+  ): Promise<void> {
+    if (await this.providerApiSecretRef(providerId) !== previousRef) {
+      await this.healthRecords.invalidateDiagnostics(providerId);
+    }
   }
 
   async removeCredential(
@@ -782,7 +815,11 @@ export class ProviderDockApplication {
   }
 
   async setSecret(reference: string, value: string): Promise<void> {
-    await this.requireSecretVault().set(secretReferenceSchema.parse(reference), value);
+    const parsed = secretReferenceSchema.parse(reference);
+    await this.rejectManagedSecretMutation(parsed);
+    await this.credentials?.initializeEmptyRegistry();
+    await this.invalidateDoctorEvidenceForSecret(parsed);
+    await this.requireSecretVault().set(parsed, value);
     await this.portals?.invalidateSecret(reference);
   }
 
@@ -791,9 +828,30 @@ export class ProviderDockApplication {
   }
 
   async removeSecret(reference: string): Promise<boolean> {
-    const removed = await this.requireSecretVault().delete(secretReferenceSchema.parse(reference));
+    const parsed = secretReferenceSchema.parse(reference);
+    await this.rejectManagedSecretMutation(parsed);
+    await this.invalidateDoctorEvidenceForSecret(parsed);
+    const removed = await this.requireSecretVault().delete(parsed);
     await this.portals?.invalidateSecret(reference);
     return removed;
+  }
+
+  private async invalidateDoctorEvidenceForSecret(reference: string): Promise<void> {
+    for (const profile of await this.profiles.list()) {
+      const usedByAuth = profile.auth.kind !== "none" && profile.auth.secretRef === reference;
+      if (usedByAuth || Object.values(profile.secretHeaders).includes(reference)) {
+        await this.healthRecords.invalidateDiagnostics(profile.id);
+      }
+    }
+  }
+
+  private async rejectManagedSecretMutation(reference: string): Promise<void> {
+    if (await this.credentials?.managesReference(reference)) {
+      throw new CredentialManagerError(
+        "CONFLICT",
+        "Managed credentials must be rotated or removed with credential commands.",
+      );
+    }
   }
 
   async resolveApprovalLevel(

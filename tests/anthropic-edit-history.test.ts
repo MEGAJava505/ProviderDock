@@ -16,7 +16,7 @@ function deliveredLedger(name: string, arguments_: Record<string, unknown>) {
   return new TurnLedger({ initialSnapshot: ledger.snapshot() });
 }
 
-function continuation(name: string, arguments_: Record<string, unknown>) {
+function continuation(name: string, arguments_: unknown) {
   return extractAnthropicTurnSignature({ messages: [
     { role: "assistant", content: [{ type: "tool_use", id: callId, name, input: arguments_ }] },
     { role: "user", content: [{ type: "tool_result", tool_use_id: callId, content: "File edited" }] },
@@ -24,6 +24,13 @@ function continuation(name: string, arguments_: Record<string, unknown>) {
 }
 
 describe("Claude Edit history defaults", () => {
+  it("accepts semantically equivalent object and JSON-string Edit arguments", () => {
+    const admitted = deliveredLedger("Edit", input).admit(
+      continuation("Edit", JSON.stringify(input)),
+    );
+    expect(admitted.decision).toBe("accepted");
+  });
+
   it("accepts a completed Edit when Claude adds replace_all false", () => {
     expect(deliveredLedger("Edit", input).admit(continuation("Edit", { ...input, replace_all: false })).decision)
       .toBe("accepted");

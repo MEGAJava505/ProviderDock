@@ -1,9 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "node:crypto";
-import { promisify } from "node:util";
 import { z } from "zod";
 import { SecretProtectionError } from "./dpapi-secret-vault.js";
 
-const deriveKey = promisify(scrypt);
 const keyLength = 32;
 const saltLength = 16;
 const nonceLength = 12;
@@ -126,11 +124,21 @@ function assertPassphrase(passphrase: string): void {
 }
 
 async function derivePortableKey(passphrase: string, salt: Buffer): Promise<Buffer> {
-  const derived = await deriveKey(passphrase, salt, keyLength, {
-    N: scryptCost,
-    r: scryptBlockSize,
-    p: scryptParallelization,
-    maxmem: scryptMaxMemory,
+  return new Promise((resolve, reject) => {
+    scrypt(
+      passphrase,
+      salt,
+      keyLength,
+      {
+        N: scryptCost,
+        r: scryptBlockSize,
+        p: scryptParallelization,
+        maxmem: scryptMaxMemory,
+      },
+      (error, derived) => {
+        if (error) reject(error);
+        else resolve(Buffer.from(derived));
+      },
+    );
   });
-  return Buffer.from(derived);
 }

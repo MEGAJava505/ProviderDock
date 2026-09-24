@@ -106,6 +106,7 @@ export class CredentialManager {
   private readonly now: () => Date;
   private readonly idFactory: () => string;
   private readonly unlockedValues = new Map<string, string>();
+  private mutationTail: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: CredentialManagerOptions) {
     this.now = options.now ?? (() => new Date());
@@ -129,6 +130,10 @@ export class CredentialManager {
 
   /** Import existing profile/portal references into the registry without replacing their ciphertext. */
   async reconcile(): Promise<readonly CredentialSummary[]> {
+    return this.runMutation(() => this.reconcileUnqueued());
+  }
+
+  private async reconcileUnqueued(): Promise<readonly CredentialSummary[]> {
     const bindings = await this.options.bindings?.list() ?? [];
     const records = [...(await this.options.metadata.list())];
     for (const binding of bindings) {
@@ -189,9 +194,14 @@ export class CredentialManager {
   }
 
   async add(input: AddCredentialInput): Promise<CredentialSummary> {
+    return this.runMutation(() => this.addUnqueued(input));
+  }
+
+  private async addUnqueued(input: AddCredentialInput): Promise<CredentialSummary> {
     this.assertProviderId(input.providerId);
     credentialPurposeSchema.parse(input.purpose);
     this.assertValue(input.value);
+    await this.assertMissingRegistrySafe();
     const id = this.idFactory();
     const secretRef = secretReferenceSchema.parse(`credential-${id}`);
     const record: CredentialRecord = {
@@ -212,12 +222,20 @@ export class CredentialManager {
       throw error;
     }
     if (input.activate === true) {
-      return this.activate(input.providerId, input.purpose, id);
+      return this.activateUnqueued(input.providerId, input.purpose, id);
     }
     return this.toSummary(record, false);
   }
 
   async activate(
+    providerId: string,
+    purpose: CredentialPurpose,
+    credentialId: string,
+  ): Promise<CredentialSummary> {
+    return this.runMutation(() => this.activateUnqueued(providerId, purpose, credentialId));
+  }
+
+  private async activateUnqueued(
     providerId: string,
     purpose: CredentialPurpose,
     credentialId: string,
@@ -259,7 +277,11 @@ export class CredentialManager {
       }
       await this.options.bindings.activate({ providerId, purpose, secretRef: selected.secretRef });
     } catch (error) {
-      await this.restoreMetadata(previousRecords);
+      await this.restoreMetadata(
+        previousRecords.filter(
+          (record) => record.providerId === providerId && record.purpose === purpose,
+        ),
+      );
       if (previousBinding !== undefined) {
         await this.options.bindings.activate(previousBinding).catch(() => undefined);
       }
@@ -271,6 +293,14 @@ export class CredentialManager {
   }
 
   async remove(
+    providerId: string,
+    credentialId: string,
+    purpose?: CredentialPurpose,
+  ): Promise<void> {
+    return this.runMutation(() => this.removeUnqueued(providerId, credentialId, purpose));
+  }
+
+  private async removeUnqueued(
     providerId: string,
     credentialId: string,
     purpose?: CredentialPurpose,
@@ -296,6 +326,10 @@ export class CredentialManager {
   }
 
   async createBackup(destination: string, passphrase: string): Promise<CredentialBackupReport> {
+    return this.runMutation(() => this.createBackupUnqueued(destination, passphrase));
+  }
+
+  private async createBackupUnqueued(destination: string, passphrase: string): Promise<CredentialBackupReport> {
     await assertSafeBackupPath(destination, false);
     const records: Array<{ readonly record: CredentialRecord; readonly value: string }> = [];
     let skipped = 0;
@@ -328,6 +362,10 @@ export class CredentialManager {
   }
 
   async restoreBackup(source: string, passphrase: string): Promise<CredentialRestoreReport> {
+    return this.runMutation(() => this.restoreBackupUnqueued(source, passphrase));
+  }
+
+  private async restoreBackupUnqueued(source: string, passphrase: string): Promise<CredentialRestoreReport> {
     await assertSafeBackupPath(source, true);
     let envelope: unknown;
     try {
@@ -393,6 +431,42 @@ export class CredentialManager {
     }
   }
 
+  async revision(reference: string): Promise<string | undefined> {
+    const parsed = secretReferenceSchema.parse(reference);
+    if (this.unlockedValues.has(parsed)) return undefined;
+    return this.options.secrets.revision?.(parsed);
+  }
+
+  async managesReference(reference: string): Promise<boolean> {
+    const parsed = secretReferenceSchema.parse(reference);
+    if ((await this.options.metadata.list()).some((record) => record.secretRef === parsed)) return true;
+    await this.assertMissingRegistrySafe();
+    return /^credential-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed);
+  }
+
+  async listManagedReferences(): Promise<readonly string[]> {
+    const records = await this.options.metadata.list();
+    await this.assertMissingRegistrySafe();
+    return records.map((record) => record.secretRef);
+  }
+
+  async initializeEmptyRegistry(): Promise<void> {
+    await this.assertMissingRegistrySafe();
+    if (await this.options.metadata.isInitialized?.() === false) {
+      await this.options.metadata.initializeEmpty?.();
+    }
+  }
+
+  private async assertMissingRegistrySafe(): Promise<void> {
+    if (await this.options.metadata.isInitialized?.() !== false) return;
+    const vault = this.tryRequireVault();
+    if (vault === undefined || (await vault.listReferences()).length > 0) {
+      throw new CredentialManagerError(
+        "UNAVAILABLE", "Credential registry is missing while protected secrets exist.",
+      );
+    }
+  }
+
   private requireVault(): SecretVault {
     if (this.options.vault !== undefined) return this.options.vault;
     const candidate = this.options.secrets as Partial<SecretVault>;
@@ -421,13 +495,21 @@ export class CredentialManager {
     return this.options.secrets.get(reference);
   }
 
-  private async restoreMetadata(records: readonly CredentialRecord[]): Promise<void> {
-    const current = await this.options.metadata.list();
-    const previousIds = new Set(records.map((record) => record.id));
-    for (const record of current) {
-      if (!previousIds.has(record.id)) await this.options.metadata.delete(record.id);
-    }
-    for (const record of records) await this.options.metadata.upsert(record);
+  // Restore only the records this activation may have rewritten. Activation
+  // re-points state within one (providerId, purpose) group and never creates or
+  // deletes a record, so a rollback re-upserts exactly those prior records and
+  // must never delete one it did not touch: deleting "records absent from the
+  // snapshot" would erase a credential a concurrent writer added outside this
+  // operation's transaction.
+  private async restoreMetadata(previous: readonly CredentialRecord[]): Promise<void> {
+    for (const record of previous) await this.options.metadata.upsert(record);
+  }
+
+  private runMutation<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.mutationTail.then(() =>
+      this.options.metadata.withTransaction?.(work) ?? work());
+    this.mutationTail = result.then(() => undefined, () => undefined);
+    return result;
   }
 
   private async requireValue(record: CredentialRecord): Promise<string> {

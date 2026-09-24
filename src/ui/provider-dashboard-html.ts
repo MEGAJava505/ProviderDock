@@ -29,6 +29,8 @@ export const providerDashboardHtml = `<!doctype html>
     </div>
   </div>
 
+  <div id="refresh-status" class="failure-banner" role="status" aria-live="polite" hidden></div>
+  <div id="portal-recovery-banner" class="failure-banner" role="alert" hidden></div>
   <div id="view-overview">
     <div class="stats" data-page="providers">
       <div class="stat"><span>Провайдеры</span><strong id="metric-providers">—</strong><small id="metric-provider-detail"></small></div>
@@ -162,7 +164,7 @@ export const providerDashboardHtml = `<!doctype html>
     <p id="cookie-import-provider"></p>
     <label>Адрес сайта кабинета<input name="siteUrl" type="url" required placeholder="https://provider.example"><small>Секрет сохраняется только для выбранного провайдера и этого домена.</small></label>
     <label>Способ подключения<select name="authKind"><option value="cookie">Cookie-Editor</option><option value="bearer">Access Token</option></select></label>
-    <label id="portal-import-user-id">ID аккаунта <span class="optional">только если сайт требует New-Api-User</span><input name="userId" type="number" min="1" step="1"></label>
+    <label id="portal-import-user-id">ID аккаунта <span class="optional">обычно определяется из user/self; укажите вручную только если сайт требует New-Api-User</span><input name="userId" type="number" min="1" step="1"></label>
     <label><span id="portal-import-raw-label">Экспорт Cookie-Editor</span><textarea name="raw" rows="10" required placeholder="В Cookie-Editor выберите Export → JSON и вставьте результат сюда"></textarea><small id="portal-import-raw-hint">Поддерживаются JSON, Header String и Netscape. Экспортируйте cookies текущего сайта, не всего браузера.</small></label>
     <div class="advanced-fields"><label>Платформа<select name="adapterId" required></select></label><label class="checkbox-label"><input name="autoRefresh" type="checkbox" checked> Автообновление каждые 5 минут</label></div>
     <input name="providerId" type="hidden">
@@ -173,8 +175,16 @@ export const providerDashboardHtml = `<!doctype html>
 
 <dialog id="launch-dialog" aria-labelledby="launch-dialog-title"><div class="dialog-card launch-dialog-card"><div class="dialog-head"><div><span class="eyebrow">РАБОЧАЯ СЕССИЯ</span><h2 id="launch-dialog-title">Запустить агента</h2></div><button type="button" class="icon-button" data-close-dialog="launch-dialog" aria-label="Закрыть">×</button></div>        <form class="dialog-body" id="launch-form" novalidate>
           <label>Папка проекта<span class="input-action"><input id="launch-project" name="projectDirectory" required readonly placeholder="Папка не выбрана"><button id="pick-launch-project" class="button" type="button">Выбрать папку</button></span></label>
-          <label>Агент<select id="launch-client" name="client"><option value="auto">Авто</option><option value="codex">Codex CLI</option><option value="claude-code">Claude Code</option></select></label>
-          <label>Подтверждение действий<select id="launch-approval" name="approvalLevel"><option value="">???????????? ???????????</option><option value="ask">Подтверждать действия</option><option value="auto">Автоматически в проекте</option><option value="full-auto">Без подтверждений (опасно)</option></select><small>«Автоматически» разрешает правки только в папке проекта. «Без подтверждений» отключает запросы и песочницу.</small></label>
+          <label>Агент<select id="launch-client" name="client"><option value="auto">Авто</option><option value="codex">Codex CLI</option><option value="claude-code">Claude Code</option><option value="omp">OMP (пилот)</option></select></label>
+          <label id="launch-approval-field">Подтверждение действий<select id="launch-approval" name="approvalLevel"><option value="">Сохранённое подтверждение</option><option value="ask">Подтверждать действия</option><option value="auto">Автоматически в проекте</option><option value="full-auto">Без подтверждений (опасно)</option></select><small>«Автоматически» разрешает правки только в папке проекта. «Без подтверждений» отключает запросы и песочницу.</small></label>
+          <div id="launch-omp-fields" class="omp-launch-fields" hidden>
+            <label>Аккаунт OMP<input id="launch-omp-account" name="ompAccountId" autocomplete="off" placeholder="Например: personal"></label>
+            <label class="checkbox-label"><input id="launch-omp-acknowledgement" name="ompAcknowledgement" type="checkbox"> Подтверждаю пилот OMP: только инструмент чтения, без OS-песочницы</label>
+            <button id="launch-omp-preflight" class="button" type="button" disabled>Проверить OMP</button>
+            <p id="omp-preflight-status" class="status-line" aria-live="polite"></p>
+            <div class="field-label">Запуски OMP</div>
+            <div id="omp-runs" class="item-list omp-run-list"></div>
+          </div>
           <div class="field-label">Маршрут</div>
           <div class="route-tabs" id="route-tabs">
             <button type="button" class="route-tab active" data-route="provider">Модель</button>
@@ -321,6 +331,7 @@ export const providerDashboardHtml = `<!doctype html>
     <div class="dialog-body">
       <label>Имя ссылки<input name="reference" required pattern="[A-Za-z0-9][A-Za-z0-9_.:-]*" placeholder="AGENTROUTER_API_KEY"></label>
       <label>API-ключ<input name="value" type="password" required autocomplete="new-password"><small>Шифруется Windows и никогда не возвращается через API.</small></label>
+      <p id="secret-write-status" class="status-line" aria-live="polite"></p>
     </div>
     <div class="dialog-foot"><button data-close-dialog="secret-dialog" class="button" type="button">Отмена</button><button class="button primary" type="submit">Сохранить ключ</button></div>
   </form>

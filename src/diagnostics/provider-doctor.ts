@@ -8,7 +8,9 @@ import { readSanitizedProviderErrorBody } from "../core/security/provider-error-
 import type { ProviderAdapterRegistry } from "../core/providers/provider-adapter-registry.js";
 import { ProviderHttpRequestBuilder } from "../core/providers/provider-http-request.js";
 import type { ProviderProfile } from "../core/providers/provider-profile.js";
+import { providerConfigurationFingerprint } from "../core/health/provider-health-repository.js";
 import type { SecretStore } from "../core/security/secret-store.js";
+import { providerSecretRevisionFingerprint } from "../core/security/secret-revision.js";
 import { SseDecoder } from "../bridge/sse/sse-decoder.js";
 import { ResponsesStreamState } from "../bridge/responses/responses-stream-state.js";
 
@@ -40,6 +42,8 @@ export interface DoctorCheck {
 
 export interface DoctorReport {
   readonly providerId: string;
+  readonly configurationFingerprint?: string;
+  readonly credentialFingerprint?: string;
   readonly modelId?: string;
   readonly protocol?: DoctorProtocol;
   readonly level: DoctorLevel;
@@ -72,8 +76,10 @@ export class ProviderDoctor {
   private readonly fetchImpl: typeof fetch;
   private readonly monotonicNow: () => number;
   private readonly now: () => Date;
+  private readonly secretStore: SecretStore;
 
   constructor(options: ProviderDoctorOptions) {
+    this.secretStore = options.secretStore;
     this.requests = new ProviderHttpRequestBuilder(options.secretStore);
     this.registry = options.adapterRegistry;
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -84,6 +90,7 @@ export class ProviderDoctor {
   async run(profile: ProviderProfile, options: RunDoctorOptions = {}): Promise<DoctorReport> {
     const level = options.level ?? 1;
     const prepared = this.registry.prepareProfile(profile);
+    const credentialFingerprintBefore = await providerSecretRevisionFingerprint(prepared, this.secretStore);
     const checks: DoctorCheck[] = [];
     let modelId = options.modelId;
     let protocol: DoctorProtocol | undefined;
@@ -131,8 +138,16 @@ export class ProviderDoctor {
       }
     }
 
+    const credentialFingerprintAfter = await providerSecretRevisionFingerprint(prepared, this.secretStore);
+    if (credentialFingerprintBefore !== credentialFingerprintAfter) {
+      checks.push({ name: "credential-generation", status: "FAIL",
+        details: "Referenced credential changed during diagnostics." });
+    }
     return {
       providerId: prepared.id,
+      configurationFingerprint: providerConfigurationFingerprint(prepared),
+      ...(credentialFingerprintBefore === undefined || credentialFingerprintBefore !== credentialFingerprintAfter
+        ? {} : { credentialFingerprint: credentialFingerprintBefore }),
       ...(modelId === undefined ? {} : { modelId }),
       ...(protocol === undefined ? {} : { protocol }),
       level,
@@ -240,7 +255,7 @@ export class ProviderDoctor {
       }
       const observed = await observeSseStream(response.body, protocol, profile.timeoutMs);
       const status: DoctorCheckStatus = observed.terminalSucceeded
-        ? observed.duplicates > 0
+        ? observed.duplicates > 0 || !observed.textObserved
           ? "DEGRADED"
           : "PASS"
         : "FAIL";
@@ -250,6 +265,8 @@ export class ProviderDoctor {
         latencyMs: this.elapsed(startedAt),
         details: observed.terminalSeen && !observed.terminalSucceeded
           ? "Provider ended the stream with a failure or incomplete response."
+          : observed.terminalSucceeded && !observed.textObserved
+          ? "Stream reached a successful terminal event without a text delta."
           : observed.terminalSeen
           ? `${observed.eventCount} event(s); terminal event received` +
             (observed.duplicates > 0 ? `; ${observed.duplicates} duplicate event(s)` : "")
@@ -761,6 +778,7 @@ interface SseObservation {
   readonly duplicates: number;
   readonly terminalSeen: boolean;
   readonly terminalSucceeded: boolean;
+  readonly textObserved: boolean;
 }
 
 async function observeSseStream(
@@ -775,6 +793,7 @@ async function observeSseStream(
   let duplicates = 0;
   let terminalSeen = false;
   let terminalSucceeded = false;
+  let textObserved = false;
   let anthropicStopReason: unknown;
   const responses = new ResponsesStreamState();
   const deadline = Date.now() + timeoutMs;
@@ -802,11 +821,16 @@ async function observeSseStream(
     }
     if (protocol === "openai-responses") {
       responses.observe(payload, event.id);
+      if (payload.type === "response.output_text.delta" &&
+          typeof payload.delta === "string" && payload.delta.length > 0) textObserved = true;
       terminalSeen = responses.terminalEventSeen;
       terminalSucceeded = responses.terminalEventType === "response.completed";
       return terminalSeen;
     }
     if (protocol === "anthropic-messages") {
+      if (payload.type === "content_block_delta" && isRecord(payload.delta) &&
+          payload.delta.type === "text_delta" && typeof payload.delta.text === "string" &&
+          payload.delta.text.length > 0) textObserved = true;
       if (payload.type === "message_delta" && isRecord(payload.delta)) {
         anthropicStopReason = payload.delta.stop_reason ?? anthropicStopReason;
       }
@@ -818,6 +842,8 @@ async function observeSseStream(
       return false;
     }
     const choice = Array.isArray(payload.choices) ? payload.choices[0] : undefined;
+    if (isRecord(choice) && isRecord(choice.delta) &&
+        typeof choice.delta.content === "string" && choice.delta.content.length > 0) textObserved = true;
     if (isRecord(choice) && choice.finish_reason != null) {
       terminalSeen = true;
       terminalSucceeded = ["stop", "tool_calls", "function_call"].includes(String(choice.finish_reason));
@@ -844,7 +870,7 @@ async function observeSseStream(
         if (timer !== undefined) clearTimeout(timer);
       }
       for (const event of chunk.done ? decoder.finish() : decoder.push(chunk.value)) {
-        if (observe(event)) return { eventCount, duplicates, terminalSeen, terminalSucceeded };
+        if (observe(event)) return { eventCount, duplicates, terminalSeen, terminalSucceeded, textObserved };
       }
       if (chunk.done) break;
     }
@@ -852,7 +878,7 @@ async function observeSseStream(
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
-  return { eventCount, duplicates, terminalSeen, terminalSucceeded };
+  return { eventCount, duplicates, terminalSeen, terminalSucceeded, textObserved };
 }
 
 function skipped(name: string, details: string): DoctorCheck {

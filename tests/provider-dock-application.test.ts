@@ -1,10 +1,11 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   GenericOpenAiAdapter,
   CredentialManager,
+  FileCredentialMetadataRepository,
   MemoryProviderHealthRepository,
   MemoryProviderProfileRepository,
   MemoryCredentialMetadataRepository,
@@ -59,6 +60,45 @@ describe("ProviderDockApplication", () => {
     await expect(application.setSecret("ROUTER_KEY", "secret")).rejects.toBeInstanceOf(
       SecretVaultUnavailableError,
     );
+  });
+
+  it("invalidates Doctor evidence before overwriting or removing a referenced secret", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    await profiles.upsert({ id: "router", displayName: "Router", baseUrl: "https://router.test/v1",
+      auth: { kind: "bearer", secretRef: "ROUTER_KEY" } });
+    const secrets = new MemorySecretStore({ ROUTER_KEY: "old-secret" });
+    const health = new MemoryProviderHealthRepository();
+    const invalidate = vi.spyOn(health, "invalidateDiagnostics");
+    const app = new ProviderDockApplication(profiles, new ProviderProbeService(new ProviderAdapterRegistry()),
+      secrets, undefined, undefined, undefined, undefined, undefined, undefined, undefined, health);
+    await app.setSecret("ROUTER_KEY", "replacement-secret");
+    expect(invalidate).toHaveBeenCalledWith("router");
+    invalidate.mockClear();
+    await app.removeSecret("ROUTER_KEY");
+    expect(invalidate).toHaveBeenCalledWith("router");
+  });
+
+  it("invalidates stale Doctor evidence after activating a different provider API key", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const portals = new MemoryPortalRepository();
+    await profiles.upsert({ id: "router", displayName: "Router", baseUrl: "https://router.test/v1",
+      auth: { kind: "bearer", secretRef: "OLD_API" } });
+    const secrets = new MemorySecretStore({ OLD_API: "old-secret" });
+    const health = new MemoryProviderHealthRepository();
+    const invalidate = vi.spyOn(health, "invalidateDiagnostics");
+    const manager = new CredentialManager({ secrets,
+      metadata: new MemoryCredentialMetadataRepository(),
+      bindings: new ApplicationCredentialBindings(profiles, portals) });
+    const candidate = await manager.add({ providerId: "router", purpose: "provider-api", value: "new-secret" });
+    const app = new ProviderDockApplication(profiles, new ProviderProbeService(new ProviderAdapterRegistry()),
+      secrets, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      health, undefined, undefined, undefined, undefined, undefined, undefined, manager);
+    await app.activateCredential("router", "provider-api", candidate.id);
+    expect(invalidate).toHaveBeenCalledWith("router");
+    invalidate.mockClear();
+    await app.addCredential({ providerId: "router", purpose: "provider-api",
+      value: "newer-secret", activate: true });
+    expect(invalidate).toHaveBeenCalledWith("router");
   });
 
   it("validates logical-model provider references and protects routes from dangling", async () => {
@@ -901,6 +941,7 @@ describe("ApplicationCredentialBindings", () => {
   });
 
   it("exposes credential operations through the application without returning plaintext", async () => {
+    const registryPath = join(await mkdtemp(join(tmpdir(), "provider-dock-registry-loss-")), "registry.json");
     const profiles = new MemoryProviderProfileRepository();
     const portals = new MemoryPortalRepository();
     await profiles.upsert({
@@ -912,7 +953,7 @@ describe("ApplicationCredentialBindings", () => {
     const secrets = new MemorySecretStore();
     const manager = new CredentialManager({
       secrets,
-      metadata: new MemoryCredentialMetadataRepository(),
+      metadata: new FileCredentialMetadataRepository(registryPath),
       bindings: new ApplicationCredentialBindings(profiles, portals),
     });
     const application = new ProviderDockApplication(
@@ -949,6 +990,34 @@ describe("ApplicationCredentialBindings", () => {
       kind: "bearer",
       secretRef: expect.stringMatching(/^credential-/),
     });
+    const firstRef = (await application.getProvider("fixture")).auth;
+    if (firstRef.kind === "none") throw new Error("Expected a managed API credential.");
+    expect(await application.listManagedSecretReferences()).toContain(firstRef.secretRef);
+
+    await expect(application.setSecret(firstRef.secretRef, "unexpected-replacement"))
+      .rejects.toMatchObject({ code: "CONFLICT" });
+    expect(await secrets.get(firstRef.secretRef)).toBe("fixture-api-secret");
+    expect((await application.listCredentials("fixture", "provider-api"))[0]?.maskedValue)
+      .toBe("fix…cret");
+
+    await application.addCredential({
+      providerId: "fixture",
+      purpose: "provider-api",
+      value: "second-api-secret",
+      activate: true,
+    });
+    await expect(application.removeSecret(firstRef.secretRef))
+      .rejects.toMatchObject({ code: "CONFLICT" });
+    expect(await secrets.get(firstRef.secretRef)).toBe("fixture-api-secret");
+
+    await unlink(registryPath);
+    await expect(application.setSecret(firstRef.secretRef, "lost-registry-overwrite"))
+      .rejects.toMatchObject({ code: "UNAVAILABLE" });
+    await expect(application.removeSecret(firstRef.secretRef))
+      .rejects.toMatchObject({ code: "UNAVAILABLE" });
+    expect(await secrets.get(firstRef.secretRef)).toBe("fixture-api-secret");
+    await expect(application.listManagedSecretReferences())
+      .rejects.toMatchObject({ code: "UNAVAILABLE" });
   });
 });
 

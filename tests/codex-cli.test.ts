@@ -11,13 +11,11 @@ import {
   ProviderAdapterRegistry,
   ProviderDockApplication,
   ProviderProbeService,
-  runProviderDockCli,
-  type CliIo,
   type CodexBridgeFactory,
   type CreateCodexBridgeInput,
-  type CodexProcessRunner,
   type CodexProcessStartRequest,
 } from "../src/index.js";
+import { emitConfiguredFallback, RecordingProcessRunner, runCli } from "./support/cli-harness.js";
 
 const sessionId = "11111111111111111111111111111111";
 
@@ -249,7 +247,7 @@ async function createCliFixture() {
     randomId: () => sessionId,
     isProcessAlive: () => false,
   });
-  const runner = new FakeProcessRunner();
+  const runner = new RecordingProcessRunner<CodexProcessStartRequest>(5432);
   const bridges = new RecordingBridgeFactory();
   const application = new ProviderDockApplication(
     new MemoryProviderProfileRepository(),
@@ -264,30 +262,6 @@ async function createCliFixture() {
   return { application, runner, bridges, projectDirectory };
 }
 
-async function runCli(
-  application: ProviderDockApplication,
-  argv: string[],
-  environment: NodeJS.ProcessEnv = {},
-) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const io: CliIo = {
-    stdout: (message) => stdout.push(message),
-    stderr: (message) => stderr.push(message),
-  };
-  const code = await runProviderDockCli(argv, { application, io, environment });
-  return { code, stdout, stderr };
-}
-
-class FakeProcessRunner implements CodexProcessRunner {
-  request: CodexProcessStartRequest | undefined;
-
-  async start(request: CodexProcessStartRequest) {
-    this.request = request;
-    return { pid: 5432, wait: async () => ({ exitCode: 0, signal: null }) };
-  }
-}
-
 class RecordingBridgeFactory implements CodexBridgeFactory {
   input: CreateCodexBridgeInput | undefined;
   stopCount = 0;
@@ -296,18 +270,7 @@ class RecordingBridgeFactory implements CodexBridgeFactory {
     this.input = input;
     return {
       start: async () => {
-        const [from, to] = input.fallback?.logicalModel.routes ?? [];
-        if (from !== undefined && to !== undefined) {
-          input.onFallback?.({
-            kind: "FALLBACK",
-            logicalModelId: input.fallback?.logicalModel.id ?? input.modelId,
-            from,
-            to,
-            errorType: "NETWORK_ERROR",
-            phase: "connection-failed",
-            message: "Primary connection failed.",
-          });
-        }
+        emitConfiguredFallback(input);
         return {
           host: "127.0.0.1" as const,
           port: 45678,

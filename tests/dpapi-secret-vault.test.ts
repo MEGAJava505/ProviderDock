@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, readdir } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -25,6 +26,8 @@ describe("DpapiFileSecretVault", () => {
     const vault = new DpapiFileSecretVault(directory, new Base64Protector());
 
     await vault.set("ROUTER_KEY", "actual-secret-value");
+    const originalRevision = await vault.revision("ROUTER_KEY");
+    expect(originalRevision).toMatch(/^[a-f0-9]{64}$/);
     expect(await vault.get("ROUTER_KEY")).toBe("actual-secret-value");
     expect(await vault.listReferences()).toEqual(["ROUTER_KEY"]);
 
@@ -34,6 +37,10 @@ describe("DpapiFileSecretVault", () => {
     expect(storedFile).toContain("ROUTER_KEY");
 
     await vault.set("ROUTER_KEY", "replacement-secret");
+    expect(await vault.revision("ROUTER_KEY")).not.toBe(originalRevision);
+    const replacementRevision = await vault.revision("ROUTER_KEY");
+    await vault.set("ROUTER_KEY", "replacement-secret");
+    expect(await vault.revision("ROUTER_KEY")).not.toBe(replacementRevision);
     expect(await vault.get("ROUTER_KEY")).toBe("replacement-secret");
     expect(await vault.delete("ROUTER_KEY")).toBe(true);
     expect(await vault.delete("ROUTER_KEY")).toBe(false);
@@ -44,6 +51,18 @@ describe("DpapiFileSecretVault", () => {
     const directory = await mkdtemp(join(tmpdir(), "provider-dock-secrets-"));
     const vault = new DpapiFileSecretVault(directory, new Base64Protector());
     await expect(vault.set("../escape", "secret")).rejects.toThrow();
+  });
+
+  it("changes the opaque revision if protected bytes change without changing the generation", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-secrets-"));
+    const vault = new DpapiFileSecretVault(directory, new Base64Protector());
+    await vault.set("ROUTER_KEY", "original-secret");
+    const firstRevision = await vault.revision("ROUTER_KEY");
+    const [fileName] = await readdir(directory);
+    const path = join(directory, fileName!);
+    const stored = JSON.parse(await readFile(path, "utf8")) as { protectedValue: string; generation: string };
+    await writeFile(path, JSON.stringify({ ...stored, protectedValue: Buffer.from("changed-secret").toString("base64") }));
+    expect(await vault.revision("ROUTER_KEY")).not.toBe(firstRevision);
   });
 });
 
@@ -216,6 +235,21 @@ describe("CredentialManager", () => {
     ]);
   });
 
+  it("keeps every record when managed credentials are imported concurrently", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-credential-concurrency-"));
+    const metadata = new FileCredentialMetadataRepository(join(directory, "registry.json"));
+    await metadata.initializeEmpty();
+    const secrets = new MemorySecretStore();
+    const manager = new CredentialManager({ secrets, metadata, bindings: new TestCredentialBindings() });
+
+    await Promise.all(Array.from({ length: 12 }, (_, index) => manager.add({
+      providerId: "vsllm", purpose: "provider-api", value: `synthetic-key-${index}`,
+    })));
+
+    expect(await metadata.list()).toHaveLength(12);
+    expect(await secrets.listReferences()).toHaveLength(12);
+  });
+
   it("reconciles legacy bindings additively without changing their secret references", async () => {
     const secrets = new MemorySecretStore({ LEGACY_VSLLM_KEY: "legacy-provider-secret" });
     const bindings = new TestCredentialBindings();
@@ -242,6 +276,29 @@ describe("CredentialManager", () => {
     const record = (await metadata.list())[0];
     expect(record?.secretRef).toBe("LEGACY_VSLLM_KEY");
     expect(await secrets.get("LEGACY_VSLLM_KEY")).toBe("legacy-provider-secret");
+  });
+
+  it("marks an unavailable legacy binding without overwriting its ciphertext", async () => {
+    const bindings = new TestCredentialBindings();
+    await bindings.activate({ providerId: "vsllm", purpose: "provider-api", secretRef: "LEGACY_VSLLM_KEY" });
+    let writes = 0;
+    const secrets = {
+      async get(): Promise<string | undefined> { throw new SecretProtectionError("Windows DPAPI operation failed."); },
+      async set(): Promise<void> { writes += 1; },
+      async delete(): Promise<boolean> { return false; },
+      async listReferences(): Promise<readonly string[]> { return ["LEGACY_VSLLM_KEY"]; },
+    };
+    const metadata = new MemoryCredentialMetadataRepository();
+    const manager = new CredentialManager({ secrets, metadata, bindings });
+
+    const summaries = await manager.reconcile();
+
+    expect(summaries).toEqual([
+      expect.objectContaining({ providerId: "vsllm", maskedValue: "unavailable", state: "unavailable" }),
+    ]);
+    // The legacy ciphertext reference is preserved and never rewritten with a placeholder.
+    expect((await metadata.list())[0]?.secretRef).toBe("LEGACY_VSLLM_KEY");
+    expect(writes).toBe(0);
   });
 
   it("keeps an explicitly unlocked restore usable when no writable vault is available", async () => {
@@ -301,6 +358,253 @@ describe("CredentialManager", () => {
     ]));
     expect((await bindings.list())[0]?.secretRef).toBe((await metadata.get(first.id))?.secretRef);
   });
+
+  it("does not erase a concurrent import while rolling back failed activation", async () => {
+    const secrets = new MemorySecretStore();
+    const metadata = new MemoryCredentialMetadataRepository();
+    const bindings = new TestCredentialBindings();
+    const manager = new CredentialManager({ secrets, metadata, bindings });
+    await manager.add({ providerId: "vsllm", purpose: "provider-api", value: "first-secret", activate: true });
+    const selected = await manager.add({ providerId: "vsllm", purpose: "provider-api", value: "second-secret" });
+    const selectedRef = (await metadata.get(selected.id))?.secretRef;
+    const { entered: activationEntered, release } = pauseFailingActivation(bindings, selectedRef);
+
+    const activation = manager.activate("vsllm", "provider-api", selected.id);
+    await activationEntered;
+    const added = manager.add({ providerId: "vsllm", purpose: "provider-api", value: "third-secret" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    release();
+    await expect(activation).rejects.toThrow("simulated binding failure");
+    const third = await added;
+
+    expect(await metadata.get(third.id)).toBeDefined();
+    expect(await secrets.get((await metadata.get(third.id))?.secretRef ?? "missing")).toBe("third-secret");
+  });
+
+  it("does not erase an import from another manager when activation rolls back", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-cross-manager-"));
+    const path = join(directory, "registry.json");
+    const metadataA = new FileCredentialMetadataRepository(path);
+    const metadataB = new FileCredentialMetadataRepository(path);
+    await metadataA.initializeEmpty();
+    const secrets = new MemorySecretStore();
+    const bindings = new TestCredentialBindings();
+    const managerA = new CredentialManager({ secrets, metadata: metadataA, bindings });
+    const managerB = new CredentialManager({ secrets, metadata: metadataB, bindings });
+    await managerA.add({ providerId: "vsllm", purpose: "provider-api", value: "first-secret", activate: true });
+    const selected = await managerA.add({ providerId: "vsllm", purpose: "provider-api", value: "second-secret" });
+    const selectedRef = (await metadataA.get(selected.id))?.secretRef;
+    const { entered: activationEntered, release } = pauseFailingActivation(bindings, selectedRef);
+
+    const activation = managerA.activate("vsllm", "provider-api", selected.id);
+    await activationEntered;
+    const addition = managerB.add({ providerId: "vsllm", purpose: "provider-api", value: "third-secret" });
+    const completedBeforeRelease = await Promise.race([
+      addition.then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 300)),
+    ]);
+    release();
+    await expect(activation).rejects.toThrow("simulated binding failure");
+    const third = await addition;
+
+    expect(completedBeforeRelease).toBe(false);
+    expect(await metadataB.get(third.id)).toBeDefined();
+    expect(await secrets.get((await metadataB.get(third.id))?.secretRef ?? "missing")).toBe("third-secret");
+  });
+
+  it("preserves records written outside its snapshot when activation rolls back", async () => {
+    const secrets = new MemorySecretStore();
+    const metadata = new MemoryCredentialMetadataRepository();
+    const bindings = new TestCredentialBindings();
+    const manager = new CredentialManager({ secrets, metadata, bindings });
+    const first = await manager.add({ providerId: "vsllm", purpose: "provider-api", value: "first-secret", activate: true });
+    const selected = await manager.add({ providerId: "vsllm", purpose: "provider-api", value: "second-secret" });
+    const selectedRef = (await metadata.get(selected.id))?.secretRef;
+    const outsideId = "5f0a5d2c-7d3b-4a2e-9c11-2b3c4d5e6f70";
+    const originalActivate = bindings.activate.bind(bindings);
+    bindings.activate = async (binding) => {
+      if (binding.secretRef === selectedRef) {
+        // A writer outside this operation's transaction lands a record between
+        // the activation snapshot and the rollback; the rollback must not touch it.
+        await metadata.upsert({
+          id: outsideId,
+          providerId: "other",
+          purpose: "provider-api",
+          secretRef: "OUTSIDE-CREDENTIAL",
+          maskedValue: "out…side",
+          state: "available",
+          createdAt: "2026-09-23T00:00:00.000Z",
+        });
+        throw new Error("simulated binding failure");
+      }
+      await originalActivate(binding);
+    };
+
+    await expect(manager.activate("vsllm", "provider-api", selected.id)).rejects.toThrow(
+      "simulated binding failure",
+    );
+
+    expect(await metadata.get(outsideId)).toBeDefined();
+    expect(await manager.list("vsllm", "provider-api")).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: first.id, state: "active" }),
+      expect.objectContaining({ id: selected.id, state: "available" }),
+    ]));
+  });
+});
+
+describe("FileCredentialMetadataRepository lock safety", () => {
+  const sampleRecord = {
+    id: "b0c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
+    providerId: "vsllm",
+    purpose: "provider-api",
+    secretRef: "SAMPLE-REF",
+    maskedValue: "sam…ref",
+    state: "available",
+    createdAt: "2026-09-23T00:00:00.000Z",
+  } as const;
+
+  async function reservedDeadPid(): Promise<number> {
+    const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
+    const pid = child.pid;
+    if (pid === undefined) throw new Error("Could not spawn a probe process.");
+    await new Promise<void>((resolve) => child.on("exit", () => resolve()));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return pid;
+  }
+
+  it("fails closed on a lock with no identifiable owner instead of removing a possible live successor", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-markerless-fail-"));
+    const path = join(directory, "registry.json");
+    const repo = new FileCredentialMetadataRepository(path, { busyTimeoutMs: 200, retryIntervalMs: 10 });
+    await repo.initializeEmpty();
+    const lockPath = `${path}.lock`;
+    // A markerless lock is indistinguishable from a live writer that took the
+    // directory but has not yet published its owner marker. Age it far past any
+    // grace window so an auto-reclaiming writer would treat it as abandoned and
+    // enter after moving it — exactly the interleaving that must never delete a
+    // live successor's lock.
+    await mkdir(lockPath);
+    const aged = new Date(Date.now() - 3_600_000);
+    await utimes(lockPath, aged, aged);
+
+    // Fail closed and name the lock: an owner that cannot be identified cannot be
+    // proven dead, so its directory is never removed.
+    await expect(repo.upsert(sampleRecord)).rejects.toThrow(lockPath);
+    await expect(stat(lockPath)).resolves.toBeDefined();
+    expect((await repo.list()).map((record) => record.id)).not.toContain(sampleRecord.id);
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it("fails closed on a lock whose recorded owner is gone instead of deleting it after the check", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-deadowner-fail-"));
+    const path = join(directory, "registry.json");
+    const repo = new FileCredentialMetadataRepository(path, { busyTimeoutMs: 200, retryIntervalMs: 10 });
+    await repo.initializeEmpty();
+    const lockPath = `${path}.lock`;
+    await mkdir(lockPath);
+    // The recorded owner has already exited. An auto-reclaimer would read this id
+    // and then delete the directory — but a live successor can replace the lock
+    // in the gap between that check and the delete, so the provably safe choice
+    // is to refuse and fail closed rather than delete on the strength of a stale
+    // observation.
+    await writeFile(join(lockPath, "owner.json"), JSON.stringify({
+      ownerId: "crashed", pid: await reservedDeadPid(), acquiredAt: new Date().toISOString(),
+    }));
+
+    await expect(repo.upsert(sampleRecord)).rejects.toThrow(lockPath);
+    const marker = JSON.parse(await readFile(join(lockPath, "owner.json"), "utf8")) as { ownerId: string };
+    expect(marker.ownerId).toBe("crashed");
+    expect((await repo.list()).map((record) => record.id)).not.toContain(sampleRecord.id);
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it("refuses to steal a lock held by a live process and names the lock path", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-live-lock-"));
+    const path = join(directory, "registry.json");
+    const repo = new FileCredentialMetadataRepository(path, { busyTimeoutMs: 150, retryIntervalMs: 10 });
+    await repo.initializeEmpty();
+    const lockPath = `${path}.lock`;
+    await mkdir(lockPath);
+    await writeFile(join(lockPath, "owner.json"), JSON.stringify({
+      ownerId: "live", pid: process.pid, acquiredAt: new Date().toISOString(),
+    }));
+
+    const error = await repo.upsert(sampleRecord).then(() => undefined, (reason) => reason);
+    const message = (error as Error).message;
+    expect(message).toContain(lockPath);                                   // exact lock path
+    expect(message).toContain("No changes were made.");
+    expect(message).toMatch(/if no ProviderDock process is running/);      // deletion advice is CONDITIONAL, never for a live lock
+    expect(message).not.toMatch(/SAMPLE-REF|sam…ref/);                     // no secret/ref leaks into the message
+    // The live owner's lock and marker survive the refusal, and nothing was written.
+    const marker = JSON.parse(await readFile(join(lockPath, "owner.json"), "utf8")) as { ownerId: string };
+    expect(marker.ownerId).toBe("live");
+    expect((await repo.list()).map((record) => record.id)).not.toContain(sampleRecord.id);
+  });
+
+  it("aborts fail-closed when it cannot publish its ownership marker", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-marker-fail-"));
+    const path = join(directory, "registry.json");
+    const lockPath = `${path}.lock`;
+    // A writer whose marker publication always fails: without a marker it could
+    // not prove ownership at release time, so it must abort rather than hold a
+    // directory it cannot safely release.
+    class UnmarkableRepository extends FileCredentialMetadataRepository {
+      protected async writeOwnerMarker(): Promise<boolean> {
+        return false;
+      }
+    }
+    const repo = new UnmarkableRepository(path, { busyTimeoutMs: 400, retryIntervalMs: 10 });
+
+    await expect(repo.upsert(sampleRecord)).rejects.toThrow(lockPath);
+    // No unidentifiable lock is left behind, and nothing was written.
+    await expect(stat(lockPath)).rejects.toMatchObject({ code: "ENOENT" });
+    expect((await repo.list()).map((record) => record.id)).not.toContain(sampleRecord.id);
+  });
+
+  it("releases only its own lock, sparing a successor that took over mid-write", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-release-own-"));
+    const path = join(directory, "registry.json");
+    const lockPath = `${path}.lock`;
+    // While this writer holds the lock and its work runs, a successor reclaims
+    // the directory. Cleanup must not delete the successor's live lock.
+    class SwappingRepository extends FileCredentialMetadataRepository {
+      public armed = false;
+      protected async onLockHeld(lock: string): Promise<void> {
+        if (!this.armed) return;
+        this.armed = false;
+        await rm(lock, { recursive: true, force: true });
+        await mkdir(lock);
+        await writeFile(join(lock, "owner.json"), JSON.stringify({
+          ownerId: "successor", pid: process.pid, acquiredAt: new Date().toISOString(),
+        }));
+      }
+    }
+    const repo = new SwappingRepository(path, { busyTimeoutMs: 400, retryIntervalMs: 10 });
+    await repo.initializeEmpty();
+    repo.armed = true;
+
+    await repo.upsert(sampleRecord);
+    // The record was still committed, and the successor's lock survived cleanup.
+    expect((await repo.list()).map((record) => record.id)).toContain(sampleRecord.id);
+    const marker = JSON.parse(await readFile(join(lockPath, "owner.json"), "utf8")) as { ownerId: string };
+    expect(marker.ownerId).toBe("successor");
+  });
+
+  it("preserves both records when two independent writers race on one file", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-concurrent-write-"));
+    const path = join(directory, "registry.json");
+    const writerA = new FileCredentialMetadataRepository(path, { busyTimeoutMs: 5_000, retryIntervalMs: 5 });
+    const writerB = new FileCredentialMetadataRepository(path, { busyTimeoutMs: 5_000, retryIntervalMs: 5 });
+    await writerA.initializeEmpty();
+    const recordA = { ...sampleRecord, id: "a1111111-1111-4111-8111-111111111111" };
+    const recordB = { ...sampleRecord, id: "b2222222-2222-4222-8222-222222222222" };
+
+    await Promise.all([writerA.upsert(recordA), writerB.upsert(recordB)]);
+
+    const ids = (await writerA.list()).map((record) => record.id);
+    expect(ids).toContain(recordA.id);
+    expect(ids).toContain(recordB.id);
+  });
 });
 
 const windowsIt = process.platform === "win32" ? it : it.skip;
@@ -322,6 +626,29 @@ class Base64Protector implements SecretProtector {
   async unprotect(protectedValue: string): Promise<string> {
     return Buffer.from(protectedValue, "base64").toString("utf8");
   }
+}
+
+// Deterministic gate for the activation-rollback races: hold the binding
+// activation for `secretRef` open until released, then fail it, so a test can
+// land a concurrent write in the gap between the snapshot and the rollback.
+function pauseFailingActivation(
+  bindings: TestCredentialBindings,
+  secretRef: string | undefined,
+): { entered: Promise<void>; release: () => void } {
+  let entered!: () => void;
+  let release!: () => void;
+  const activationEntered = new Promise<void>((resolve) => { entered = resolve; });
+  const activationReleased = new Promise<void>((resolve) => { release = resolve; });
+  const originalActivate = bindings.activate.bind(bindings);
+  bindings.activate = async (binding) => {
+    if (binding.secretRef === secretRef) {
+      entered();
+      await activationReleased;
+      throw new Error("simulated binding failure");
+    }
+    await originalActivate(binding);
+  };
+  return { entered: activationEntered, release };
 }
 
 class TestCredentialBindings implements CredentialBindingAdapter {

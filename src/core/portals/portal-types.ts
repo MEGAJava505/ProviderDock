@@ -37,6 +37,10 @@ const quota = z.number().int().safe();
 const count = quota.nonnegative();
 export const walletSchema = z.object({
   accountFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  // New API exposes a numeric user identity from an authenticated portal
+  // session. It is non-secret and lets the importer bind New-Api-User for
+  // subsequent reads without persisting cookie material in the record.
+  userId: z.number().int().positive().safe().optional(),
   group: z.string().max(128).nullable(),
   remainingQuota: quota.nullable(),
   usedQuota: count.nullable(),

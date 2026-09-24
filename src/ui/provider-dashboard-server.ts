@@ -8,16 +8,32 @@ import {
 import type { AddressInfo } from "node:net";
 import { z } from "zod";
 import type { ProviderDockApplication } from "../application/provider-dock-application.js";
+import type { OmpLaunchInput, OmpLaunchResult } from "../application/omp-launch-service.js";
+import type { OmpPreflightResult } from "../clients/omp/omp-runtime.js";
+import type { OmpRunRecord } from "../clients/omp/omp-run-repository.js";
 import { agentApprovalLevels, type AgentApprovalLevel } from "../clients/agent-approval.js";
 import type { FallbackNotification } from "../core/fallback/fallback-session-router.js";
-import { providerErrorGuidance } from "../core/errors/provider-error.js";
+import { ProviderRequestError, providerErrorGuidance } from "../core/errors/provider-error.js";
+import {
+  createOperationDiagnostic,
+  sanitizeOperationDiagnostic,
+  type OperationDiagnostic,
+  type OperationStage,
+} from "../core/errors/operation-diagnostic.js";
+import { ModelDisabledError, ModelUnavailableError } from "../core/providers/model-access.js";
 import type { ProviderHealthRecord } from "../core/health/provider-health-repository.js";
+import {
+  providerConfigurationFingerprint,
+  summarizeProviderSurfaces,
+} from "../core/health/provider-health-repository.js";
 import { PortalRepositoryCorruptionError } from "../core/portals/portal-repository.js";
+import { CredentialManagerError } from "../core/security/credential-manager.js";
 import {
   portalAdapterIdForSite,
   portalConnectionSchema,
   type PortalRecord,
 } from "../core/portals/portal-types.js";
+import { secretReferenceSchema, type ProviderProfile } from "../core/providers/provider-profile.js";
 import {
   providerDashboardCss,
   providerDashboardHtml,
@@ -80,10 +96,20 @@ export type ProviderDashboardApplication = Pick<
   | "launchLogicalModelAutomatic"
   | "launchPromptProfileAutomatic"
   | "launchProjectProfileAutomatic"
->;
+> & Partial<Pick<ProviderDockApplication, "listCredentials" | "listManagedSecretReferences" | "addCredential" | "restoreProviderPortalIfUnchanged">>;
+
+export interface ProviderDashboardOmpLauncher {
+  preflight(input: OmpLaunchInput): Promise<OmpPreflightResult>;
+  launch(input: OmpLaunchInput): Promise<OmpLaunchResult>;
+  listRuns(): Promise<readonly OmpRunRecord[]>;
+  cancel(runId: string): Promise<OmpRunRecord | undefined>;
+  reconcileAfterRestart(): Promise<readonly OmpRunRecord[]>;
+}
 
 export interface ProviderDashboardServerOptions {
   readonly application: ProviderDashboardApplication;
+  /** Direct OMP launcher; never routes through legacy Codex/Claude bridges. */
+  readonly ompLauncher?: ProviderDashboardOmpLauncher;
   /** Fixed port for explicit operator configuration/tests; zero selects a random port. */
   readonly port?: number;
   /** Overridable for deterministic tests. Never expose a predictable production token. */
@@ -203,6 +229,18 @@ const launchRequestSchema = z
 
 export type ProviderDashboardLaunchRequest = z.infer<typeof launchRequestSchema>;
 
+const ompLaunchRequestSchema = z
+  .object({
+    providerId: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
+    modelId: z.string().trim().min(1).max(256),
+    accountId: z.string().trim().min(1).max(256),
+    projectDirectory: z.string().trim().min(1).max(4_096),
+    permissionAcknowledgement: z.literal("read-only-pilot-no-sandbox"),
+  })
+  .strict();
+
+export type ProviderDashboardOmpLaunchRequest = z.infer<typeof ompLaunchRequestSchema>;
+
 export type ProviderDashboardLaunchStatus = "STARTING" | "RUNNING" | "EXITED" | "FAILED";
 
 export interface ProviderDashboardLaunchRecord {
@@ -215,6 +253,9 @@ export interface ProviderDashboardLaunchRecord {
   readonly resolvedClient?: "codex" | "claude-code";
   readonly exitSummary?: string;
   readonly errorMessage?: string;
+  /** Additive terminal detail; legacy status values remain supported. */
+  readonly outcome?: "succeeded" | "failed" | "cancelled";
+  readonly diagnostic?: OperationDiagnostic;
   readonly fallbacks: readonly FallbackNotification[];
 }
 
@@ -228,6 +269,8 @@ interface MutableLaunchRecord {
   resolvedClient?: "codex" | "claude-code";
   exitSummary?: string;
   errorMessage?: string;
+  outcome?: "succeeded" | "failed" | "cancelled";
+  diagnostic?: OperationDiagnostic;
   fallbacks: FallbackNotification[];
 }
 
@@ -247,12 +290,14 @@ export class ProviderDashboardServer {
   private readonly now: () => Date;
   private readonly onUnexpectedError: ((error: unknown) => void) | undefined;
   private readonly pickDirectory: () => Promise<string | undefined>;
+  private readonly ompLauncher: ProviderDashboardOmpLauncher | undefined;
   private readonly launches = new Map<string, MutableLaunchRecord>();
   private server: Server | undefined;
   private startTask: Promise<ProviderDashboardAddress> | undefined;
   private stopTask: Promise<void> | undefined;
   private healthMonitorTimer: NodeJS.Timeout | undefined;
   private healthMonitorTask: Promise<void> | undefined;
+  private secretWriteTask: Promise<void> = Promise.resolve();
 
   constructor(options: ProviderDashboardServerOptions) {
     this.application = options.application;
@@ -271,6 +316,7 @@ export class ProviderDashboardServer {
     this.now = options.now ?? (() => new Date());
     this.onUnexpectedError = options.onUnexpectedError;
     this.pickDirectory = options.pickDirectory ?? pickProjectDirectory;
+    this.ompLauncher = options.ompLauncher;
   }
 
   start(): Promise<ProviderDashboardAddress> {
@@ -308,7 +354,9 @@ export class ProviderDashboardServer {
   private async listen(): Promise<ProviderDashboardAddress> {
     const server = createServer((request, response) => {
       void this.handleRequest(request, response).catch((error: unknown) => {
-        this.handleRequestError(response, error);
+        const stage = /\/api\/(?:snapshot|agent-sessions)(?:\?|$)/.test(request.url ?? "")
+          ? "storage" : "validation";
+        this.handleRequestError(response, error, stage);
       });
     });
     server.on("clientError", (_error, socket) => {
@@ -328,6 +376,7 @@ export class ProviderDashboardServer {
         }
         if (isDashboardPortAllowed(address.port)) {
           this.startHealthMonitor();
+          await this.reconcileOmpAfterRestart();
           return createDashboardAddress(address, this.sessionToken);
         }
         await closeListeningServer(server);
@@ -430,6 +479,19 @@ export class ProviderDashboardServer {
       return;
     }
 
+    // Verify account links before mutations which could discard unknown associations.
+    // Independent API launch/probe routes remain available.
+    if (request.method !== "GET" && (
+      /^\/api\/portals\/import(?:-cookies)?$/.test(path) ||
+      /^\/api\/providers\/[^/]+\/portal(?:\/refresh)?$/.test(path) ||
+      (request.method === "DELETE" && /^\/api\/(?:secrets|providers)\/[^/]+$/.test(path))
+    )) {
+      await this.listProviderPortalsForSnapshot();
+      if (this.application.providerPortalStatus().state === "corrupt") {
+        throw new PortalRepositoryCorruptionError("Portal state needs recovery.");
+      }
+    }
+
     if (request.method === "GET" && path === "/") {
       sendAsset(response, "text/html; charset=utf-8", providerDashboardHtml);
       return;
@@ -448,6 +510,51 @@ export class ProviderDashboardServer {
     }
     if (request.method === "GET" && path === "/api/snapshot") {
       sendJson(response, 200, await this.createSnapshot());
+      return;
+    }
+    if (path === "/api/omp/preflight") {
+      if (request.method !== "POST") {
+        methodNotAllowed(response, "POST");
+        return;
+      }
+      const ompLauncher = this.requireOmpLauncher();
+      const input = ompLaunchRequestSchema.parse(
+        await readJsonBody(request, this.requestBodyLimitBytes),
+      );
+      const result = await ompLauncher.preflight(input);
+      sendJson(response, 200, { result: projectOmpPreflight(result) });
+      return;
+    }
+    if (path === "/api/omp/launch") {
+      if (request.method !== "POST") {
+        methodNotAllowed(response, "POST");
+        return;
+      }
+      const ompLauncher = this.requireOmpLauncher();
+      const input = ompLaunchRequestSchema.parse(
+        await readJsonBody(request, this.requestBodyLimitBytes),
+      );
+      const result = await ompLauncher.launch(input);
+      sendJson(response, result.ok ? 202 : 200, { result: projectOmpLaunch(result) });
+      return;
+    }
+    if (request.method === "GET" && path === "/api/omp/runs") {
+      const runs = await this.requireOmpLauncher().listRuns();
+      sendJson(response, 200, { runs: runs.map(copyOmpRunRecord) });
+      return;
+    }
+    const ompRunCancel = /^\/api\/omp\/runs\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/cancel$/.exec(path);
+    if (ompRunCancel !== null) {
+      if (request.method !== "POST") {
+        methodNotAllowed(response, "POST");
+        return;
+      }
+      const runId = ompRunCancel[1]!;
+      const run = await this.requireOmpLauncher().cancel(runId);
+      if (run === undefined) {
+        throw new DashboardRequestError(404, "OMP_RUN_NOT_FOUND", "OMP run was not found.");
+      }
+      sendJson(response, 200, { run: copyOmpRunRecord(run) });
       return;
     }
     if (request.method === "GET" && path === "/api/launches") {
@@ -644,14 +751,57 @@ export class ProviderDashboardServer {
       }
       const sameAuthKind = sameSite && previous?.connection.auth.kind === input.authKind;
       const suffix = input.authKind === "cookie" ? "PORTAL_COOKIE" : "PORTAL_ACCESS_TOKEN";
-      const reference = sameAuthKind && previous?.connection.auth.kind !== "none"
+      let reference = sameAuthKind && previous?.connection.auth.kind !== "none"
         ? previous.connection.auth.secretRef
         : provider.id.replaceAll("-", "_").toUpperCase() + "_" + suffix + "_" + randomUUID().slice(0, 8);
-      await this.application.setSecret(reference, secretValue);
-      const configured = await this.application.setProviderPortal({
-        ...connection,
-        auth: { kind: input.authKind, secretRef: reference },
-      });
+      const managed = sameAuthKind &&
+        (await this.application.listManagedSecretReferences?.() ?? []).includes(reference);
+      let configured: PortalRecord;
+      if (managed) {
+        if (this.application.addCredential === undefined ||
+          this.application.restoreProviderPortalIfUnchanged === undefined) {
+          throw new DashboardRequestError(501, "CREDENTIAL_MANAGER_UNAVAILABLE", "Credential manager is not configured.");
+        }
+        // Validate and persist the non-secret portal settings while the old
+        // credential is still active. A configuration failure must not switch
+        // the binding to a new token behind a failed import response.
+        const staged = await this.application.setProviderPortal({
+          ...connection,
+          auth: { kind: input.authKind, secretRef: reference },
+        });
+        try {
+          await this.application.addCredential({
+            providerId: provider.id,
+            purpose: "portal-session",
+            value: secretValue,
+            activate: true,
+          });
+        } catch (error) {
+          const restored = previous !== undefined &&
+            await this.application.restoreProviderPortalIfUnchanged(staged, previous)
+              .catch(() => false);
+          if (!restored) {
+            throw new DashboardRequestError(500, "PORTAL_IMPORT_RECOVERY_REQUIRED",
+              "Portal import could not restore its previous configuration.");
+          }
+          throw error;
+        }
+        const rotated = (await this.application.listProviderPortals())
+          .find((record) => record.connection.providerId === provider.id);
+        if (rotated?.connection.auth.kind === "none" ||
+          rotated?.connection.auth.secretRef === undefined ||
+          rotated.connection.auth.secretRef === reference) {
+          throw new DashboardRequestError(409, "CREDENTIAL_ROTATION_FAILED", "Portal credential was not activated.");
+        }
+        reference = rotated.connection.auth.secretRef;
+        configured = rotated;
+      } else {
+        await this.application.setSecret(reference, secretValue);
+        configured = await this.application.setProviderPortal({
+          ...connection,
+          auth: { kind: input.authKind, secretRef: reference },
+        });
+      }
       const refreshed = await this.application.refreshProviderPortal(provider.id).catch(() => undefined);
       sendJson(response, 200, {
         imported: [provider.id],
@@ -731,11 +881,30 @@ export class ProviderDashboardServer {
 
     const secretResource = /^\/api\/secrets\/([^/]+)$/.exec(path);
     if (secretResource !== null && request.method === "PUT") {
-      const reference = decodePathSegment(secretResource[1] as string);
+      const reference = secretReferenceSchema.parse(decodePathSegment(secretResource[1] as string));
       const input = secretWriteRequestSchema.parse(
         await readJsonBody(request, this.requestBodyLimitBytes),
       );
-      await this.application.setSecret(reference, input.value);
+      // Keep the uniqueness check and write together across dashboard PUTs.
+      const task = this.secretWriteTask.then(async () => {
+        await this.listProviderPortalsForSnapshot();
+        const corrupt = this.application.providerPortalStatus().state === "corrupt";
+        if (corrupt &&
+          (await this.application.listSecretReferences()).includes(reference)) {
+          throw new PortalRepositoryCorruptionError("Portal state needs recovery.");
+        }
+        try {
+          await this.application.setSecret(reference, input.value);
+        } catch (error) {
+          // setSecret persists first, then invalidates portal observations. For a
+          // verified NEW reference only, do not misreport that post-write corruption
+          // as a failed credential save. Never mask a vault failure or an overwrite.
+          if (!(corrupt && error instanceof PortalRepositoryCorruptionError &&
+            (await this.application.listSecretReferences()).includes(reference))) throw error;
+        }
+      });
+      this.secretWriteTask = task.catch(() => undefined);
+      await task;
       sendJson(response, 200, { stored: true, reference });
       return;
     }
@@ -787,6 +956,7 @@ export class ProviderDashboardServer {
       secretVault,
       portals,
       usageEvents,
+      credentialSnapshot,
     ] = await Promise.all([
       this.application.listProviders(),
       this.application.listProviderHealth(),
@@ -797,13 +967,17 @@ export class ProviderDashboardServer {
       this.createSecretVaultSnapshot(),
       this.listProviderPortalsForSnapshot(),
       this.application.listUsage(),
+      this.createCredentialSnapshot(),
     ]);
     const portalStatus = this.application.providerPortalStatus();
+    const profilesById = new Map(providers.map((profile) => [profile.id, profile]));
     return {
       version: 1,
       generatedAt: this.now().toISOString(),
       providers,
-      health: health.map(enrichHealthRecord),
+      health: health.map((record) =>
+        enrichHealthRecord(record, profilesById.get(record.providerId), this.now()),
+      ),
       storefront: buildModelStorefront(providers, health, this.now(), portals),
       logicalModels,
       promptProfiles,
@@ -811,16 +985,54 @@ export class ProviderDashboardServer {
       providerPlugins: this.application.listProviderPlugins(),
       usage,
       usageEvents,
+      ...credentialSnapshot,
       secretVault,
       portals,
+      ...(!secretVault.available ? {
+        secretVaultDiagnostic: createOperationDiagnostic({ stage: "credentials", code: "VAULT_UNAVAILABLE" }),
+      } : {}),
       portalStatus: {
         state: portalStatus.state,
-        ...(portalStatus.message === undefined
-          ? {}
-          : { message: portalStatus.message }),
+        ...(portalStatus.state === "corrupt" ? {
+          // Keep the legacy content-free messages, not arbitrary repository text/paths.
+          message: portalStatus.message === "Portal state needs recovery."
+            ? "Portal state needs recovery." : "Portal account store is corrupt.",
+        } : portalStatus.state === "recovered" ? {
+          message: "Portal state recovered from backup; verify account connections.",
+        } : {}),
       },
+      ...(portalStatus.state === "corrupt" ? {
+        portalDiagnostic: createOperationDiagnostic({ stage: "storage", code: "PORTAL_STORAGE_CORRUPT" }),
+      } : {}),
       portalAdapters: this.application.listPortalAdapters(),
     };
+  }
+
+  private async createCredentialSnapshot(): Promise<{
+    readonly credentials: Awaited<ReturnType<ProviderDockApplication["listCredentials"]>>;
+    readonly managedSecretReferences: readonly string[];
+    readonly credentialDiagnostic?: OperationDiagnostic;
+  }> {
+    try {
+      const [credentials, managedSecretReferences] = await Promise.all([
+        this.application.listCredentials?.() ?? [],
+        this.application.listManagedSecretReferences?.() ?? [],
+      ]);
+      return { credentials, managedSecretReferences };
+    } catch (error) {
+      // Some isolated hosts do not configure the maintenance manager. A real
+      // unreadable registry is reported without exposing its raw error text.
+      if (error instanceof CredentialManagerError && error.code === "CONFLICT") {
+        return { credentials: [], managedSecretReferences: [] };
+      }
+      return {
+        credentials: [],
+        managedSecretReferences: [],
+        credentialDiagnostic: createOperationDiagnostic({
+          stage: "credentials", code: "CREDENTIAL_REGISTRY_UNAVAILABLE",
+        }),
+      };
+    }
   }
 
   private async listProviderPortalsForSnapshot(): Promise<readonly PortalRecord[]> {
@@ -852,11 +1064,35 @@ export class ProviderDashboardServer {
         return {
           available: false,
           references: [],
-          errorMessage: error.message,
+          errorMessage: "A writable OS secret vault is not available on this platform.",
         };
       }
       throw error;
     }
+  }
+
+  private async reconcileOmpAfterRestart(): Promise<void> {
+    if (this.ompLauncher === undefined) return;
+    try {
+      await this.ompLauncher.reconcileAfterRestart();
+    } catch (error: unknown) {
+      try {
+        this.onUnexpectedError?.(error);
+      } catch {
+        // Reconciliation must not prevent the local dashboard from starting.
+      }
+    }
+  }
+
+  private requireOmpLauncher(): ProviderDashboardOmpLauncher {
+    if (this.ompLauncher === undefined) {
+      throw new DashboardRequestError(
+        501,
+        "OMP_LAUNCHER_UNAVAILABLE",
+        "The OMP launcher is not configured.",
+      );
+    }
+    return this.ompLauncher;
   }
 
   private async startLaunch(
@@ -880,23 +1116,41 @@ export class ProviderDashboardServer {
       launch.fallbacks.push(notification);
     };
     const onStarted = (client: "codex" | "claude-code"): void => {
+      if (launch.status !== "STARTING") return;
       launch.status = "RUNNING";
       launch.resolvedClient = client;
     };
     void this.performLaunch(request, resolvedApprovalLevel, onFallback, onStarted).then(
       ({ client, exitCode, signal }) => {
-        launch.status = "EXITED";
+        const succeeded = exitCode === 0 && signal === null;
+        launch.status = succeeded ? "EXITED" : "FAILED";
+        launch.outcome = succeeded ? "succeeded" : "failed";
         launch.resolvedClient = client;
         launch.finishedAt = this.now().toISOString();
         launch.exitSummary =
           signal === null
             ? `Exited with code ${exitCode === null ? "unknown" : exitCode}.`
             : `Exited after signal ${signal}.`;
+        if (!succeeded) {
+          launch.diagnostic = createOperationDiagnostic({
+            operationId: launch.id, stage: "shutdown",
+            code: signal !== null ? "PROCESS_SIGNALLED" : exitCode === null ? "PROCESS_EXIT_UNKNOWN" : "PROCESS_EXIT_NONZERO",
+            occurredAt: launch.finishedAt,
+            ...(exitCode === null ? {} : { exitCode }),
+          });
+          launch.errorMessage = launch.diagnostic.message;
+        }
       },
       (error: unknown) => {
-        launch.status = "FAILED";
         launch.finishedAt = this.now().toISOString();
-        launch.errorMessage = publicErrorMessage(error);
+        launch.diagnostic = createOperationDiagnostic({
+          ...(knownErrorDiagnostic(error) ?? { stage: "agent-init", code: "OPERATION_FAILED" }),
+          operationId: launch.id, occurredAt: launch.finishedAt,
+        });
+        const cancelled = launch.diagnostic.code === "OPERATION_CANCELLED";
+        launch.status = cancelled ? "EXITED" : "FAILED";
+        launch.outcome = cancelled ? "cancelled" : "failed";
+        launch.errorMessage = launch.diagnostic.message;
       },
     );
     return copyLaunchRecord(launch);
@@ -1006,9 +1260,22 @@ export class ProviderDashboardServer {
     }
   }
 
-  private handleRequestError(response: ServerResponse, error: unknown): void {
+  private handleRequestError(response: ServerResponse, error: unknown, stage: OperationStage): void {
     if (response.headersSent) {
       response.destroy();
+      return;
+    }
+    if (error instanceof CredentialManagerError) {
+      sendJson(response, error.code === "CONFLICT" || error.code === "ACTIVE_REFERENCE" ? 409 : 400, {
+        code: `CREDENTIAL_${error.code}`,
+        message: error.message,
+      });
+      return;
+    }
+    const diagnostic = knownErrorDiagnostic(error);
+    if (diagnostic !== undefined) {
+      sendJson(response, error instanceof PortalRepositoryCorruptionError ? 409 : 400,
+        { code: diagnostic.code, message: diagnostic.message, diagnostic });
       return;
     }
     if (error instanceof DashboardRequestError) {
@@ -1034,6 +1301,7 @@ export class ProviderDashboardServer {
     sendJson(response, 500, {
       code: "INTERNAL_ERROR",
       message: "Unexpected dashboard failure.",
+      diagnostic: createOperationDiagnostic({ stage, code: "OPERATION_FAILED" }),
     });
   }
 }
@@ -1047,6 +1315,31 @@ class DashboardRequestError extends Error {
     super(message);
     this.name = "DashboardRequestError";
   }
+}
+
+function projectOmpPreflight(result: OmpPreflightResult): OmpPreflightResult {
+  return result.ok ? result : {
+    ok: false,
+    diagnostic: sanitizeOperationDiagnostic(result.diagnostic),
+  };
+}
+
+function projectOmpLaunch(result: OmpLaunchResult): OmpLaunchResult {
+  return result.ok ? result : {
+    ok: false,
+    runId: result.runId,
+    diagnostic: sanitizeOperationDiagnostic(result.diagnostic),
+  };
+}
+
+function copyOmpRunRecord(record: OmpRunRecord): OmpRunRecord {
+  return {
+    ...record,
+    transitions: record.transitions.map((step) => ({ ...step })),
+    ...(record.diagnostic === undefined
+      ? {}
+      : { diagnostic: sanitizeOperationDiagnostic(record.diagnostic) }),
+  };
 }
 
 function copyLaunchRecord(
@@ -1068,6 +1361,8 @@ function copyLaunchRecord(
     ...(launch.errorMessage === undefined
       ? {}
       : { errorMessage: launch.errorMessage }),
+    ...(launch.outcome === undefined ? {} : { outcome: launch.outcome }),
+    ...(launch.diagnostic === undefined ? {} : { diagnostic: { ...launch.diagnostic } }),
     fallbacks: [...launch.fallbacks],
   };
 }
@@ -1239,8 +1534,13 @@ function nonnegativeSafeInteger(value: number, name: string): number {
   return value;
 }
 
-function enrichHealthRecord(record: ProviderHealthRecord): ProviderHealthRecord & {
+function enrichHealthRecord(
+  record: ProviderHealthRecord,
+  profile?: ProviderProfile,
+  now = new Date(),
+): ProviderHealthRecord & {
   readonly errorGuidance?: ReturnType<typeof providerErrorGuidance>;
+  readonly surfaceOverview: ReturnType<typeof summarizeProviderSurfaces>;
 } {
   const latestRuntime = record.runtimeSignals.reduce<
     ProviderHealthRecord["runtimeSignals"][number] | undefined
@@ -1259,6 +1559,14 @@ function enrichHealthRecord(record: ProviderHealthRecord): ProviderHealthRecord 
       : latestProbe?.errorType;
   return {
     ...record,
+    surfaceOverview:
+      profile === undefined
+        ? { surfaces: [] }
+        : summarizeProviderSurfaces(
+            record,
+            providerConfigurationFingerprint(profile),
+            now,
+          ),
     ...(errorType === undefined
       ? {}
       : { errorGuidance: providerErrorGuidance(errorType) }),
@@ -1331,9 +1639,34 @@ function statusForApplicationError(error: unknown): number | undefined {
 }
 
 function publicErrorMessage(error: unknown): string {
+  const diagnostic = knownErrorDiagnostic(error);
+  if (diagnostic !== undefined) return diagnostic.message;
   const status = statusForApplicationError(error);
   if (status !== undefined && error instanceof Error) return error.message;
   return "The requested operation failed unexpectedly.";
+}
+
+function knownErrorDiagnostic(error: unknown): OperationDiagnostic | undefined {
+  if (error instanceof PortalRepositoryCorruptionError) {
+    return createOperationDiagnostic({ stage: "storage", code: "PORTAL_STORAGE_CORRUPT" });
+  }
+  const code = error instanceof ModelDisabledError ? "MODEL_DISABLED"
+    : error instanceof ModelUnavailableError ? "MODEL_NOT_AVAILABLE" : undefined;
+  if (code !== undefined) return createOperationDiagnostic({ stage: "validation", code });
+  if (error instanceof ProviderRequestError) {
+    return createOperationDiagnostic({ stage: "upstream", code: error.type,
+      ...(error.httpStatus === undefined ? {} : { httpStatus: error.httpStatus }) });
+  }
+  if (error instanceof Error) {
+    const system = error as NodeJS.ErrnoException;
+    if (system.code === "ENOENT" && system.syscall?.startsWith("spawn")) {
+      return createOperationDiagnostic({ stage: "process-spawn", code: "EXECUTABLE_NOT_FOUND" });
+    }
+    if (error.name === "AbortError" || system.code === "ABORT_ERR") {
+      return createOperationDiagnostic({ stage: "shutdown", code: "OPERATION_CANCELLED" });
+    }
+  }
+  return undefined;
 }
 
 /** Browser Fetch rejects a small list of historically unsafe ports. */

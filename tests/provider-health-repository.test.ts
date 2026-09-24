@@ -84,7 +84,10 @@ describe("FileProviderHealthRepository", () => {
       capabilitySnapshot("gpt-y", "2026-08-30T10:01:00.000Z", "PASS"),
     );
     await repository.recordDiagnostics(
-      capabilitySnapshot("gpt-x", "2026-08-30T10:02:00.000Z", "PASS"),
+      {
+        ...capabilitySnapshot("gpt-x", "2026-08-30T10:02:00.000Z", "PASS"),
+        configurationFingerprint: "a".repeat(64),
+      },
     );
 
     expect(await repository.get("router")).toMatchObject({
@@ -94,6 +97,7 @@ describe("FileProviderHealthRepository", () => {
         {
           modelId: "gpt-x",
           checkedAt: "2026-08-30T10:02:00.000Z",
+          configurationFingerprint: "a".repeat(64),
           verdict: "PASS",
         },
         {
@@ -107,9 +111,24 @@ describe("FileProviderHealthRepository", () => {
     await repository.record(probeResult("2026-08-30T10:03:00.000Z", "ONLINE", 9));
     const reloaded = new FileProviderHealthRepository(filePath);
     expect((await reloaded.get("router"))?.diagnostics).toHaveLength(2);
+    expect((await reloaded.get("router"))?.diagnostics[0]?.configurationFingerprint).toBe("a".repeat(64));
     expect((await reloaded.get("router"))?.latest?.health.status).toBe("ONLINE");
     expect(await reloaded.delete("router")).toBe(true);
     expect(await reloaded.get("router")).toBeUndefined();
+  });
+
+  it.each(["file", "memory"] as const)("invalidates only model diagnostics after a secret change in %s storage", async (kind) => {
+    const directory = await mkdtemp(join(tmpdir(), "provider-dock-health-secret-"));
+    const filePath = join(directory, "history.json");
+    const repository = kind === "file"
+      ? new FileProviderHealthRepository(filePath)
+      : new MemoryProviderHealthRepository();
+    await repository.record(probeResult("2026-08-30T10:00:00.000Z", "ONLINE", 12));
+    await repository.recordDiagnostics(capabilitySnapshot("gpt-x", "2026-08-30T10:01:00.000Z", "PASS"));
+    await repository.invalidateDiagnostics("router");
+    const reloaded = kind === "file" ? new FileProviderHealthRepository(filePath) : repository;
+    expect((await reloaded.get("router"))?.diagnostics).toEqual([]);
+    expect((await reloaded.get("router"))?.latest?.health.status).toBe("ONLINE");
   });
 
   it("persists bounded real-traffic health signals independently of token usage", async () => {

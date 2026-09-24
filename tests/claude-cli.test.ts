@@ -11,13 +11,11 @@ import {
   ProviderAdapterRegistry,
   ProviderDockApplication,
   ProviderProbeService,
-  runProviderDockCli,
   type ClaudeBridgeFactory,
-  type ClaudeProcessRunner,
   type ClaudeProcessStartRequest,
-  type CliIo,
   type CreateClaudeBridgeInput,
 } from "../src/index.js";
+import { emitConfiguredFallback, RecordingProcessRunner, runCli } from "./support/cli-harness.js";
 
 describe("Claude management CLI", () => {
   it("launches a logical model through the managed fallback bridge and reports switches", async () => {
@@ -147,7 +145,13 @@ describe("Claude management CLI", () => {
       sessionInstructions: "Review all affected invariants.",
       fallback: { logicalModel: { id: "logical-claude" } },
     });
-    expect(fixture.runner.request?.args).toEqual(["--permission-mode", "manual", "--verbose"]);
+    expect(fixture.runner.request?.args).toEqual([
+      "--permission-mode",
+      "manual",
+      "--model",
+      "logical-claude",
+      "--verbose",
+    ]);
     expect(fixture.runner.request?.environment.ANTHROPIC_MODEL).toBe(
       "logical-claude",
     );
@@ -200,7 +204,7 @@ async function createCliFixture() {
   const root = await mkdtemp(join(tmpdir(), "provider-dock-claude-cli-"));
   const projectDirectory = join(root, "project");
   await mkdir(projectDirectory);
-  const runner = new FakeClaudeProcessRunner();
+  const runner = new RecordingProcessRunner<ClaudeProcessStartRequest>(6543);
   const bridges = new RecordingClaudeBridgeFactory();
   const application = new ProviderDockApplication(
     new MemoryProviderProfileRepository(),
@@ -222,30 +226,6 @@ async function createCliFixture() {
   return { application, runner, bridges, projectDirectory };
 }
 
-async function runCli(
-  application: ProviderDockApplication,
-  argv: string[],
-  environment: NodeJS.ProcessEnv = {},
-) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const io: CliIo = {
-    stdout: (message) => stdout.push(message),
-    stderr: (message) => stderr.push(message),
-  };
-  const code = await runProviderDockCli(argv, { application, io, environment });
-  return { code, stdout, stderr };
-}
-
-class FakeClaudeProcessRunner implements ClaudeProcessRunner {
-  request: ClaudeProcessStartRequest | undefined;
-
-  async start(request: ClaudeProcessStartRequest) {
-    this.request = request;
-    return { pid: 6543, wait: async () => ({ exitCode: 0, signal: null }) };
-  }
-}
-
 class RecordingClaudeBridgeFactory implements ClaudeBridgeFactory {
   input: CreateClaudeBridgeInput | undefined;
   stopCount = 0;
@@ -254,18 +234,7 @@ class RecordingClaudeBridgeFactory implements ClaudeBridgeFactory {
     this.input = input;
     return {
       start: async () => {
-        const [from, to] = input.fallback?.logicalModel.routes ?? [];
-        if (from !== undefined && to !== undefined) {
-          input.onFallback?.({
-            kind: "FALLBACK",
-            logicalModelId: input.fallback?.logicalModel.id ?? input.modelId,
-            from,
-            to,
-            errorType: "NETWORK_ERROR",
-            phase: "connection-failed",
-            message: "Primary connection failed.",
-          });
-        }
+        emitConfiguredFallback(input);
         return {
           host: "127.0.0.1" as const,
           port: 45679,

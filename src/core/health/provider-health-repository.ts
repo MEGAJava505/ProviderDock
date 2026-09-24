@@ -1,5 +1,6 @@
 import { updateModelRemovals } from "./model-presence.js";
 import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
@@ -24,6 +25,7 @@ import type {
   ProviderHealthSnapshot,
   ProviderProbeResult,
 } from "./provider-probe-service.js";
+import type { ProviderProfile } from "../providers/provider-profile.js";
 
 const storageVersion = 2 as const;
 const defaultMaximumFileBytes = 16 * 1024 * 1024;
@@ -47,6 +49,54 @@ export const providerSurfaceCheckOutcomes = [
   "unsupported",
   "unavailable",
 ] as const;
+
+/**
+ * Identifies the non-secret provider connection/routing configuration used by
+ * compatibility checks. Secret values are deliberately excluded; changing a
+ * secret reference still invalidates measurements without persisting its
+ * value.
+ */
+export function providerConfigurationFingerprint(
+  profile: Pick<
+    ProviderProfile,
+    | "baseUrl"
+    | "apiType"
+    | "adapterId"
+    | "auth"
+    | "staticHeaders"
+    | "secretHeaders"
+    | "queryParameters"
+    | "modelsEndpoint"
+  >,
+): string {
+  const auth =
+    profile.auth.kind === "none"
+      ? { kind: profile.auth.kind }
+      : profile.auth.kind === "bearer"
+        ? { kind: profile.auth.kind, secretRef: profile.auth.secretRef }
+        : profile.auth.kind === "header"
+          ? {
+              kind: profile.auth.kind,
+              headerName: profile.auth.headerName,
+              secretRef: profile.auth.secretRef,
+            }
+          : {
+              kind: profile.auth.kind,
+              parameterName: profile.auth.parameterName,
+              secretRef: profile.auth.secretRef,
+            };
+  const payload = JSON.stringify({
+    baseUrl: profile.baseUrl,
+    apiType: profile.apiType,
+    adapterId: profile.adapterId,
+    auth,
+    staticHeaders: sortedRecord(profile.staticHeaders),
+    secretHeaders: sortedRecord(profile.secretHeaders),
+    queryParameters: sortedRecord(profile.queryParameters),
+    modelsEndpoint: profile.modelsEndpoint,
+  });
+  return createHash("sha256").update(payload, "utf8").digest("hex");
+}
 
 const providerIdSchema = z
   .string()
@@ -157,6 +207,8 @@ const diagnosticProtocols = [
 const modelCapabilitySnapshotSchema = z
   .object({
     providerId: providerIdSchema,
+    configurationFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    credentialFingerprint: z.string().regex(/^[a-f0-9]{64}$/).optional(),
     modelId: z.string().min(1).max(256),
     checkedAt: z.string().datetime(),
     doctorLevel: z.number().int().min(0).max(3),
@@ -461,6 +513,8 @@ export function summarizeProviderSurfaces(
 
 export interface ModelCapabilitySnapshot {
   readonly providerId: string;
+  readonly configurationFingerprint?: string;
+  readonly credentialFingerprint?: string;
   readonly modelId: string;
   readonly checkedAt: string;
   readonly doctorLevel: number;
@@ -478,6 +532,8 @@ export interface ProviderHealthRepository {
   get(providerId: string): Promise<ProviderHealthRecord | undefined>;
   record(result: ProviderProbeResult): Promise<ProviderHealthRecord>;
   recordDiagnostics(snapshot: ModelCapabilitySnapshot): Promise<ProviderHealthRecord>;
+  /** Fail closed after a referenced secret is replaced or removed. */
+  invalidateDiagnostics(providerId: string): Promise<void>;
   recordRuntimeSignal(
     signal: ProviderRuntimeHealthSignal,
   ): Promise<ProviderHealthRecord>;
@@ -592,6 +648,16 @@ export class FileProviderHealthRepository implements ProviderHealthRepository {
       records.sort((left, right) => left.providerId.localeCompare(right.providerId));
       await this.writeAtomically(records);
       return record;
+    });
+  }
+
+  invalidateDiagnostics(providerId: string): Promise<void> {
+    return this.serializeMutation(async () => {
+      const records = [...(await this.load())];
+      const index = records.findIndex((record) => record.providerId === providerId);
+      if (index < 0 || records[index]!.diagnostics.length === 0) return;
+      records[index] = { ...records[index]!, diagnostics: [] };
+      await this.writeAtomically(records);
     });
   }
 
@@ -808,6 +874,12 @@ export class MemoryProviderHealthRepository implements ProviderHealthRepository 
     return record;
   }
 
+  async invalidateDiagnostics(providerId: string): Promise<void> {
+    const record = this.records.get(providerId);
+    if (record === undefined || record.diagnostics.length === 0) return;
+    this.records.set(providerId, { ...record, diagnostics: [] });
+  }
+
   async recordRuntimeSignal(
     signal: ProviderRuntimeHealthSignal,
   ): Promise<ProviderHealthRecord> {
@@ -894,6 +966,12 @@ function normalizeCapabilitySnapshot(
 ): ModelCapabilitySnapshot {
   return {
     providerId: snapshot.providerId,
+    ...(snapshot.configurationFingerprint === undefined ? {} : {
+      configurationFingerprint: snapshot.configurationFingerprint,
+    }),
+    ...(snapshot.credentialFingerprint === undefined ? {} : {
+      credentialFingerprint: snapshot.credentialFingerprint,
+    }),
     modelId: snapshot.modelId,
     checkedAt: snapshot.checkedAt,
     doctorLevel: snapshot.doctorLevel,
@@ -997,6 +1075,14 @@ function normalizeSurfaceCheck(check: StoredProviderSurfaceCheck): ProviderSurfa
     ...(check.errorType === undefined ? {} : { errorType: check.errorType }),
     ...(errorMessage === undefined ? {} : { errorMessage }),
   };
+}
+
+function sortedRecord(
+  values: Readonly<Record<string, string>>,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(values).sort(([left], [right]) => left.localeCompare(right)),
+  );
 }
 
 function migrateStoredHealth(input: unknown, cause: z.ZodError) {

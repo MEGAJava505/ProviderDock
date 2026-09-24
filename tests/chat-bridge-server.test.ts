@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   MemorySecretStore,
   ResponsesBridgeServer,
-  SseDecoder,
   encodeSseEvent,
   parseProviderProfile,
 } from "../src/index.js";
-
-const encoder = new TextEncoder();
+import {
+  chunkedBody,
+  decodeEvents,
+  jsonResponse as chatJsonResponse,
+} from "./support/bridge-sse.js";
 
 describe("Chat Completions bridge", () => {
   it("translates non-streaming Responses requests and Chat answers", async () => {
@@ -395,13 +397,6 @@ function chatBridge(
   });
 }
 
-function chatJsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-}
-
 function chatSse(body: unknown): string {
   return encodeSseEvent({ data: JSON.stringify(body), comments: [] });
 }
@@ -411,24 +406,5 @@ function postResponses(baseUrl: string, body: Record<string, unknown>): Promise<
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-  });
-}
-
-function decodeEvents(source: string) {
-  const decoder = new SseDecoder();
-  return [...decoder.push(encoder.encode(source)), ...decoder.finish()];
-}
-
-function chunkedBody(source: string, boundaries: readonly number[]): ReadableStream<Uint8Array> {
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      let previous = 0;
-      for (const boundary of boundaries) {
-        controller.enqueue(encoder.encode(source.slice(previous, boundary)));
-        previous = boundary;
-      }
-      controller.enqueue(encoder.encode(source.slice(previous)));
-      controller.close();
-    },
   });
 }

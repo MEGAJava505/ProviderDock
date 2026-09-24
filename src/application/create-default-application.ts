@@ -9,6 +9,8 @@ import { FilePromptProfileRepository } from "../core/profiles/prompt-profile-rep
 import { FileProjectProfileRepository } from "../core/profiles/project-profile-repository.js";
 import { FileAgentApprovalPreferenceRepository } from "../clients/agent-approval-preference.js";
 import { FileProviderHealthRepository } from "../core/health/provider-health-repository.js";
+import { providerSecretRevisionFingerprint } from "../core/security/secret-revision.js";
+import { fingerprintOmpProviderProfile } from "../migration/omp-provider-mapping.js";
 import { FileUsageRepository } from "../core/usage/usage-repository.js";
 import { ProviderAdapterRegistry } from "../core/providers/provider-adapter-registry.js";
 import { FileProviderProfileRepository } from "../core/providers/provider-profile-repository.js";
@@ -282,6 +284,10 @@ function assembleDefaultProviderDock(
     rootDirectory: ompRootDirectory,
     artifact: pinnedOmpArtifact,
     secretStore: runtime.secrets,
+    currentProfileFingerprint: async (providerId) => {
+      const profile = await runtime.profiles.get(providerId);
+      return profile === undefined ? undefined : fingerprintOmpProviderProfile(profile);
+    },
     ambientEnvironment: runtime.environment,
   });
   const ompLauncher = new OmpLaunchService({
@@ -294,6 +300,8 @@ function assembleDefaultProviderDock(
     evidence: new FileOmpProviderLocalSmokeEvidenceSource(
       join(runtime.paths.dataDirectory, "migration", "omp-provider-evidence.json"),
     ),
+    healthRecords: runtime.healthRecords,
+    credentialFingerprint: (profile) => providerSecretRevisionFingerprint(profile, runtime.secrets),
     supervisor: new OmpProcessSupervisor({
       runtime: ompRuntime,
       runs: new FileOmpRunRepository(join(runtime.paths.runtimeDirectory, "omp-runs")),

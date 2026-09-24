@@ -57,6 +57,44 @@ describe("buildClaudeChildEnvironment", () => {
 });
 
 describe("ClaudeLauncher", () => {
+  it("passes the selected model explicitly to Claude Code", async () => {
+    const bridge = {
+      start: vi.fn(async () => ({
+        host: "127.0.0.1" as const,
+        port: 45678,
+        url: "http://127.0.0.1:45678",
+      })),
+      stop: vi.fn(async () => undefined),
+    };
+    let startedRequest: ClaudeProcessStartRequest | undefined;
+    const launcher = new ClaudeLauncher(
+      { create: () => bridge },
+      {
+        start: async (request) => {
+          startedRequest = request;
+          return { pid: 42, wait: async () => ({ exitCode: 0, signal: null }) };
+        },
+      },
+      createSessionHomes(
+        await mkdtemp(join(tmpdir(), "providerdock-claude-explicit-model-")),
+      ),
+    );
+
+    await launcher.launch({
+      profile: testProfile(),
+      modelId: "gpt-5.6-sol",
+      projectDirectory: "/tmp/project",
+      parentEnvironment: {},
+    });
+
+    expect(startedRequest?.args).toEqual([
+      "--permission-mode",
+      "manual",
+      "--model",
+      "gpt-5.6-sol",
+    ]);
+  });
+
   it("persists the session ledger while Claude runs and removes it on clean exit", async () => {
     const root = await mkdtemp(join(tmpdir(), "providerdock-claude-runtime-"));
     const runtimeRoot = join(root, "runtime");
@@ -401,6 +439,8 @@ describe("ClaudeLauncher", () => {
     expect(startedRequest?.args).toEqual([
       "--permission-mode",
       "manual",
+      "--model",
+      "claude-x",
       "--resume",
       "8fbf0290-d6ae-44a9-85e2-fc36e0915743",
       "--verbose",
@@ -465,7 +505,13 @@ describe("ClaudeLauncher", () => {
     });
 
     expect(exit).toEqual({ exitCode: 0, signal: null });
-    expect(startedRequest?.args).toEqual(["--permission-mode", "acceptEdits", "--verbose"]);
+    expect(startedRequest?.args).toEqual([
+      "--permission-mode",
+      "acceptEdits",
+      "--model",
+      "claude-x",
+      "--verbose",
+    ]);
   });
 });
 

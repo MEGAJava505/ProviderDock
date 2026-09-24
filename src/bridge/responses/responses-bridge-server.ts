@@ -478,6 +478,9 @@ export class ResponsesBridgeServer {
             safeUpstreamHeaders(upstream, false),
             selected,
           );
+          if (fallbackFailurePhaseForHttpStatus(upstream.status) === "unknown") {
+            headers.set("x-should-retry", "false");
+          }
           if (selected.fallbackBlock !== undefined) {
             headers.set("x-providerdock-fallback-block", selected.fallbackBlock.code);
           }

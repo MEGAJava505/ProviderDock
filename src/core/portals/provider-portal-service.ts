@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import type { PortalRepository } from "./portal-repository.js";
 import { portalAdapterIdForSite, portalConnectionSchema, portalSnapshotSchema, PortalConfigurationError,
   type ProviderPortalAdapterRegistry, type PortalRecord } from "./portal-types.js";
@@ -18,6 +19,18 @@ export class ProviderPortalService {
     });
     this.adapters.resolve(connection.adapterId);
     return (await this.records.update(connection.providerId, () => ({ connection, revision: randomUUID(), failures: 0 })))!;
+  }
+  async restoreIfUnchanged(staged: PortalRecord, previous: PortalRecord): Promise<boolean> {
+    if (staged.connection.providerId !== previous.connection.providerId) {
+      throw new PortalConfigurationError("Portal rollback provider mismatch.");
+    }
+    let restored = false;
+    await this.records.update(staged.connection.providerId, (current) => {
+      if (!isDeepStrictEqual(current, staged)) return current;
+      restored = true;
+      return previous;
+    });
+    return restored;
   }
   async disconnect(providerId: string) { await this.records.update(providerId, () => undefined); }
   async invalidateSecret(reference: string) {
@@ -60,13 +73,17 @@ export class ProviderPortalService {
       ? record.connection
       : portalConnectionSchema.parse({ ...record.connection, adapterId });
     const latest = portalSnapshotSchema.parse(await this.adapters.resolve(adapterId).read(connection, now));
+    const discoveredUserId = connection.userId ?? latest.wallet.value?.userId;
+    const boundConnection = discoveredUserId === undefined || connection.userId !== undefined
+      ? connection
+      : portalConnectionSchema.parse({ ...connection, userId: discoveredUserId });
     const failed = Object.values(latest).some((item) => item?.status === "error");
     const failures = failed ? Math.min(10, record.failures + 1) : 0;
     const delay = Math.min(3_600_000, record.connection.refreshIntervalMs * 2 ** Math.min(failures, 4));
     const retryAt = Math.max(now.valueOf() + delay, ...Object.values(latest).map((item) => item?.retryAt ? Date.parse(item.retryAt) : 0));
     return this.records.update(record.connection.providerId, (current) => {
       if (!current || current.revision !== record.revision) return current;
-      return { ...current, connection, latest, failures, nextRefreshAt: new Date(retryAt).toISOString(),
+      return { ...current, connection: boundConnection, latest, failures, nextRefreshAt: new Date(retryAt).toISOString(),
         ...(latest.wallet.value ? { lastWallet: { value: latest.wallet.value, observedAt: latest.wallet.observedAt } } : {}) };
     });
   }

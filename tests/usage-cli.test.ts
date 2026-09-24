@@ -10,9 +10,8 @@ import {
   ProviderDockApplication,
   ProviderProbeService,
   createUsageTelemetryEvent,
-  runProviderDockCli,
-  type CliIo,
 } from "../src/index.js";
+import { runCli } from "./support/cli-harness.js";
 
 describe("usage dashboard CLI", () => {
   it("configures model pricing and renders event and summary dashboards", async () => {
@@ -112,22 +111,4 @@ function createApplication(
     new MemoryProviderHealthRepository(),
     usage,
   );
-}
-
-async function runCli(
-  application: ProviderDockApplication,
-  argv: string[],
-) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const io: CliIo = {
-    stdout: (message) => stdout.push(message),
-    stderr: (message) => stderr.push(message),
-  };
-  const code = await runProviderDockCli(argv, {
-    application,
-    io,
-    environment: {},
-  });
-  return { code, stdout, stderr };
 }

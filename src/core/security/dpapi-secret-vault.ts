@@ -15,6 +15,7 @@ const storedSecretSchema = z
     version: z.literal(1),
     reference: secretReferenceSchema,
     protectedValue: z.string().min(1).max(1_048_576),
+    generation: z.string().uuid().optional(),
   })
   .strict();
 
@@ -84,6 +85,25 @@ export class DpapiFileSecretVault implements SecretVault {
     return this.protector.unprotect(stored.protectedValue);
   }
 
+  async revision(referenceInput: string): Promise<string | undefined> {
+    const reference = secretReferenceSchema.parse(referenceInput);
+    let contents: string;
+    try {
+      contents = await readFile(this.filePath(reference), "utf8");
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") return undefined;
+      throw error;
+    }
+    const stored = storedSecretSchema.parse(JSON.parse(contents));
+    if (stored.reference !== reference) throw new SecretProtectionError("Stored secret reference does not match its file name.");
+    // Bind both the per-write generation and protected bytes; legacy files
+    // predate generation IDs and remain bound to their protected bytes alone.
+    const revisionSource = stored.generation === undefined
+      ? stored.protectedValue
+      : `${stored.generation}\0${stored.protectedValue}`;
+    return createHash("sha256").update(revisionSource, "utf8").digest("hex");
+  }
+
   async set(referenceInput: string, value: string): Promise<void> {
     const reference = secretReferenceSchema.parse(referenceInput);
     if (value.length === 0 || value.length > maxSecretLength) {
@@ -93,7 +113,7 @@ export class DpapiFileSecretVault implements SecretVault {
     }
 
     const protectedValue = await this.protector.protect(value);
-    const stored = storedSecretSchema.parse({ version: 1, reference, protectedValue });
+    const stored = storedSecretSchema.parse({ version: 1, reference, protectedValue, generation: randomUUID() });
     await mkdir(this.directory, { recursive: true });
     const targetPath = this.filePath(reference);
     const temporaryPath = `${targetPath}.${randomUUID()}.tmp`;

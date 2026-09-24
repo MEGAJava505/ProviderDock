@@ -8,7 +8,6 @@ import {
   MemorySecretStore,
   ProviderAdapterRegistry,
   ResponsesBridgeServer,
-  SseDecoder,
   agentRouterIdentityDefaults,
   encodeSseEvent,
   isBridgePortAllowed,
@@ -17,8 +16,13 @@ import {
   type ProviderRuntimeHealthSignal,
   type UsageTelemetryEvent,
 } from "../src/index.js";
-
-const encoder = new TextEncoder();
+import {
+  chunkedBody,
+  decodeEvents,
+  encoder,
+  jsonResponse as jsonResponseWithHeaders,
+  sseResponse,
+} from "./support/bridge-sse.js";
 
 describe("ResponsesBridgeServer", () => {
   it("records normalized usage and configured cost for a completed response", async () => {
@@ -200,6 +204,7 @@ describe("ResponsesBridgeServer", () => {
       });
       expect(response.headers.get("retry-after")).toBe("3");
       expect(response.headers.get("x-request-id")).toBe("upstream-request-500");
+      expect(response.headers.get("x-should-retry")).toBe("false");
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(signals).toEqual([
         expect.objectContaining({
@@ -752,31 +757,9 @@ function testBridge(
 }
 
 function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "content-type": "application/json", "x-request-id": "req-json" },
-  });
-}
-
-function sseResponse(source: string): Response {
-  return new Response(source, {
-    status: 200,
-    headers: { "content-type": "text/event-stream" },
-  });
-}
-
-function chunkedBody(source: string, boundaries: readonly number[]): ReadableStream<Uint8Array> {
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      let previous = 0;
-      for (const boundary of boundaries) {
-        controller.enqueue(encoder.encode(source.slice(previous, boundary)));
-        previous = boundary;
-      }
-      controller.enqueue(encoder.encode(source.slice(previous)));
-      controller.close();
-    },
-  });
+  // The Responses bridge asserts request-id propagation, so its JSON mocks
+  // carry an x-request-id the other bridges' mocks do not.
+  return jsonResponseWithHeaders(body, { "x-request-id": "req-json" });
 }
 
 function encodeJsonEvent(event: Record<string, unknown>): string {
@@ -785,11 +768,6 @@ function encodeJsonEvent(event: Record<string, unknown>): string {
     data: JSON.stringify(event),
     comments: [],
   });
-}
-
-function decodeEvents(source: string) {
-  const decoder = new SseDecoder();
-  return [...decoder.push(encoder.encode(source)), ...decoder.finish()];
 }
 
 async function postStream(

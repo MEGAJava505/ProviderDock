@@ -18,12 +18,11 @@ import {
   ProviderPluginValidationError,
   ProviderProbeService,
   ProviderRequestError,
-  runProviderDockCli,
   validateProviderPluginDefinition,
-  type CliIo,
   type ProviderAdapter,
   type ProviderPluginDefinition,
 } from "../src/index.js";
+import { runCli } from "./support/cli-harness.js";
 
 describe("provider plugin SDK", () => {
   it("loads an explicitly configured local module and exposes its adapter", async () => {
@@ -405,22 +404,4 @@ function pluginProfile() {
     auth: { kind: "bearer", secretRef: "ROUTER_KEY" },
     secretHeaders: { "x-provider-secret": "SECONDARY_KEY" },
   });
-}
-
-async function runCli(
-  application: ProviderDockApplication,
-  argv: string[],
-) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const io: CliIo = {
-    stdout: (message) => stdout.push(message),
-    stderr: (message) => stderr.push(message),
-  };
-  const code = await runProviderDockCli(argv, {
-    application,
-    io,
-    environment: {},
-  });
-  return { code, stdout, stderr };
 }
