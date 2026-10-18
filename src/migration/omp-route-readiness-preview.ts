@@ -29,24 +29,25 @@ export type RouteNodeName =
 
 export type RouteNodeState = "ready" | "unknown" | "stale" | "blocked";
 
-// The VSLLM evidence tiers the milestone distinguishes, plus "none" when no
-// representable v2 decision exists. Only "real-paid-pilot" can back a ready
-// route, and it is emitted EXCLUSIVELY on the accepted-gate branch.
+// These tiers describe Doctor L3 and local smoke/artifact provenance, NOT a
+// completed OMP pilot. The persisted v2 field named realPilot binds a Doctor
+// snapshot; it supplies no evidence that OMP ran. Only "doctor-l3-ready-for-pilot"
+// can back a ready route, exclusively on the accepted-gate branch.
 // "incomplete-provenance" marks a route whose Doctor snapshot matches the pilot
 // record but whose mandatory local-smoke/artifact provenance is absent or
-// mismatched. "real-pilot-evidence-route-blocked" marks a route whose evidence
-// is itself complete and proven, but which the gate rejected on another node
-// (account/model/protocol/origin/provider) — proven evidence is NOT a usable
-// route, so the tier never claims "real-paid-pilot" for it.
+// mismatched. "doctor-l3-evidence-route-blocked" marks matching Doctor/local
+// evidence on a route rejected at another node (account/model/protocol/origin/
+// provider). Neither tier proves a successful OMP pilot or production readiness.
 export type OmpEvidenceTier =
-  | "real-paid-pilot"
-  | "real-pilot-evidence-route-blocked"
+  | "doctor-l3-ready-for-pilot"
+  | "doctor-l3-evidence-route-blocked"
   | "incomplete-provenance"
   | "stale-doctor-snapshot"
   | "local-smoke-only"
   | "v2-candidate"
   | "none";
 
+/** `ready` means eligible for preflight/a pilot, never that the pilot passed. */
 export type PreviewVerdict = "ready" | "unknown" | "blocked";
 
 export interface RouteChainNode {
@@ -87,7 +88,7 @@ const NODE_ORDER: readonly RouteNodeName[] = [
 /**
  * Build the read-only readiness preview for one selection. Pure and side-effect
  * free. When the authoritative gate accepts, every node is `ready` and the tier
- * is `real-paid-pilot`; otherwise each node is annotated best-effort and the
+ * is `doctor-l3-ready-for-pilot`; otherwise each node is annotated best-effort and the
  * verdict is at most `unknown` — never `ready`.
  */
 export function buildOmpRouteReadinessPreview(
@@ -103,7 +104,7 @@ export function buildOmpRouteReadinessPreview(
       selection,
       verdict: "ready",
       reason: "route-accepted-for-pilot",
-      evidenceTier: "real-paid-pilot",
+      evidenceTier: "doctor-l3-ready-for-pilot",
       chain: NODE_ORDER.map((node) => ({
         node,
         state: "ready" as const,
@@ -229,7 +230,8 @@ function classifyCredential(input: EvaluateOmpRouteDecisionForPilotInput): NodeV
  * pieces: a matching Doctor Level-3 snapshot AND matching local-smoke evidence
  * AND matching executable/source-commit artifact provenance. A Doctor snapshot
  * that attests upstream but lacks that local provenance is `incomplete-provenance`,
- * never `real-paid-pilot`. A present-but-mismatched snapshot is `stale`;
+ * never `doctor-l3-ready-for-pilot`. These prerequisites do not attest an OMP
+ * run. A present-but-mismatched snapshot is `stale`;
  * loopback-only or no evidence stays `unknown`.
  *
  * Note on "stale": there is NO age-based freshness/TTL policy for Doctor L3
@@ -243,7 +245,7 @@ function classifyEvidence(
   input: EvaluateOmpRouteDecisionForPilotInput,
 ): { readonly tier: OmpEvidenceTier; readonly node: NodeVerdict } {
   const doctor = input.doctorSnapshot;
-  const doctorMatchesPilot = doctor !== undefined &&
+  const doctorMatchesDecision = doctor !== undefined &&
     doctor.providerId === decision.providerId &&
     doctor.modelId === decision.modelId &&
     doctor.protocol === decision.protocol &&
@@ -263,7 +265,7 @@ function classifyEvidence(
   const artifactOk = decision.localSmoke.executableSha256 === input.artifact.sha256 &&
     decision.localSmoke.sourceCommit === input.artifact.sourceCommit;
 
-  if (doctorMatchesPilot) {
+  if (doctorMatchesDecision) {
     if (!localSmokeOk) {
       // Upstream is attested, but the mandatory local-smoke provenance is
       // absent or mismatched — the route is not fully proven. Localise it here
@@ -275,11 +277,9 @@ function classifyEvidence(
     if (!artifactOk) {
       return { tier: "incomplete-provenance", node: ["blocked", "artifact-provenance-mismatch"] };
     }
-    // The evidence itself is complete and proven. We are only here because the
-    // gate rejected the route on a non-evidence node, so the evidence node is
-    // honestly `ready` but the tier must NOT claim a usable "real-paid-pilot"
-    // route — that label is reserved for the accepted-gate branch.
-    return { tier: "real-pilot-evidence-route-blocked", node: ["ready", "level-3-real-pilot-evidence"] };
+    // Doctor/local provenance matches, but another route node failed the gate.
+    // The evidence node is ready; neither the route nor a completed OMP pilot is.
+    return { tier: "doctor-l3-evidence-route-blocked", node: ["ready", "doctor-level-3-and-local-provenance"] };
   }
   if (doctor !== undefined) {
     return { tier: "stale-doctor-snapshot", node: ["stale", "doctor-snapshot-does-not-match-pilot"] };
@@ -287,7 +287,7 @@ function classifyEvidence(
   if (localSmokeOk) {
     return { tier: "local-smoke-only", node: ["unknown", "loopback-smoke-only-not-upstream-pass"] };
   }
-  return { tier: "v2-candidate", node: ["unknown", "no-paid-pilot-evidence-yet"] };
+  return { tier: "v2-candidate", node: ["unknown", "no-doctor-level-3-evidence-yet"] };
 }
 
 function recommend(verdict: PreviewVerdict, tier: OmpEvidenceTier, credential: RouteNodeState): string {

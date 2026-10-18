@@ -19,24 +19,55 @@ export interface OmpRouteFixture {
 }
 
 /**
+ * Overrides for {@link makeOmpRouteFixture}. Every field defaults to the canonical
+ * `https://gateway.invalid` values, so `makeOmpRouteFixture()` with no argument is
+ * byte-identical to the original data-only fixture. The integration harness passes
+ * a `http://127.0.0.1:<port>/v1` loopback `baseUrl`/`origin` plus the fake child's
+ * real streamed hash as `executableSha256` and the pinned `sourceCommit`, so the
+ * SAME production route-acceptance path (evaluateOmpRouteDecisionForPilot +
+ * verifyArtifact) passes with no test-only bypass.
+ */
+export interface OmpRouteFixtureOverrides {
+  readonly baseUrl?: string;
+  readonly origin?: string;
+  readonly accountId?: string;
+  readonly modelId?: string;
+  readonly executableSha256?: string;
+  readonly sourceCommit?: string;
+  /**
+   * Overrides the credential-revision fingerprint stamped on both the returned
+   * value and the Doctor snapshot. The integration harness passes the real
+   * `providerSecretRevisionFingerprint(profile, store)` so the SAME production
+   * `assertCredentialGeneration` check accepts the fixture.
+   */
+  readonly credentialFingerprint?: string;
+}
+
+/**
  * The canonical accepted single-route fixture shared by the OMP route-decision
  * and route-readiness-preview suites. It is deliberately data-only: each suite
  * keeps its own assertions and edge-case mutations, so failure locality and the
  * negative checks stay in the file that owns them.
  */
-export function makeOmpRouteFixture(): OmpRouteFixture {
-  const credentialFingerprint = "9".repeat(64);
+export function makeOmpRouteFixture(overrides: OmpRouteFixtureOverrides = {}): OmpRouteFixture {
+  const baseUrl = overrides.baseUrl ?? "https://gateway.invalid/v1";
+  const origin = overrides.origin ?? "https://gateway.invalid";
+  const accountId = overrides.accountId ?? "confirmed-account";
+  const modelId = overrides.modelId ?? "exact-model";
+  const executableSha256 = overrides.executableSha256 ?? "c".repeat(64);
+  const sourceCommit = overrides.sourceCommit ?? "d".repeat(40);
+  const credentialFingerprint = overrides.credentialFingerprint ?? "9".repeat(64);
   const profile = parseProviderProfile({
     id: "gateway",
     displayName: "Gateway",
-    baseUrl: "https://gateway.invalid/v1",
+    baseUrl,
     apiType: "openai-chat-completions",
     auth: { kind: "bearer", secretRef: "gateway.key" },
-    manualModelIds: ["exact-model"],
+    manualModelIds: [modelId],
   });
   const doctorSnapshot: ModelCapabilitySnapshot = {
     providerId: "gateway",
-    modelId: "exact-model",
+    modelId,
     protocol: "openai-chat-completions",
     checkedAt: "2026-09-22T20:44:45.061Z",
     doctorLevel: 3,
@@ -55,10 +86,10 @@ export function makeOmpRouteFixture(): OmpRouteFixture {
   const decision: OmpRouteDecision = {
     providerId: "gateway",
     profileSha256: fingerprintOmpProviderProfile(profile),
-    accountId: "confirmed-account",
-    baseUrl: "https://gateway.invalid/v1",
-    origin: "https://gateway.invalid",
-    modelId: "exact-model",
+    accountId,
+    baseUrl,
+    origin,
+    modelId,
     protocol: "openai-chat-completions",
     capabilities: { text: "supported", streaming: "supported", tools: "supported" },
     realPilot: {
@@ -73,8 +104,8 @@ export function makeOmpRouteFixture(): OmpRouteFixture {
       status: "passed",
       inventorySha256: "a".repeat(64),
       smokeReportSha256: "b".repeat(64),
-      executableSha256: "c".repeat(64),
-      sourceCommit: "d".repeat(40),
+      executableSha256,
+      sourceCommit,
     },
   };
   const evidence: OmpProviderLocalSmokeEvidence = {

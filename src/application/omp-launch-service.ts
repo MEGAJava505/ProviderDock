@@ -13,6 +13,11 @@ import {
   type OmpRouteDecisionSource,
 } from "../migration/omp-route-decisions.js";
 import { OmpProviderEvidenceError, type OmpProviderLocalSmokeEvidenceSource } from "../migration/omp-provider-evidence.js";
+import {
+  buildOmpRouteReadinessPreview,
+  type OmpRouteReadinessPreview,
+  type RouteNodeName,
+} from "../migration/omp-route-readiness-preview.js";
 import type { ProviderHealthRepository } from "../core/health/provider-health-repository.js";
 import type { ProviderProfile } from "../core/providers/provider-profile.js";
 import { fingerprintOmpProviderProfile } from "../migration/omp-provider-mapping.js";
@@ -23,6 +28,13 @@ export interface OmpLaunchInput {
   readonly accountId: string;
   readonly projectDirectory: string;
   readonly permissionAcknowledgement?: "read-only-pilot-no-sandbox" | undefined;
+}
+
+/** Read-only preview selection: no project path, credential value, or acknowledgement. */
+export interface OmpRoutePreviewInput {
+  readonly providerId: string;
+  readonly accountId: string;
+  readonly modelId: string;
 }
 
 export type OmpLaunchResult =
@@ -59,6 +71,31 @@ function failure(code: string): { ok: false; diagnostic: OperationDiagnostic } {
   return { ok: false, diagnostic: createOperationDiagnostic({ code, stage: "validation" }) };
 }
 
+/** Chain order matches the builder's private NODE_ORDER; kept here for synthesized blocked previews. */
+const OMP_PREVIEW_NODE_ORDER: readonly RouteNodeName[] = [
+  "provider", "account", "model", "protocol", "origin", "credential-state", "evidence-state",
+];
+
+/**
+ * A preview we can answer without ever reaching the builder (unknown/disabled
+ * provider or malformed selection). It is fail-closed: every node blocked, no
+ * evidence tier, and it never authorizes a launch.
+ */
+function blockedRoutePreview(
+  selection: OmpRouteReadinessPreview["selection"], nodeReason: string,
+): OmpRouteReadinessPreview {
+  return {
+    selection,
+    verdict: "blocked",
+    reason: "route-blocked",
+    evidenceTier: "none",
+    chain: OMP_PREVIEW_NODE_ORDER.map((node) => ({ node, state: "blocked", reason: nodeReason })),
+    autoFallback: "not-offered",
+    loopbackSmokeIsUpstreamPass: false,
+    recommendedAction: "fix-or-publish-v2-route-decision",
+  };
+}
+
 /** Public launch seam. `prepare()`, child environments, and raw RPC stay private. */
 export class OmpLaunchService {
   readonly #application: OmpLaunchServiceOptions["application"];
@@ -88,13 +125,19 @@ export class OmpLaunchService {
   }
 
   async launch(input: OmpLaunchInput): Promise<OmpLaunchResult> {
-    const preflight = await this.preflight(input);
-    if (!preflight.ok) {
-      return { ok: false, runId: "00000000-0000-4000-8000-000000000000", diagnostic: preflight.diagnostic };
-    }
+    const unassignedRunId = "00000000-0000-4000-8000-000000000000";
+    // One launch resolves exactly one immutable selection. The same object is
+    // preflighted and then started, so a profile/decision/credential change
+    // between reads can never route supervisor.start to an unverified route.
+    // The runtime still rechecks the pinned credential/profile fingerprint
+    // before creating the child environment (fail-closed on rotation/removal).
     const selection = await this.selection(input);
     if (!("route" in selection)) {
-      return { ok: false, runId: "00000000-0000-4000-8000-000000000000", diagnostic: selection.diagnostic };
+      return { ok: false, runId: unassignedRunId, diagnostic: selection.diagnostic };
+    }
+    const preflight = await this.#runtime.preflight(selection);
+    if (!preflight.ok) {
+      return { ok: false, runId: unassignedRunId, diagnostic: preflight.diagnostic };
     }
     const result = await this.#supervisor.start(selection);
     return result.ok ? result : {
@@ -169,5 +212,48 @@ export class OmpLaunchService {
       expectedCredentialFingerprint: currentCredentialFingerprint,
       expectedProfileSha256: fingerprintOmpProviderProfile(profile),
     };
+  }
+
+  /**
+   * Read-only explanation of a route's readiness. It gathers the same current
+   * non-secret profile/decision/evidence/Doctor/credential-revision metadata as
+   * `selection()` and hands it to the existing builder. Unlike `selection()`, it
+   * requires no pilot acknowledgement, never calls `runtime.preflight`, reads no
+   * secret value, and writes no files. Corrupt/legacy evidence and a missing
+   * decision degrade to a safe blocked/unknown verdict — never to a spurious PASS.
+   * The returned view is content-free (codes only) and safe to send over HTTP.
+   */
+  async preview(input: OmpRoutePreviewInput): Promise<OmpRouteReadinessPreview> {
+    const echo = (value: string): string => (typeof value === "string" ? value : "");
+    const selection = {
+      providerId: echo(input.providerId),
+      accountId: echo(input.accountId),
+      modelId: echo(input.modelId),
+    };
+    for (const key of ["providerId", "accountId", "modelId"] as const) {
+      if (typeof input[key] !== "string" || input[key].trim().length === 0) {
+        return blockedRoutePreview(selection, "invalid-route-selection");
+      }
+    }
+    const profile = (await this.#application.listProviders().catch(() => []))
+      .find((item) => item.id === input.providerId);
+    if (profile === undefined || !profile.enabled) {
+      return blockedRoutePreview(selection, "provider-unavailable-or-disabled");
+    }
+    const decision = await this.#routeDecisions
+      .get(input.providerId, input.accountId, input.modelId).catch(() => undefined);
+    const evidence = await this.#evidence.get().catch(() => undefined);
+    const doctorSnapshot = (await this.#healthRecords.get(input.providerId).catch(() => undefined))
+      ?.diagnostics.find((snapshot) => snapshot.modelId === input.modelId);
+    const currentCredentialFingerprint = await this.#credentialFingerprint(profile).catch(() => undefined);
+    return buildOmpRouteReadinessPreview({
+      profile, decision, evidence, doctorSnapshot, currentCredentialFingerprint,
+      selection: {
+        providerId: input.providerId,
+        accountId: input.accountId,
+        modelId: input.modelId,
+      },
+      artifact: this.#artifact,
+    });
   }
 }

@@ -163,6 +163,7 @@ describe("managed OMP runtime preflight and preparation", () => {
     expect(models).toContain(selectedVars[0]![0]);
     expect(JSON.parse(policy)).toMatchObject({
       retry: { enabled: false }, mcp: { enableProjectConfig: false },
+      fetch: { enabled: false },
       startup: { setupWizard: false, checkUpdate: false, showSplash: false },
       tools: { approvalMode: "always-ask", approval: { task: "deny", eval: "deny", browser: "deny", computer: "deny" } },
     });
@@ -209,6 +210,15 @@ describe("managed OMP runtime preflight and preparation", () => {
   it.each([
     [".omp/config.yml", '{"speechgen":{"enabled":true},"tools":{"approval":{"tts":"allow"}}}'],
     [".omp/config.yml", "["],
+    [".env", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.local", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.development", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.development.local", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.production", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.production.local", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.test", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.test.local", "OMP_TEST_SECRET=must-not-be-loaded"],
+    [".env.staging.local", "OMP_TEST_SECRET=must-not-be-loaded"],
     [".omp/settings.json", '{"tools":{"approval":{"tts":"allow"}}}'],
     [".claude/settings.json", "{}"],
     [".claude/settings.local.json", "{}"],

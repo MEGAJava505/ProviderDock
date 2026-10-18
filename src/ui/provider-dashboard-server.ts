@@ -8,8 +8,9 @@ import {
 import type { AddressInfo } from "node:net";
 import { z } from "zod";
 import type { ProviderDockApplication } from "../application/provider-dock-application.js";
-import type { OmpLaunchInput, OmpLaunchResult } from "../application/omp-launch-service.js";
+import type { OmpLaunchInput, OmpLaunchResult, OmpRoutePreviewInput } from "../application/omp-launch-service.js";
 import type { OmpPreflightResult } from "../clients/omp/omp-runtime.js";
+import type { OmpRouteReadinessPreview } from "../migration/omp-route-readiness-preview.js";
 import type { OmpRunRecord } from "../clients/omp/omp-run-repository.js";
 import { agentApprovalLevels, type AgentApprovalLevel } from "../clients/agent-approval.js";
 import type { FallbackNotification } from "../core/fallback/fallback-session-router.js";
@@ -27,7 +28,8 @@ import {
   summarizeProviderSurfaces,
 } from "../core/health/provider-health-repository.js";
 import { PortalRepositoryCorruptionError } from "../core/portals/portal-repository.js";
-import { CredentialManagerError } from "../core/security/credential-manager.js";
+import { CredentialManagerError, type CredentialSummary } from "../core/security/credential-manager.js";
+import { credentialPurposeSchema } from "../core/security/credential-repository.js";
 import {
   portalAdapterIdForSite,
   portalConnectionSchema,
@@ -96,11 +98,20 @@ export type ProviderDashboardApplication = Pick<
   | "launchLogicalModelAutomatic"
   | "launchPromptProfileAutomatic"
   | "launchProjectProfileAutomatic"
-> & Partial<Pick<ProviderDockApplication, "listCredentials" | "listManagedSecretReferences" | "addCredential" | "restoreProviderPortalIfUnchanged">>;
+> & Partial<Pick<ProviderDockApplication,
+  | "listCredentials"
+  | "listManagedSecretReferences"
+  | "addCredential"
+  | "activateCredential"
+  | "removeCredential"
+  | "restoreProviderPortalIfUnchanged"
+>>;
 
 export interface ProviderDashboardOmpLauncher {
   preflight(input: OmpLaunchInput): Promise<OmpPreflightResult>;
   launch(input: OmpLaunchInput): Promise<OmpLaunchResult>;
+  /** Read-only route explanation; requires no acknowledgement and never launches. */
+  preview(input: OmpRoutePreviewInput): Promise<OmpRouteReadinessPreview>;
   listRuns(): Promise<readonly OmpRunRecord[]>;
   cancel(runId: string): Promise<OmpRunRecord | undefined>;
   reconcileAfterRestart(): Promise<readonly OmpRunRecord[]>;
@@ -240,6 +251,57 @@ const ompLaunchRequestSchema = z
   .strict();
 
 export type ProviderDashboardOmpLaunchRequest = z.infer<typeof ompLaunchRequestSchema>;
+
+/**
+ * Preview accepts only the explicit route identity. It deliberately omits
+ * projectDirectory, any credential value, an acknowledgement, or a browser-built
+ * decision; `.strict()` rejects any of those if a client tries to smuggle them in.
+ */
+const ompPreviewRequestSchema = z
+  .object({
+    providerId: z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
+    modelId: z.string().trim().min(1).max(256),
+    accountId: z.string().trim().min(1).max(256),
+  })
+  .strict();
+
+export type ProviderDashboardOmpPreviewRequest = z.infer<typeof ompPreviewRequestSchema>;
+
+/**
+ * Credential mutation requests. Every schema is `.strict()`, so a client cannot
+ * smuggle a raw `secretRef`, `projectDirectory`, backup path, or any other field:
+ * add carries a purpose-scoped provider id and the plaintext value (the ONLY
+ * endpoint where a value is accepted, handed straight to the manager and never
+ * echoed back); activate/remove carry identifiers only, never a value.
+ */
+const credentialProviderIdSchema = z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/);
+
+const addCredentialRequestSchema = z
+  .object({
+    providerId: credentialProviderIdSchema,
+    purpose: credentialPurposeSchema,
+    // Mirrors the credential manager's own value limit; the manager re-validates.
+    value: z.string().min(1).max(64 * 1024),
+    label: z.string().trim().min(1).max(128).optional(),
+    activate: z.boolean().optional(),
+  })
+  .strict();
+
+const activateCredentialRequestSchema = z
+  .object({
+    providerId: credentialProviderIdSchema,
+    purpose: credentialPurposeSchema,
+    credentialId: z.string().uuid(),
+  })
+  .strict();
+
+const removeCredentialRequestSchema = z
+  .object({
+    providerId: credentialProviderIdSchema,
+    credentialId: z.string().uuid(),
+    purpose: credentialPurposeSchema.optional(),
+  })
+  .strict();
 
 export type ProviderDashboardLaunchStatus = "STARTING" | "RUNNING" | "EXITED" | "FAILED";
 
@@ -523,6 +585,19 @@ export class ProviderDashboardServer {
       );
       const result = await ompLauncher.preflight(input);
       sendJson(response, 200, { result: projectOmpPreflight(result) });
+      return;
+    }
+    if (path === "/api/omp/preview") {
+      if (request.method !== "POST") {
+        methodNotAllowed(response, "POST");
+        return;
+      }
+      const ompLauncher = this.requireOmpLauncher();
+      const input = ompPreviewRequestSchema.parse(
+        await readJsonBody(request, this.requestBodyLimitBytes),
+      );
+      const preview = await ompLauncher.preview(input);
+      sendJson(response, 200, { preview: projectOmpRoutePreview(preview) });
       return;
     }
     if (path === "/api/omp/launch") {
@@ -875,6 +950,66 @@ export class ProviderDashboardServer {
       await this.application.removePromptProfile(
         decodePathSegment(promptProfileResource[1] as string),
       );
+      sendJson(response, 200, { removed: true });
+      return;
+    }
+
+    if (path === "/api/credentials/add") {
+      if (request.method !== "POST") {
+        methodNotAllowed(response, "POST");
+        return;
+      }
+      if (this.application.addCredential === undefined) {
+        throw new DashboardRequestError(501, "CREDENTIAL_MANAGER_UNAVAILABLE", "Credential manager is not configured.");
+      }
+      const input = addCredentialRequestSchema.parse(
+        await readJsonBody(request, this.requestBodyLimitBytes),
+      );
+      // The plaintext value is forwarded to the manager and never returned; the
+      // response and every snapshot carry only id/mask/state.
+      const credential = await this.application.addCredential({
+        providerId: input.providerId,
+        purpose: input.purpose,
+        value: input.value,
+        ...(input.label === undefined ? {} : { label: input.label }),
+        ...(input.activate === undefined ? {} : { activate: input.activate }),
+      });
+      sendJson(response, 200, { credential: projectCredentialSummary(credential) });
+      return;
+    }
+    if (path === "/api/credentials/activate") {
+      if (request.method !== "POST") {
+        methodNotAllowed(response, "POST");
+        return;
+      }
+      if (this.application.activateCredential === undefined) {
+        throw new DashboardRequestError(501, "CREDENTIAL_MANAGER_UNAVAILABLE", "Credential manager is not configured.");
+      }
+      const input = activateCredentialRequestSchema.parse(
+        await readJsonBody(request, this.requestBodyLimitBytes),
+      );
+      // Switching the active provider-api key invalidates stale Doctor evidence at
+      // the application layer, so OMP preview/preflight stop trusting the old key.
+      const credential = await this.application.activateCredential(
+        input.providerId, input.purpose, input.credentialId,
+      );
+      sendJson(response, 200, { credential: projectCredentialSummary(credential) });
+      return;
+    }
+    if (path === "/api/credentials/remove") {
+      if (request.method !== "POST") {
+        methodNotAllowed(response, "POST");
+        return;
+      }
+      if (this.application.removeCredential === undefined) {
+        throw new DashboardRequestError(501, "CREDENTIAL_MANAGER_UNAVAILABLE", "Credential manager is not configured.");
+      }
+      const input = removeCredentialRequestSchema.parse(
+        await readJsonBody(request, this.requestBodyLimitBytes),
+      );
+      // The manager rejects removing an active or referenced credential
+      // (ACTIVE_REFERENCE) so an in-use rollback key cannot be dropped.
+      await this.application.removeCredential(input.providerId, input.credentialId, input.purpose);
       sendJson(response, 200, { removed: true });
       return;
     }
@@ -1329,6 +1464,49 @@ function projectOmpLaunch(result: OmpLaunchResult): OmpLaunchResult {
     ok: false,
     runId: result.runId,
     diagnostic: sanitizeOperationDiagnostic(result.diagnostic),
+  };
+}
+
+/**
+ * Allowlist copy of a credential summary. Only non-secret identifiers, the mask,
+ * and lifecycle state cross the wire; the plaintext value and the underlying
+ * secretRef never appear. Copying field-by-field keeps any future summary field
+ * server-side until it is deliberately shipped.
+ */
+function projectCredentialSummary(credential: CredentialSummary): CredentialSummary {
+  return {
+    id: credential.id,
+    providerId: credential.providerId,
+    purpose: credential.purpose,
+    maskedValue: credential.maskedValue,
+    state: credential.state,
+    createdAt: credential.createdAt,
+    ...(credential.label === undefined ? {} : { label: credential.label }),
+    ...(credential.lastUsedAt === undefined ? {} : { lastUsedAt: credential.lastUsedAt }),
+  };
+}
+
+/**
+ * Explicit allowlist copy of the readiness preview. The builder already emits a
+ * content-free view (codes only), and copying field-by-field guarantees that any
+ * future addition to the preview type stays server-side until deliberately shipped.
+ */
+function projectOmpRoutePreview(preview: OmpRouteReadinessPreview): OmpRouteReadinessPreview {
+  return {
+    selection: {
+      providerId: preview.selection.providerId,
+      accountId: preview.selection.accountId,
+      modelId: preview.selection.modelId,
+    },
+    verdict: preview.verdict,
+    reason: preview.reason,
+    evidenceTier: preview.evidenceTier,
+    chain: preview.chain.map((entry) => ({
+      node: entry.node, state: entry.state, reason: entry.reason,
+    })),
+    autoFallback: preview.autoFallback,
+    loopbackSmokeIsUpstreamPass: preview.loopbackSmokeIsUpstreamPass,
+    recommendedAction: preview.recommendedAction,
   };
 }
 

@@ -498,12 +498,31 @@ describe("OMP run input boundary", () => {
       { accountId: " \t" }, { modelId: "DO-NOT-REPORT\0" }, { modelId: "x".repeat(1025) },
       { projectDirectory: "relative/DO-NOT-REPORT" }, { mode: "DO-NOT-REPORT" },
       { argv: ["DO-NOT-REPORT"] }, { environment: { TOKEN: "DO-NOT-REPORT" } },
-      { stdout: "DO-NOT-REPORT" }, { runId: missingId }, { state: "READY" },
+      { stdout: "DO-NOT-REPORT" }, { runId: "DO-NOT-REPORT" }, { runId: `${missingId}:secret` }, { state: "READY" },
     ]) {
       await expect(repository.create({ ...input, ...patch } as OmpRunCreateInput))
         .rejects.toThrow(/OMP_RUN_/);
     }
     expect(await repository.list()).toEqual([]);
+  });
+
+  it("accepts a valid caller-supplied runId, persists it as the record id, and fails closed on a colliding id", async () => {
+    const { repository, directory, input } = await fixture();
+    // The supervisor pre-generates the runId so it can register ownership before the record is
+    // published; a supplied valid UUID is honoured as both the record id and its on-disk filename.
+    const created = await repository.create({ ...input, runId: missingId });
+    expect(created.runId).toBe(missingId);
+    expect(created.state).toBe("VALIDATING");
+    expect(JSON.parse(await fs.readFile(join(directory, `${missingId}.json`), "utf8")).runId).toBe(missingId);
+    expect((await repository.get(missingId))?.runId).toBe(missingId);
+    // The write() overwrite guard is the collision defence: a second create for the same id must
+    // fail closed rather than clobber the first run's record.
+    await expect(repository.create({ ...input, runId: missingId })).rejects.toThrow(/^OMP_RUN_/);
+    expect(JSON.parse(await fs.readFile(join(directory, `${missingId}.json`), "utf8")).runId).toBe(missingId);
+    // Omitting runId still mints an independent id, so existing callers are unaffected.
+    const minted = await repository.create(input);
+    expect(minted.runId).not.toBe(missingId);
+    expect((await repository.list()).map((run) => run.runId).sort()).toEqual([missingId, minted.runId].sort());
   });
 
   it("rejects invalid details without silently storing or dropping arbitrary fields", async () => {

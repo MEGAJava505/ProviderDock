@@ -1,4 +1,5 @@
-import { mkdtemp, unlink } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -29,7 +30,11 @@ import {
   type CodexLauncher,
 } from "../src/index.js";
 import { ApplicationCredentialBindings } from "../src/core/security/credential-bindings.js";
-import { MemoryPortalRepository } from "../src/core/portals/portal-repository.js";
+import {
+  FilePortalRepository,
+  MemoryPortalRepository,
+  PortalRepositoryCorruptionError,
+} from "../src/core/portals/portal-repository.js";
 
 describe("ProviderDockApplication", () => {
   it("supports provider set, get, list, and remove", async () => {
@@ -1019,6 +1024,319 @@ describe("ApplicationCredentialBindings", () => {
     await expect(application.listManagedSecretReferences())
       .rejects.toMatchObject({ code: "UNAVAILABLE" });
   });
+
+  it("keeps the rotated-out provider key available for rollback and refuses to drop the active one", async () => {
+    const profiles = new MemoryProviderProfileRepository();
+    const portals = new MemoryPortalRepository();
+    const secrets = new MemorySecretStore();
+    const health = new MemoryProviderHealthRepository();
+    await profiles.upsert({
+      id: "fixture",
+      displayName: "Fixture",
+      baseUrl: "https://inference.invalid/v1",
+      auth: { kind: "bearer", secretRef: "SEED_API" },
+    });
+    const manager = new CredentialManager({
+      secrets,
+      metadata: new MemoryCredentialMetadataRepository(),
+      bindings: new ApplicationCredentialBindings(profiles, portals),
+    });
+    const application = new ProviderDockApplication(
+      profiles, new ProviderProbeService(new ProviderAdapterRegistry()),
+      secrets, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      health, undefined, undefined, undefined, undefined, undefined, undefined, manager,
+    );
+
+    const first = await application.addCredential({
+      providerId: "fixture", purpose: "provider-api", value: "rollback-key-one", label: "first", activate: true,
+    });
+    const second = await application.addCredential({
+      providerId: "fixture", purpose: "provider-api", value: "rollback-key-two", label: "second", activate: true,
+    });
+    expect(first.maskedValue).not.toBe(second.maskedValue);
+
+    // Rotation keeps both keys of the same provider: the new one active, the prior one retained for rollback.
+    const afterRotation = await application.listCredentials("fixture", "provider-api");
+    expect(afterRotation).toHaveLength(2);
+    expect(afterRotation.find((entry) => entry.id === first.id)?.state).toBe("available");
+    expect(afterRotation.find((entry) => entry.id === second.id)?.state).toBe("active");
+
+    // The active (in-use) credential cannot be removed.
+    await expect(application.removeCredential("fixture", second.id, "provider-api"))
+      .rejects.toMatchObject({ code: "ACTIVE_REFERENCE" });
+
+    // Explicitly re-activating the retained key rolls back the active binding.
+    const rolledBack = await application.activateCredential("fixture", "provider-api", first.id);
+    expect(rolledBack.state).toBe("active");
+    const afterRollback = await application.listCredentials("fixture", "provider-api");
+    expect(afterRollback.find((entry) => entry.id === first.id)?.state).toBe("active");
+    expect(afterRollback.find((entry) => entry.id === second.id)?.state).toBe("available");
+
+    // Once it is no longer active or referenced, the rotated-out key can be dropped.
+    await application.removeCredential("fixture", second.id, "provider-api");
+    const afterRemoval = await application.listCredentials("fixture", "provider-api");
+    expect(afterRemoval).toHaveLength(1);
+    expect(afterRemoval[0]?.id).toBe(first.id);
+    expect(afterRemoval[0]?.state).toBe("active");
+  });
+
+  it("refuses to delete an unavailable credential while the portal catalog is corrupt, revealing no path", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const profiles = new MemoryProviderProfileRepository();
+    const portals = new FilePortalRepository(catalogPath);
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "portal-session-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(),
+      providerId: "fixture",
+      purpose: "portal-session",
+      secretRef,
+      maskedValue: "unavailable",
+      state: "unavailable",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const manager = new CredentialManager({
+      secrets,
+      metadata,
+      bindings: new ApplicationCredentialBindings(profiles, portals),
+    });
+    const before = await readFile(catalogPath, "utf8");
+
+    // The destructive check is fail-closed: an unreadable catalog means "usage unknown", never "unused".
+    const rejection = await manager
+      .remove("fixture", record.id, "portal-session")
+      .then(() => undefined, (error: unknown) => error);
+    expect(rejection).toMatchObject({ code: "CONFLICT" });
+    const message = (rejection as { message: string }).message;
+    expect(message).toBe(
+      "Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    );
+    expect(message).not.toContain(catalogPath);
+
+    // Nothing was deleted: ciphertext, metadata record, and the catalog bytes are all intact.
+    expect(await secrets.get(secretRef)).toBe("portal-session-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+    expect(await readFile(catalogPath, "utf8")).toBe(before);
+  });
+  it("stays fail-closed for an available, unreferenced provider-api key while the catalog is corrupt", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const portals = new FilePortalRepository(catalogPath);
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "provider-api-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(),
+      providerId: "fixture",
+      purpose: "provider-api",
+      secretRef,
+      maskedValue: "pro…text",
+      state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const manager = new CredentialManager({
+      secrets,
+      metadata,
+      bindings: new ApplicationCredentialBindings(new MemoryProviderProfileRepository(), portals),
+    });
+
+    // Even an available, profile-unreferenced key cannot be confirmed unused while the catalog is unreadable.
+    await expect(manager.remove("fixture", record.id, "provider-api"))
+      .rejects.toMatchObject({ code: "CONFLICT" });
+    expect(await secrets.get(secretRef)).toBe("provider-api-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+  it("still reports a known profile reference as true (not an error) when the catalog is corrupt", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const profiles = new MemoryProviderProfileRepository();
+    await profiles.upsert({
+      id: "fixture",
+      displayName: "Fixture",
+      baseUrl: "https://inference.invalid/v1",
+      auth: { kind: "bearer", secretRef: "PROFILE_API" },
+    });
+    const bindings = new ApplicationCredentialBindings(profiles, new FilePortalRepository(catalogPath));
+
+    // Profiles are enumerated first, so a known reference short-circuits before the corrupt catalog is read.
+    expect(await bindings.isReferenced("PROFILE_API")).toBe(true);
+
+    // Through the manager a known reference is refused as ACTIVE_REFERENCE, never masked into CONFLICT.
+    const secrets = new MemorySecretStore({ PROFILE_API: "profile-api-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(),
+      providerId: "fixture",
+      purpose: "provider-api",
+      secretRef: "PROFILE_API",
+      maskedValue: "pro…text",
+      state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const manager = new CredentialManager({ secrets, metadata, bindings });
+    await expect(manager.remove("fixture", record.id, "provider-api"))
+      .rejects.toMatchObject({ code: "ACTIVE_REFERENCE" });
+    expect(await secrets.get("PROFILE_API")).toBe("profile-api-ciphertext");
+  });
+  it("keeps provider API bindings readable through the tolerant list() when the catalog is corrupt", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const profiles = new MemoryProviderProfileRepository();
+    await profiles.upsert({
+      id: "fixture",
+      displayName: "Fixture",
+      baseUrl: "https://inference.invalid/v1",
+      auth: { kind: "bearer", secretRef: "API_REF" },
+    });
+    const portals = new FilePortalRepository(catalogPath);
+    const bindings = new ApplicationCredentialBindings(profiles, portals);
+
+    // The corruption is real: a direct portal read throws.
+    await expect(portals.list()).rejects.toBeInstanceOf(PortalRepositoryCorruptionError);
+    // Yet the non-destructive read path stays tolerant and still surfaces the provider API binding.
+    expect(await bindings.list()).toEqual([
+      { providerId: "fixture", purpose: "provider-api", secretRef: "API_REF" },
+    ]);
+  });
+
+  it("propagates the fail-closed CONFLICT through application.removeCredential when the catalog is corrupt", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const profiles = new MemoryProviderProfileRepository();
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "app-portal-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "portal-session",
+      secretRef, maskedValue: "app…sess", state: "unavailable",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const manager = new CredentialManager({
+      secrets, metadata,
+      bindings: new ApplicationCredentialBindings(profiles, new FilePortalRepository(catalogPath)),
+    });
+    const application = new ProviderDockApplication(
+      profiles, new ProviderProbeService(new ProviderAdapterRegistry()),
+      secrets, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined, manager,
+    );
+    const before = await readFile(catalogPath, "utf8");
+
+    // The application forwards the manager's fail-closed guard verbatim: usage-unknown, never usage-none.
+    const rejection = await application
+      .removeCredential("fixture", record.id, "portal-session")
+      .then(() => undefined, (error: unknown) => error);
+    expect(rejection).toMatchObject({ code: "CONFLICT" });
+    expect((rejection as { message: string }).message).toBe(
+      "Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    );
+    expect((rejection as { message: string }).message).not.toContain(catalogPath);
+
+    // Nothing was deleted: ciphertext, metadata record, and the catalog bytes are all intact.
+    expect(await secrets.get(secretRef)).toBe("app-portal-ciphertext-canary");
+    expect(await metadata.get(record.id)).toBeDefined();
+    expect(await readFile(catalogPath, "utf8")).toBe(before);
+  });
+
+  it("fails closed to CONFLICT (not a raw error) when the portal catalog path is an unreadable directory", async () => {
+    // The reviewer's reopened defect: a portal catalog that is a directory yields a raw EISDIR, which
+    // previously propagated instead of the fixed CONFLICT — so removal could reject unhandled.
+    const catalogPath = await makeUnreadableStorePath("portals.json");
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "eisdir-portal-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "portal-session",
+      secretRef, maskedValue: "eis…sess", state: "unavailable",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const manager = new CredentialManager({
+      secrets, metadata,
+      bindings: new ApplicationCredentialBindings(
+        new MemoryProviderProfileRepository(), new FilePortalRepository(catalogPath),
+      ),
+    });
+
+    const rejection = await manager
+      .remove("fixture", record.id, "portal-session")
+      .then(() => undefined, (error: unknown) => error);
+    expect(rejection).toMatchObject({ code: "CONFLICT" });
+    const message = (rejection as { message: string }).message;
+    expect(message).toBe(
+      "Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    );
+    expect(message).not.toContain(catalogPath);
+
+    // Nothing was deleted: the fail-closed guard runs before any vault/metadata mutation.
+    expect(await secrets.get(secretRef)).toBe("eisdir-portal-ciphertext-canary");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+
+  it("projects an EACCES portal-seam fault to a fixed cause, never leaking its path or canary", async () => {
+    const seamCanary = `portal-seam-canary-${randomUUID()}`;
+    const rawPath = `C:\\fake\\master-keys\\${seamCanary}\\portals.json`;
+    const failure = Object.assign(new Error(`EACCES: permission denied, open '${rawPath}'`), { code: "EACCES" });
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "eacces-portal-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "portal-session",
+      secretRef, maskedValue: "eac…sess", state: "unavailable",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const manager = new CredentialManager({
+      secrets, metadata,
+      bindings: new ApplicationCredentialBindings(
+        new MemoryProviderProfileRepository(), throwingPortalRepository(failure),
+      ),
+    });
+
+    const rejection = await manager
+      .remove("fixture", record.id, "portal-session")
+      .then(() => undefined, (error: unknown) => error);
+    expect(rejection).toMatchObject({ code: "CONFLICT" });
+    const message = (rejection as { message: string }).message;
+    expect(message).toBe(
+      "Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    );
+    expect(message).not.toContain(seamCanary);
+    expect(message).not.toContain(rawPath);
+    expect(await secrets.get(secretRef)).toBe("eacces-portal-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+
+  it("pins a profile-read failure separately: EIO on the provider store fails closed before the portal read", async () => {
+    const seamCanary = `profile-seam-canary-${randomUUID()}`;
+    const rawPath = `C:\\fake\\home\\${seamCanary}\\providers.json`;
+    const failure = Object.assign(new Error(`EIO: i/o error, read '${rawPath}'`), { code: "EIO" });
+    // If the portal read were (wrongly) reached, it would surface this distinct marker instead.
+    const portalCanary = `portal-should-not-be-read-${randomUUID()}`;
+    const portals = throwingPortalRepository(new Error(portalCanary));
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "profile-eio-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "provider-api",
+      secretRef, maskedValue: "eio…api", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const manager = new CredentialManager({
+      secrets, metadata,
+      bindings: new ApplicationCredentialBindings(throwingProfileRepository(failure), portals),
+    });
+
+    const rejection = await manager
+      .remove("fixture", record.id, "provider-api")
+      .then(() => undefined, (error: unknown) => error);
+    expect(rejection).toMatchObject({ code: "CONFLICT" });
+    const message = (rejection as { message: string }).message;
+    // The provider-store cause is distinct from the catalog cause: the failure is pinned to the profile read.
+    expect(message).toBe(
+      "Использование ключа невозможно проверить, пока список провайдеров недоступен; сначала восстановите хранилище.",
+    );
+    expect(message).not.toContain(seamCanary);
+    expect(message).not.toContain(rawPath);
+    expect(message).not.toContain(portalCanary);
+    expect(await secrets.get(secretRef)).toBe("profile-eio-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
 });
 
 function createApplication(): ProviderDockApplication {
@@ -1026,4 +1344,36 @@ function createApplication(): ProviderDockApplication {
     new MemoryProviderProfileRepository(),
     new ProviderProbeService(new ProviderAdapterRegistry()),
   );
+}
+
+// A portal catalog of raw NUL bytes: unparseable JSON, so FilePortalRepository.list() fails
+// closed with a PortalRepositoryCorruptionError instead of returning records.
+async function makeCorruptPortalCatalog(): Promise<string> {
+  const path = join(await mkdtemp(join(tmpdir(), "provider-dock-portal-corrupt-")), "portals.json");
+  await writeFile(path, "\u0000\u0000\u0000", { encoding: "utf8" });
+  return path;
+}
+
+// A store path that is actually a directory: reading it as a file fails with a raw EISDIR. It stands
+// in for any read isReferenced cannot finish (a directory where a file was expected, a permission or
+// I/O fault) — the reference-check must fail-closed to CONFLICT rather than propagate the raw error.
+async function makeUnreadableStorePath(basename: string): Promise<string> {
+  const path = join(await mkdtemp(join(tmpdir(), "provider-dock-unreadable-")), basename);
+  await mkdir(path);
+  return path;
+}
+
+// A portal repository whose destructive-seam read rejects with the given raw error (its message may
+// embed a file path or canary). Used to prove isReferenced projects one fixed, secret-free cause.
+function throwingPortalRepository(failure: Error): MemoryPortalRepository {
+  const portals = new MemoryPortalRepository();
+  portals.list = async () => { throw failure; };
+  return portals;
+}
+
+// A provider-profile repository whose read rejects; pins the profile-read failure independently.
+function throwingProfileRepository(failure: Error): MemoryProviderProfileRepository {
+  const profiles = new MemoryProviderProfileRepository();
+  profiles.list = async () => { throw failure; };
+  return profiles;
 }

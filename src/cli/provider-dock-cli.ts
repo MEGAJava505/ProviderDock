@@ -60,9 +60,10 @@ import {
 import { ProviderDashboardServer } from "../ui/provider-dashboard-server.js";
 import { openDashboardInBrowser } from "../ui/open-dashboard-browser.js";
 import { providerErrorGuidance } from "../core/errors/provider-error.js";
-import type { OmpLaunchInput, OmpLaunchResult } from "../application/omp-launch-service.js";
+import type { OmpLaunchInput, OmpLaunchResult, OmpRoutePreviewInput } from "../application/omp-launch-service.js";
 import type { OmpPreflightResult } from "../clients/omp/omp-runtime.js";
 import type { OmpRunRecord } from "../clients/omp/omp-run-repository.js";
+import type { OmpRouteReadinessPreview } from "../migration/omp-route-readiness-preview.js";
 import { sanitizeOperationDiagnostic } from "../core/errors/operation-diagnostic.js";
 import {
   CredentialManagerError,
@@ -87,6 +88,7 @@ export interface RunProviderDockCliOptions {
 export interface ProviderDockOmpLauncher {
   preflight(input: OmpLaunchInput): Promise<OmpPreflightResult>;
   launch(input: OmpLaunchInput): Promise<OmpLaunchResult>;
+  preview(input: OmpRoutePreviewInput): Promise<OmpRouteReadinessPreview>;
   listRuns(): Promise<readonly OmpRunRecord[]>;
   cancel(runId: string): Promise<OmpRunRecord | undefined>;
   reconcileAfterRestart(): Promise<readonly OmpRunRecord[]>;}

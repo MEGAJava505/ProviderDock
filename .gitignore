@@ -1,5 +1,8 @@
 node_modules/
 dist/
+.dist-staging/
+.dist-prev/
+.dist-build.lock
 coverage/
 .scratch/
 .env
@@ -10,6 +13,7 @@ coverage/
 *.pdv.*.tmp
 *.log
 .provider-dock/
+/m10-output/
 .DS_Store
 Thumbs.db
 

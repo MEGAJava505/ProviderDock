@@ -3,8 +3,26 @@ import type { AutomaticLaunchResult } from "../src/application/provider-dock-app
 import type { ProviderProfile } from "../src/core/providers/provider-profile.js";
 import type { ProviderDashboardApplication } from "../src/ui/provider-dashboard-server.js";
 import { ProviderDashboardServer } from "../src/ui/provider-dashboard-server.js";
-import { PortalRepositoryCorruptionError } from "../src/core/portals/portal-repository.js";
+import {
+  FilePortalRepository,
+  MemoryPortalRepository,
+  PortalRepositoryCorruptionError,
+} from "../src/core/portals/portal-repository.js";
 import { CredentialManagerError } from "../src/core/security/credential-manager.js";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  CredentialManager,
+  MemoryCredentialMetadataRepository,
+  MemoryProviderProfileRepository,
+  MemorySecretStore,
+  ProviderAdapterRegistry,
+  ProviderDockApplication,
+  ProviderProbeService,
+} from "../src/index.js";
+import { ApplicationCredentialBindings } from "../src/core/security/credential-bindings.js";
 import {
   providerDashboardCss,
   providerDashboardHtml,
@@ -720,6 +738,219 @@ describe("ProviderDashboardServer", () => {
   });
 });
 
+describe("managed credential endpoints", () => {
+  const credentialId = "00000000-0000-4000-8000-000000000001";
+  const summary = {
+    id: credentialId,
+    providerId: "provider-a",
+    purpose: "provider-api" as const,
+    label: "main",
+    maskedValue: "sec…et99",
+    state: "active" as const,
+    createdAt: "2026-08-30T12:00:00.000Z",
+  };
+
+  it("adds a provider key, returns only its mask, and forwards the value once", async () => {
+    const addCredential = vi.fn(async () => summary);
+    const server = createServer(createApplication({ addCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/add`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerId: "provider-a", purpose: "provider-api",
+        value: "super-secret-add-canary", label: "main", activate: true,
+      }),
+    });
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.credential).toMatchObject({ id: credentialId, maskedValue: "sec…et99", state: "active" });
+    expect(body.credential).not.toHaveProperty("value");
+    expect(JSON.stringify(body)).not.toContain("super-secret-add-canary");
+    expect(addCredential).toHaveBeenCalledWith(expect.objectContaining({
+      providerId: "provider-a", purpose: "provider-api",
+      value: "super-secret-add-canary", label: "main", activate: true,
+    }));
+  });
+
+  it("rejects an add request that smuggles route or secret-reference fields", async () => {
+    const addCredential = vi.fn(async () => summary);
+    const server = createServer(createApplication({ addCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/add`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerId: "provider-a", purpose: "provider-api", value: "v",
+        secretRef: "OTHER_KEY", projectDirectory: "E:\\x", decision: {},
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe("INVALID_REQUEST");
+    expect(addCredential).not.toHaveBeenCalled();
+  });
+  it("answers 501 when no credential manager is configured", async () => {
+    const server = createServer(createApplication());
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/add`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", value: "v" }),
+    });
+    expect(response.status).toBe(501);
+    expect((await response.json()).code).toBe("CREDENTIAL_MANAGER_UNAVAILABLE");
+  });
+
+  it("rejects an unknown credential purpose", async () => {
+    const addCredential = vi.fn(async () => summary);
+    const server = createServer(createApplication({ addCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/add`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "root", value: "v" }),
+    });
+    expect(response.status).toBe(400);
+    expect(addCredential).not.toHaveBeenCalled();
+  });
+
+  it("accepts a portal-session credential as a distinct purpose", async () => {
+    const addCredential = vi.fn(async () => ({ ...summary, purpose: "portal-session" as const }));
+    const server = createServer(createApplication({ addCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/add`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "portal-session", value: "cookie-value" }),
+    });
+    expect(response.status).toBe(200);
+    expect(addCredential).toHaveBeenCalledWith(expect.objectContaining({ purpose: "portal-session" }));
+    expect((await response.json()).credential.purpose).toBe("portal-session");
+  });
+
+  it("activates a stored credential and returns its mask", async () => {
+    const activateCredential = vi.fn(async () => summary);
+    const server = createServer(createApplication({ activateCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/activate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId }),
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).credential.maskedValue).toBe("sec…et99");
+    expect(activateCredential).toHaveBeenCalledWith("provider-a", "provider-api", credentialId);
+  });
+  it("does not let an activate request smuggle a new secret value", async () => {
+    const activateCredential = vi.fn(async () => summary);
+    const server = createServer(createApplication({ activateCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/activate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerId: "provider-a", purpose: "provider-api", credentialId, value: "sneaky",
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect(activateCredential).not.toHaveBeenCalled();
+  });
+
+  it("maps a not-found activation to 400 without leaking internals", async () => {
+    const activateCredential = vi.fn(async () => {
+      throw new CredentialManagerError("NOT_FOUND", "No such credential.");
+    });
+    const server = createServer(createApplication({ activateCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/activate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId }),
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe("CREDENTIAL_NOT_FOUND");
+  });
+
+  it("rejects a malformed credential id", async () => {
+    const activateCredential = vi.fn(async () => summary);
+    const server = createServer(createApplication({ activateCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/activate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId: "not-a-uuid" }),
+    });
+    expect(response.status).toBe(400);
+    expect(activateCredential).not.toHaveBeenCalled();
+  });
+
+  it("removes an inactive credential", async () => {
+    const removeCredential = vi.fn(async () => undefined);
+    const server = createServer(createApplication({ removeCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ removed: true });
+    expect(removeCredential).toHaveBeenCalledWith("provider-a", credentialId, "provider-api");
+  });
+  it("refuses to remove an active or in-use credential", async () => {
+    const removeCredential = vi.fn(async () => {
+      throw new CredentialManagerError(
+        "ACTIVE_REFERENCE", "An active or referenced credential cannot be removed.",
+      );
+    });
+    const server = createServer(createApplication({ removeCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId }),
+    });
+    expect(response.status).toBe(409);
+    expect((await response.json()).code).toBe("CREDENTIAL_ACTIVE_REFERENCE");
+  });
+
+  it("does not let a remove request carry a secret value", async () => {
+    const removeCredential = vi.fn(async () => undefined);
+    const server = createServer(createApplication({ removeCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", credentialId, value: "x" }),
+    });
+    expect(response.status).toBe(400);
+    expect(removeCredential).not.toHaveBeenCalled();
+  });
+
+  it("surfaces an unavailable vault instead of failing silently", async () => {
+    const addCredential = vi.fn(async () => {
+      throw new CredentialManagerError("UNAVAILABLE", "The secret vault is unavailable.");
+    });
+    const server = createServer(createApplication({ addCredential }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/add`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", value: "v" }),
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe("CREDENTIAL_UNAVAILABLE");
+  });
+
+  it("rejects non-POST verbs on credential endpoints", async () => {
+    const server = createServer(createApplication({ addCredential: vi.fn(async () => summary) }));
+    const address = await server.start();
+    const response = await fetch(`${address.url}api/credentials/add`);
+    expect(response.status).toBe(405);
+  });
+
+});
+
 function createServer(
   application: ProviderDashboardApplication,
 ): ProviderDashboardServer {
@@ -922,10 +1153,264 @@ describe("dashboard launch history layout", () => {
     expect(providerDashboardHtml).toContain('id="launch-history"');
     expect(providerDashboardJavaScript).toContain("agentSessionHistoryView");
     expect(providerDashboardJavaScript).toContain(
-      "byId('launch-provider').addEventListener('change',()=>{renderModelOptions();renderAgentSessions()})",
+      "byId('launch-provider').addEventListener('change',()=>{invalidateOmpEvidence();renderModelOptions();renderAgentSessions()})",
     );
     expect(providerDashboardJavaScript).toMatch(
       /function setRouteKind\([\s\S]*?renderAgentSessions\(\)/,
     );
   });
 });
+
+describe("credential removal guard over real HTTP", () => {
+  it("answers 409 CREDENTIAL_CONFLICT with a stable, secret-free cause and deletes nothing when the catalog is corrupt", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "http-portal-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "provider-a", purpose: "portal-session",
+      secretRef, maskedValue: "htt…sess", state: "unavailable",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const server = createServer(buildCredentialApplication({ secrets, metadata, catalogPath }));
+    const address = await server.start();
+    const before = await readFile(catalogPath, "utf8");
+
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: `http://${address.host}:${address.port}` },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "portal-session", credentialId: record.id }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("CREDENTIAL_CONFLICT");
+    expect(body.message).toBe(
+      "Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    );
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain(catalogPath);
+    expect(serialized).not.toContain("http-portal-ciphertext-canary");
+    expect(await secrets.get(secretRef)).toBe("http-portal-ciphertext-canary");
+    expect(await metadata.get(record.id)).toBeDefined();
+    expect(await readFile(catalogPath, "utf8")).toBe(before);
+  });
+
+  it("still maps a known active reference to 409 CREDENTIAL_ACTIVE_REFERENCE, keeping the ciphertext", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const profiles = new MemoryProviderProfileRepository();
+    await profiles.upsert({
+      id: "provider-a", displayName: "Provider A",
+      baseUrl: "https://provider.example/v1",
+      auth: { kind: "bearer", secretRef: "HTTP_PROFILE_REF" },
+    });
+    const secrets = new MemorySecretStore({ HTTP_PROFILE_REF: "http-active-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "provider-a", purpose: "provider-api",
+      secretRef: "HTTP_PROFILE_REF", maskedValue: "act…ref", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const server = createServer(buildCredentialApplication({ secrets, metadata, catalogPath, profiles }));
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: `http://${address.host}:${address.port}` },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId: record.id }),
+    });
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).code).toBe("CREDENTIAL_ACTIVE_REFERENCE");
+    expect(await secrets.get("HTTP_PROFILE_REF")).toBe("http-active-ciphertext-canary");
+  });
+
+  it("removes a healthy, unreferenced credential (200) with a secret-free body once the catalog is readable", async () => {
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "http-healthy-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "provider-a", purpose: "provider-api",
+      secretRef, maskedValue: "hea…thy", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const server = createServer(buildCredentialApplication({ secrets, metadata }));
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: `http://${address.host}:${address.port}` },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId: record.id }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ removed: true });
+    expect(JSON.stringify(body)).not.toContain("http-healthy-ciphertext");
+    expect(await secrets.get(secretRef)).toBeUndefined();
+    expect(await metadata.get(record.id)).toBeUndefined();
+  });
+
+  it("blocks a cross-origin remove before the manager runs, deleting nothing", async () => {
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "http-crossorigin-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "provider-a", purpose: "provider-api",
+      secretRef, maskedValue: "cro…orig", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const server = createServer(buildCredentialApplication({ secrets, metadata }));
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://attacker.example" },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId: record.id }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await secrets.get(secretRef)).toBe("http-crossorigin-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+
+  it("rejects a strict-schema violation that smuggles a secret value, deleting nothing", async () => {
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "http-strict-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "provider-a", purpose: "provider-api",
+      secretRef, maskedValue: "str…ict", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const server = createServer(buildCredentialApplication({ secrets, metadata }));
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: `http://${address.host}:${address.port}` },
+      body: JSON.stringify({
+        providerId: "provider-a", purpose: "provider-api",
+        credentialId: record.id, value: "http-strict-ciphertext",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe("INVALID_REQUEST");
+    expect(await secrets.get(secretRef)).toBe("http-strict-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+
+  it("answers 409 CREDENTIAL_CONFLICT when the portal store path is an unreadable directory (EISDIR)", async () => {
+    const catalogPath = await makeUnreadableStorePath("portals.json");
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "http-eisdir-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "provider-a", purpose: "provider-api",
+      secretRef, maskedValue: "eis…dir", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const server = createServer(buildCredentialApplication({ secrets, metadata, catalogPath }));
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: `http://${address.host}:${address.port}` },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId: record.id }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("CREDENTIAL_CONFLICT");
+    expect(body.message).toBe(
+      "Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    );
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain(catalogPath);
+    expect(serialized).not.toContain("EISDIR");
+    expect(serialized).not.toContain("http-eisdir-ciphertext-canary");
+    expect(await secrets.get(secretRef)).toBe("http-eisdir-ciphertext-canary");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+
+  it("projects an EACCES portal-seam fault to 409 CREDENTIAL_CONFLICT, leaking neither path nor canary", async () => {
+    const seamCanary = `seam-canary-${randomUUID()}`;
+    const rawPath = `/var/secret/${seamCanary}/portals.json`;
+    const portals = throwingPortalRepository(
+      Object.assign(new Error(`EACCES: permission denied, open '${rawPath}'`), { code: "EACCES" }),
+    );
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "http-eacces-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "provider-a", purpose: "provider-api",
+      secretRef, maskedValue: "eac…ces", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const server = createServer(buildCredentialApplication({ secrets, metadata, portals }));
+    const address = await server.start();
+
+    const response = await fetch(`${address.url}api/credentials/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: `http://${address.host}:${address.port}` },
+      body: JSON.stringify({ providerId: "provider-a", purpose: "provider-api", credentialId: record.id }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("CREDENTIAL_CONFLICT");
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain(seamCanary);
+    expect(serialized).not.toContain(rawPath);
+    expect(serialized).not.toContain("EACCES");
+    expect(await secrets.get(secretRef)).toBe("http-eacces-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+});
+
+function buildCredentialApplication(options: {
+  readonly secrets: MemorySecretStore;
+  readonly metadata: MemoryCredentialMetadataRepository;
+  readonly catalogPath?: string;
+  readonly profiles?: MemoryProviderProfileRepository;
+  readonly portals?: MemoryPortalRepository;
+}): ProviderDockApplication {
+  const profiles = options.profiles ?? new MemoryProviderProfileRepository();
+  const portals = options.portals ?? (options.catalogPath === undefined
+    ? new MemoryPortalRepository()
+    : new FilePortalRepository(options.catalogPath));
+  const manager = new CredentialManager({
+    secrets: options.secrets,
+    metadata: options.metadata,
+    bindings: new ApplicationCredentialBindings(profiles, portals),
+  });
+  return new ProviderDockApplication(
+    profiles,
+    new ProviderProbeService(new ProviderAdapterRegistry()),
+    options.secrets,
+    undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+    undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+    manager,
+  );
+}
+
+async function makeCorruptPortalCatalog(): Promise<string> {
+  const path = join(await mkdtemp(join(tmpdir(), "provider-dashboard-portal-corrupt-")), "portals.json");
+  await writeFile(path, "\u0000\u0000\u0000", { encoding: "utf8" });
+  return path;
+}
+
+// A store path that is actually a directory; reading it as a file raises a raw EISDIR.
+async function makeUnreadableStorePath(basename: string): Promise<string> {
+  const path = join(await mkdtemp(join(tmpdir(), "provider-dashboard-unreadable-")), basename);
+  await mkdir(path);
+  return path;
+}
+
+// A portal repository whose read rejects with the given raw error (its message may carry a path/canary).
+function throwingPortalRepository(failure: Error): MemoryPortalRepository {
+  const portals = new MemoryPortalRepository();
+  portals.list = async () => { throw failure; };
+  return portals;
+}

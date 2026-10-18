@@ -114,6 +114,19 @@ small{font-size:10.5px;color:var(--faint);line-height:1.45}
 .omp-run-list{display:grid;gap:2px;max-height:190px;overflow:auto;padding-right:4px}
 .omp-run-row{align-items:flex-start;flex-direction:column;gap:3px}
 .omp-run-id{font-size:10.5px;color:var(--faint);overflow-wrap:anywhere}
+.omp-run-actions{display:flex;gap:6px;margin-top:2px}
+.omp-preview{display:grid;gap:8px}
+.omp-preview-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.omp-preview-tier{font-size:11px;color:var(--muted)}
+.omp-preview-next{margin:0;font-size:11.5px;line-height:1.5;color:var(--text)}
+.omp-preview-note{margin:0;font-size:10.5px;line-height:1.5;color:var(--faint)}
+.omp-preview-nodes{display:grid;gap:3px}
+.omp-node{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 9px;font-size:11px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.omp-node-identity{display:grid;gap:1px;min-width:0}.omp-node-name{color:var(--muted)}.omp-node-reason{color:var(--faint);font-size:9.5px;overflow-wrap:anywhere}
+.badge.node-ready{color:var(--ok);background:var(--ok-dim)}
+.badge.node-unknown{color:var(--faint);background:var(--surface-3)}
+.badge.node-stale{color:var(--warn);background:var(--warn-dim)}
+.badge.node-blocked{color:var(--err);background:var(--err-dim)}
 
 /* ---------- route tabs ---------- */
 .route-tabs{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:var(--r);overflow:hidden;width:max-content;max-width:100%;flex-wrap:wrap}

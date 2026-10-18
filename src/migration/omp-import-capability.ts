@@ -25,8 +25,8 @@ export interface OmpImportCapability {
     readonly explicitSourceRootAtClassLevel: boolean;
     /** Import can target an isolated session dir (sessionDir option). */
     readonly isolatedTargetSessionDir: boolean;
-    /** No network call or model inference on the import path. */
-    readonly noNetworkOrInferenceOnImport: boolean;
+    /** The direct import factory contains no fetch call; transitive and OS network isolation are unverified. */
+    readonly importFactoryHasNoFetch: boolean;
   };
 }
 
@@ -55,7 +55,7 @@ export const OMP_IMPORT_CAPABILITY: OmpImportCapability = Object.freeze({
   supported: Object.freeze({
     explicitSourceRootAtClassLevel: true,
     isolatedTargetSessionDir: true,
-    noNetworkOrInferenceOnImport: true,
+    importFactoryHasNoFetch: true,
   }),
 });
 

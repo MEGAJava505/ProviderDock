@@ -7,11 +7,15 @@
   "bin": {
     "providerdock": "dist/cli.js"
   },
+  "files": [
+    "dist/**/*.js"
+  ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/build-dist.mjs",
+    "build:tsc": "tsc -p tsconfig.build.json",
     "start": "node dist/cli.js",
     "check:balances": "npm run build && node scripts/check-provider-balances.mjs",
     "test": "vitest run",

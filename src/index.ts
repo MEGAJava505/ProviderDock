@@ -51,6 +51,7 @@ export * from "./core/portals/helyx-portal-adapter.js";
 export * from "./core/state-machine/turn-ledger.js";
 export * from "./core/state-machine/persistent-turn-ledger.js";
 export * from "./diagnostics/provider-doctor.js";
+export * from "./diagnostics/responses-structure-probe.js";
 export * from "./diagnostics/doctor-capability-snapshot.js";
 export * from "./core/security/dpapi-secret-vault.js";
 export * from "./core/security/portable-secret-vault.js";

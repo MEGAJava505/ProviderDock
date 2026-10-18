@@ -116,6 +116,7 @@ export const providerDashboardHtml = `<!doctype html>
         <h2>Ключи</h2>
         <small id="secret-vault-state" class="hint"></small>
         <span class="spacer"></span>
+        <button id="add-credential" class="button" type="button">Добавить ключ провайдера</button>
         <button id="add-secret" class="button" type="button">Сохранить ключ</button>
       </div>
       <div id="secrets" class="item-list"></div>
@@ -179,6 +180,8 @@ export const providerDashboardHtml = `<!doctype html>
           <label id="launch-approval-field">Подтверждение действий<select id="launch-approval" name="approvalLevel"><option value="">Сохранённое подтверждение</option><option value="ask">Подтверждать действия</option><option value="auto">Автоматически в проекте</option><option value="full-auto">Без подтверждений (опасно)</option></select><small>«Автоматически» разрешает правки только в папке проекта. «Без подтверждений» отключает запросы и песочницу.</small></label>
           <div id="launch-omp-fields" class="omp-launch-fields" hidden>
             <label>Аккаунт OMP<input id="launch-omp-account" name="ompAccountId" autocomplete="off" placeholder="Например: personal"></label>
+            <div class="field-label">Готовность маршрута OMP</div>
+            <div id="omp-preview" class="omp-preview" aria-live="polite"><p class="empty">Выберите провайдера, аккаунт и модель, чтобы объяснить маршрут.</p></div>
             <label class="checkbox-label"><input id="launch-omp-acknowledgement" name="ompAcknowledgement" type="checkbox"> Подтверждаю пилот OMP: только инструмент чтения, без OS-песочницы</label>
             <button id="launch-omp-preflight" class="button" type="button" disabled>Проверить OMP</button>
             <p id="omp-preflight-status" class="status-line" aria-live="polite"></p>
@@ -334,6 +337,21 @@ export const providerDashboardHtml = `<!doctype html>
       <p id="secret-write-status" class="status-line" aria-live="polite"></p>
     </div>
     <div class="dialog-foot"><button data-close-dialog="secret-dialog" class="button" type="button">Отмена</button><button class="button primary" type="submit">Сохранить ключ</button></div>
+  </form>
+</dialog>
+
+<dialog id="credential-dialog">
+  <form id="credential-form" method="dialog" class="dialog-card narrow">
+    <div class="dialog-head"><h2>Добавить ключ провайдера</h2><button data-close-dialog="credential-dialog" class="icon-button" type="button" aria-label="Закрыть">×</button></div>
+    <div class="dialog-body">
+      <label>Провайдер<select name="providerId" required></select></label>
+      <label>Назначение<select name="purpose"><option value="provider-api">API-ключ</option><option value="portal-session">Кабинет</option></select></label>
+      <label>Метка<input name="label" maxlength="128" placeholder="например, основной"></label>
+      <label>Значение ключа<input name="value" type="password" required autocomplete="new-password"><small>Передаётся менеджеру ключей, шифруется ОС и никогда не возвращается через API.</small></label>
+      <label class="checkbox-label"><input name="activate" type="checkbox"> Сделать активным сразу</label>
+      <p id="credential-write-status" class="status-line" aria-live="polite"></p>
+    </div>
+    <div class="dialog-foot"><button data-close-dialog="credential-dialog" class="button" type="button">Отмена</button><button class="button primary" type="submit">Добавить ключ</button></div>
   </form>
 </dialog>
 

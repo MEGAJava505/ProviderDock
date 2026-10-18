@@ -909,3 +909,138 @@ function isAbortOrTimeoutError(error: unknown): boolean {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+// --- M6.2: separate, network-free structural diagnostic for `no-text-output` ---
+//
+// classifyResponsesStructure inspects an ALREADY-FETCHED OpenAI Responses payload
+// and reduces it to a fixed, secret-free summary. It is NEVER called by run(): it
+// makes no request, so invoking it adds no (potentially paid) upstream call, and it
+// leaves the fail-closed Doctor gate and the persisted health snapshot untouched.
+// Its whole output is allowlisted structure — a normalized status code, a
+// normalized incomplete reason, whether any non-empty text element was present,
+// the normalized set of output-element types, and finite non-negative usage counts.
+// Response text, keys, prompts, headers, request IDs, arbitrary provider strings
+// and paths never appear in the result.
+export type ResponsesStructureClass =
+  | "completed-with-text"
+  | "completed-without-text"
+  | "native-incomplete"
+  | "native-failed"
+  | "in-progress"
+  | "error-envelope"
+  | "proxy-non-native"
+  | "non-object";
+
+export type ResponsesStatusCode =
+  | "completed" | "incomplete" | "failed" | "in_progress"
+  | "queued" | "cancelled" | "absent" | "other";
+
+export type ResponsesIncompleteReasonCode =
+  | "max_output_tokens" | "content_filter" | "other" | "absent";
+
+export interface ResponsesUsageCounts {
+  readonly inputTokens: number | null;
+  readonly outputTokens: number | null;
+  readonly totalTokens: number | null;
+  readonly reasoningTokens: number | null;
+}
+
+export interface ResponsesStructureSummary {
+  readonly classification: ResponsesStructureClass;
+  readonly statusCode: ResponsesStatusCode;
+  readonly incompleteReason: ResponsesIncompleteReasonCode;
+  readonly textOutputPresent: boolean;
+  readonly outputElementTypes: readonly string[];
+  readonly usage: ResponsesUsageCounts;
+}
+const RESPONSES_STATUS_CODES = new Set<string>([
+  "completed", "incomplete", "failed", "in_progress", "queued", "cancelled",
+]);
+const RESPONSES_INCOMPLETE_REASONS = new Set<string>(["max_output_tokens", "content_filter"]);
+const RESPONSES_OUTPUT_TYPES = new Set<string>([
+  "message", "reasoning", "function_call", "web_search_call", "file_search_call",
+  "computer_call", "image_generation_call", "code_interpreter_call",
+  "local_shell_call", "mcp_call", "mcp_list_tools", "mcp_approval_request", "item_reference",
+]);
+
+function normalizeStatusCode(value: unknown): ResponsesStatusCode {
+  if (typeof value !== "string") return "absent";
+  return RESPONSES_STATUS_CODES.has(value) ? (value as ResponsesStatusCode) : "other";
+}
+
+function normalizeIncompleteReason(payload: Record<string, unknown>): ResponsesIncompleteReasonCode {
+  const details = payload.incomplete_details;
+  const reason = isRecord(details) ? details.reason : undefined;
+  if (typeof reason !== "string") return "absent";
+  return RESPONSES_INCOMPLETE_REASONS.has(reason) ? (reason as ResponsesIncompleteReasonCode) : "other";
+}
+
+function normalizeCount(value: unknown): number | null {
+  // A usage count is trusted only as a genuine non-negative safe integer; a
+  // fractional, non-finite, negative, or out-of-safe-range value is rejected to
+  // null rather than rounded, so the summary never invents a token count.
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= 0 && value <= Number.MAX_SAFE_INTEGER
+    ? value
+    : null;
+}
+
+function normalizeUsage(payload: Record<string, unknown>): ResponsesUsageCounts {
+  const usage: Record<string, unknown> = isRecord(payload.usage) ? payload.usage : {};
+  const details = isRecord(usage.output_tokens_details)
+    ? usage.output_tokens_details
+    : isRecord(usage.completion_tokens_details)
+      ? usage.completion_tokens_details
+      : undefined;
+  return {
+    inputTokens: normalizeCount(usage.input_tokens),
+    outputTokens: normalizeCount(usage.output_tokens),
+    totalTokens: normalizeCount(usage.total_tokens),
+    reasoningTokens: normalizeCount(details?.reasoning_tokens),
+  };
+}
+
+function normalizeOutputElementTypes(payload: Record<string, unknown>): string[] {
+  if (!Array.isArray(payload.output)) return [];
+  const seen = new Set<string>();
+  for (const item of payload.output) {
+    const type = isRecord(item) && typeof item.type === "string" ? item.type : undefined;
+    seen.add(type !== undefined && RESPONSES_OUTPUT_TYPES.has(type) ? type : "other");
+  }
+  return [...seen].sort();
+}
+export function classifyResponsesStructure(payload: unknown): ResponsesStructureSummary {
+  if (!isRecord(payload)) {
+    return {
+      classification: "non-object",
+      statusCode: "absent",
+      incompleteReason: "absent",
+      textOutputPresent: false,
+      outputElementTypes: [],
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null, reasoningTokens: null },
+    };
+  }
+  const statusCode = normalizeStatusCode(payload.status);
+  const incompleteReason = normalizeIncompleteReason(payload);
+  const usage = normalizeUsage(payload);
+  const outputElementTypes = normalizeOutputElementTypes(payload);
+  const extracted = extractOutputText("openai-responses", payload);
+  const textOutputPresent = typeof extracted === "string" && extracted.trim().length > 0;
+
+  let classification: ResponsesStructureClass;
+  if (payload.error != null || isProviderErrorEnvelope(payload)) {
+    classification = "error-envelope";
+  } else if (statusCode === "failed" || statusCode === "cancelled") {
+    classification = "native-failed";
+  } else if (statusCode === "incomplete") {
+    classification = "native-incomplete";
+  } else if (statusCode === "in_progress" || statusCode === "queued") {
+    classification = "in-progress";
+  } else if (statusCode === "completed") {
+    classification = textOutputPresent ? "completed-with-text" : "completed-without-text";
+  } else {
+    classification = "proxy-non-native";
+  }
+
+  return { classification, statusCode, incompleteReason, textOutputPresent, outputElementTypes, usage };
+}

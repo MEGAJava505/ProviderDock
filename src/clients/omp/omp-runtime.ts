@@ -1,6 +1,6 @@
 ﻿import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { lstat, mkdir, open } from "node:fs/promises";
+import { lstat, mkdir, open, readdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import type { SecretStore } from "../../core/security/secret-store.js";
 import { providerSecretRevisionFingerprint } from "../../core/security/secret-revision.js";
@@ -91,6 +91,7 @@ export function createOmpPilotPolicy(): Record<string, unknown> {
       approvalMode: "always-ask",
       approval: { task: "deny", eval: "deny", browser: "deny", computer: "deny" },
     },
+    fetch: { enabled: false },
     retry: { enabled: false }, mcp: { enableProjectConfig: false },
     // Exact pinned settings keys. "update.checkOnStartup" is NOT recognized.
     startup: { setupWizard: false, checkUpdate: false, showSplash: false },
@@ -149,13 +150,24 @@ async function inspectDirectory(path: string): Promise<void> {
 /**
  * The pin loads project settings BEFORE applying disabledProviders. Its overlay
  * deep-merges approvals; it may also quarantine malformed native YAML on start.
- * Until explicit reviewed settings import exists, admit only projects without
- * these bootstrap inputs. Check presence without parsing, reading, or renaming.
- * All six registered settings providers use cwd-local project paths at the pin.
+ * `env.ts` also parses `.env`, `.env.local`, `.env.${NODE_ENV}`, and
+ * `.env.${NODE_ENV}.local` from cwd. Since NODE_ENV is runtime-controlled,
+ * reject the exact top-level `.env` / `.env.<nonempty>` grammar rather than
+ * pretending a finite list of modes covers it. Check presence without parsing,
+ * reading, or renaming. All registered settings providers use cwd-local paths
+ * at the pin.
  */
 async function rejectUnreviewedProjectSettings(projectDirectory: string): Promise<void> {
+  let dotenvInputs: string[];
+  try {
+    dotenvInputs = (await readdir(projectDirectory)).filter((name) =>
+      name === ".env" || /^\.env\..+$/.test(name));
+  } catch {
+    throw failure("OMP_PROJECT_SETTINGS_UNREVIEWED");
+  }
   const inputs = [
     ".omp/config.yml", ".omp/settings.json",
+    ...dotenvInputs,
     ".claude/settings.json", ".claude/settings.local.json", ".codex/config.toml",
     ".cursor/settings.json", ".gemini/settings.json",
     "opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc",

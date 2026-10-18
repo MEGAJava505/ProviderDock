@@ -40,13 +40,13 @@ function stateOf(preview: ReturnType<typeof buildOmpRouteReadinessPreview>, node
 }
 
 describe("offline OMP route-readiness preview (fixtures only)", () => {
-  it("renders the full chain as ready only when the authoritative gate accepts", () => {
+  it("labels an accepted Doctor L3 route as ready for a pilot, not a completed pilot", () => {
     const input = baseInput();
     expect(evaluateOmpRouteDecisionForPilot(input).accepted).toBe(true);
 
     const preview = buildOmpRouteReadinessPreview(input);
     expect(preview.verdict).toBe("ready");
-    expect(preview.evidenceTier).toBe("real-paid-pilot");
+    expect(preview.evidenceTier).toBe("doctor-l3-ready-for-pilot");
     expect(preview.recommendedAction).toBe("none");
     expect(preview.autoFallback).toBe("not-offered");
     expect(preview.loopbackSmokeIsUpstreamPass).toBe(false);
@@ -106,7 +106,7 @@ describe("offline OMP route-readiness preview (fixtures only)", () => {
     );
     expect(preview.verdict).toBe("unknown");
     expect(preview.evidenceTier).toBe("v2-candidate");
-    expect(stateOf(preview, "evidence-state").reason).toBe("no-paid-pilot-evidence-yet");
+    expect(stateOf(preview, "evidence-state").reason).toBe("no-doctor-level-3-evidence-yet");
   });
 
   it("flags a rotated credential as stale evidence state", () => {
@@ -118,11 +118,16 @@ describe("offline OMP route-readiness preview (fixtures only)", () => {
     expect(preview.evidenceTier).toBe("stale-doctor-snapshot");
   });
 
-  it("blocks a structural mismatch on the exact node and never auto-falls-back", () => {
+  it("keeps Doctor L3 evidence on a blocked route without claiming a completed pilot", () => {
     const preview = buildOmpRouteReadinessPreview(baseInput({
       selection: { providerId: "gateway", accountId: "other-account", modelId: "exact-model" },
     }));
     expect(preview.verdict).toBe("blocked");
+    expect(preview.evidenceTier).toBe("doctor-l3-evidence-route-blocked");
+    expect(stateOf(preview, "evidence-state")).toMatchObject({
+      state: "ready",
+      reason: "doctor-level-3-and-local-provenance",
+    });
     expect(stateOf(preview, "account").state).toBe("blocked");
     expect(preview.autoFallback).toBe("not-offered");
     expect(preview.recommendedAction).toBe("fix-route-decision-mismatch");
@@ -140,13 +145,13 @@ describe("offline OMP route-readiness preview (fixtures only)", () => {
     expect(serialized).not.toContain(CREDENTIAL);
   });
 
-  it("does not render a real-paid-pilot all-ready chain when the gate rejects for missing local-smoke evidence", () => {
+  it("does not render a ready-for-pilot all-ready chain when the gate rejects for missing local-smoke evidence", () => {
     const input = baseInput({ evidence: undefined, doctorSnapshot });
     // The gate still rejects: local-smoke evidence is a mandatory piece.
     expect(evaluateOmpRouteDecisionForPilot(input).accepted).toBe(false);
 
     const preview = buildOmpRouteReadinessPreview(input);
-    expect(preview.evidenceTier).not.toBe("real-paid-pilot");
+    expect(preview.evidenceTier).not.toBe("doctor-l3-ready-for-pilot");
     expect(stateOf(preview, "evidence-state").state).not.toBe("ready");
     // The whole point: a rejected gate must never present an all-ready chain.
     expect(preview.chain.every((entry) => entry.state === "ready")).toBe(false);
@@ -159,7 +164,7 @@ describe("offline OMP route-readiness preview (fixtures only)", () => {
 
     const preview = buildOmpRouteReadinessPreview(input);
     expect(stateOf(preview, "evidence-state").state).not.toBe("ready");
-    expect(preview.evidenceTier).not.toBe("real-paid-pilot");
+    expect(preview.evidenceTier).not.toBe("doctor-l3-ready-for-pilot");
   });
 
   it("keeps the preview's per-node explanation consistent with the gate (never all-ready when rejected)", () => {
@@ -182,8 +187,8 @@ describe("offline OMP route-readiness preview (fixtures only)", () => {
       const preview = buildOmpRouteReadinessPreview(input);
       // Invariant: a rejected route is always localised to at least one non-ready node.
       expect(preview.chain.some((entry) => entry.state !== "ready")).toBe(true);
-      // And the "fully proven" tier only ever appears on an accepted route.
-      expect(preview.evidenceTier).not.toBe("real-paid-pilot");
+      // Readiness for a pilot only ever appears on an accepted route.
+      expect(preview.evidenceTier).not.toBe("doctor-l3-ready-for-pilot");
     }
   });
 });

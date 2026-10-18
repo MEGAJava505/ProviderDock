@@ -7,11 +7,18 @@ import { sanitizeOperationDiagnostic, type OperationDiagnostic } from "../../cor
 
 const stateSchema = z.enum([
   "VALIDATING", "STARTING", "TERMINAL_OPEN", "READY", "RUNNING",
+  // CANCELLING is a requested-but-unconfirmed stop: NOT terminal, because the
+  // child may still be alive. It settles to a terminal state on close/restart.
+  "CANCELLING",
   "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED",
 ]);
 export type OmpRunState = z.infer<typeof stateSchema>;
 
 export interface OmpRunCreateInput {
+  // Optional caller-supplied identity. The supervisor pre-generates the runId so it
+  // can register ownership BEFORE the record is published; when omitted the store
+  // still mints its own. The write() overwrite guard remains the collision defence.
+  readonly runId?: string;
   readonly providerId: string;
   readonly accountId: string;
   readonly modelId: string;
@@ -42,7 +49,11 @@ export interface OmpRunRepository {
 
 const identitySchema = z.string().min(1).max(1024)
   .refine((value) => value.trim().length > 0 && !/[\x00-\x1f\x7f]/.test(value));
+const idSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const createSchema = z.object({
+  // Optional caller identity (see OmpRunCreateInput). Validated as a UUID so a
+  // supplied id can never smuggle a foreign filename into write()'s destination.
+  runId: idSchema.optional(),
   providerId: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
   accountId: z.string().max(256).pipe(identitySchema),
   modelId: identitySchema,
@@ -56,7 +67,6 @@ const detailsFields = {
   diagnostic: z.record(z.unknown()).transform(sanitizeOperationDiagnostic).optional(),
 };
 const detailsSchema = z.object(detailsFields).strict().transform(projectDetails);
-const idSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const timeSchema = z.string().datetime().refine((value) =>
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value);
 const recordSchema = createSchema.extend({
@@ -73,12 +83,16 @@ const transientRenameErrorCodes = new Set(["EACCES", "EBUSY", "EPERM"]);
 const renameRetryDelaysMs = [10, 25, 50, 100, 200, 400, 800] as const;
 
 const successors: Readonly<Record<OmpRunState, readonly OmpRunState[]>> = {
-  VALIDATING: ["STARTING", "FAILED", "CANCELLED", "INTERRUPTED"],
-  STARTING: ["TERMINAL_OPEN", "READY", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
+  VALIDATING: ["STARTING", "CANCELLING", "FAILED", "CANCELLED", "INTERRUPTED"],
+  STARTING: ["TERMINAL_OPEN", "READY", "CANCELLING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
   // Opening a terminal is NOT agent readiness. Evidence is the caller's responsibility.
-  TERMINAL_OPEN: ["READY", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
-  READY: ["RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
-  RUNNING: ["SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
+  TERMINAL_OPEN: ["READY", "RUNNING", "CANCELLING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
+  READY: ["RUNNING", "CANCELLING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
+  RUNNING: ["CANCELLING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"],
+  // A cancel was requested but the stop is unconfirmed; the child may still be
+  // alive, so this stays non-terminal. Its own close settles CANCELLED, a child
+  // error FAILED, and a restart that lost ownership INTERRUPTED.
+  CANCELLING: ["CANCELLED", "FAILED", "INTERRUPTED"],
   SUCCEEDED: [], FAILED: [], CANCELLED: [],
   // Lost supervisor ownership, not evidence that the child failed or exited.
   INTERRUPTED: [],
@@ -212,7 +226,8 @@ export class FileOmpRunRepository implements OmpRunRepository {
       const selection = parse(createSchema, input);
       const at = parse(timeSchema, this.clock().toISOString());
       const record: OmpRunRecord = {
-        ...selection, runId: randomUUID(), state: "VALIDATING", createdAt: at, updatedAt: at,
+        ...selection, runId: selection.runId ?? randomUUID(),
+        state: "VALIDATING", createdAt: at, updatedAt: at,
         transitions: [{ state: "VALIDATING", at }],
       };
       await this.withWriter(async (directory) => { await this.write(record, directory); });

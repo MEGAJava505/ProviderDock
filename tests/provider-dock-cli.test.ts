@@ -1,9 +1,12 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CredentialManager,
   GenericOpenAiAdapter,
+  MemoryCredentialMetadataRepository,
   MemoryProviderHealthRepository,
   MemoryProviderProfileRepository,
   MemorySecretStore,
@@ -13,9 +16,27 @@ import {
   runProviderDockCli,
   type CredentialSummary,
 } from "../src/index.js";
+import { ApplicationCredentialBindings } from "../src/core/security/credential-bindings.js";
+import {
+  FilePortalRepository,
+  MemoryPortalRepository,
+} from "../src/core/portals/portal-repository.js";
 import { runCli } from "./support/cli-harness.js";
 import { createServer } from "node:net";
 import { openDashboardInBrowser } from "../src/ui/open-dashboard-browser.js";
+import type { OmpRouteReadinessPreview } from "../src/migration/omp-route-readiness-preview.js";
+
+/** Minimal safe preview so OMP launcher stubs satisfy the interface; no test asserts on it. */
+const ompPreviewStub = async (): Promise<OmpRouteReadinessPreview> => ({
+  selection: { providerId: "provider-a", accountId: "account-a", modelId: "model-a" },
+  verdict: "unknown",
+  reason: "route-preview-stub",
+  evidenceTier: "none",
+  chain: [],
+  autoFallback: "not-offered",
+  loopbackSmokeIsUpstreamPass: false,
+  recommendedAction: "run-local-smoke-or-paid-doctor",
+});
 import type { OmpLaunchInput } from "../src/application/omp-launch-service.js"
 import type { OperationDiagnostic } from "../src/core/errors/operation-diagnostic.js";
 
@@ -164,7 +185,7 @@ describe("ProviderDock management CLI", () => {
         application,
         io: { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) },
         environment: {},
-        ompLauncher: { preflight, launch, listRuns, cancel, reconcileAfterRestart },
+        ompLauncher: { preflight, launch, preview: vi.fn(ompPreviewStub), listRuns, cancel, reconcileAfterRestart },
       },
     );
 
@@ -220,7 +241,7 @@ describe("ProviderDock management CLI", () => {
         application,
         io: { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) },
         environment: {},
-        ompLauncher: { preflight, launch, listRuns, cancel, reconcileAfterRestart },
+        ompLauncher: { preflight, launch, preview: vi.fn(ompPreviewStub), listRuns, cancel, reconcileAfterRestart },
       },
     );
 
@@ -267,7 +288,7 @@ describe("ProviderDock management CLI", () => {
         application,
         io: { stdout: (message) => stdout.push(message), stderr: (message) => stderr.push(message) },
         environment: {},
-        ompLauncher: { preflight, launch, listRuns, cancel, reconcileAfterRestart },
+        ompLauncher: { preflight, launch, preview: vi.fn(ompPreviewStub), listRuns, cancel, reconcileAfterRestart },
       },
     );
 
@@ -531,6 +552,7 @@ describe("ProviderDock management CLI", () => {
         api: "openai-responses" as const,
       })),
       launch: vi.fn(async () => ({ ok: true as const, runId: "01937d71-7ae7-7abc-8100-000000000001" })),
+      preview: vi.fn(ompPreviewStub),
       listRuns: vi.fn(async () => []),
       cancel: vi.fn(async () => undefined),
       reconcileAfterRestart: vi.fn(async () => []),
@@ -855,6 +877,228 @@ describe("credential maintenance CLI", () => {
     expect(result.stderr.join("\n")).not.toContain("at readHiddenSecret");
   });
 });
+
+describe("credential removal guard through the real CLI", () => {
+  it("exits 1 with a stable, path-free cause when a corrupt catalog makes usage unverifiable", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "cli-portal-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "portal-session",
+      secretRef, maskedValue: "cli…sess", state: "unavailable",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const application = buildCredentialApplication({ secrets, metadata, catalogPath });
+    const before = await readFile(catalogPath, "utf8");
+
+    const result = await runCli(application, [
+      "credentials", "remove", "--provider", "fixture",
+      "--credential", record.id, "--purpose", "portal-session",
+    ]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toEqual([
+      "Error: Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    ]);
+    const emitted = [...result.stdout, ...result.stderr].join("\n");
+    expect(emitted).not.toContain(catalogPath);
+    expect(emitted).not.toContain("cli-portal-ciphertext-canary");
+    // Nothing was deleted by the refused remove.
+    expect(await secrets.get(secretRef)).toBe("cli-portal-ciphertext-canary");
+    expect(await metadata.get(record.id)).toBeDefined();
+    expect(await readFile(catalogPath, "utf8")).toBe(before);
+  });
+
+  it("still lists the unavailable key and keeps API distinct from portal-session while the catalog is corrupt", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const portalRef = `credential-${randomUUID()}`;
+    const apiRef = `credential-${randomUUID()}`;
+    // The portal key has no ciphertext (state resolves to "unavailable"); the API key has one ("available").
+    const secrets = new MemorySecretStore({ [apiRef]: "cli-list-api-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "portal-session",
+      secretRef: portalRef, maskedValue: "por…sess", state: "unavailable",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "provider-api",
+      secretRef: apiRef, maskedValue: "api…akey", state: "available",
+      createdAt: "2026-09-27T00:00:01.000Z",
+    });
+    const application = buildCredentialApplication({ secrets, metadata, catalogPath });
+
+    const result = await runCli(application, [
+      "credentials", "list", "--provider", "fixture", "--json",
+    ]);
+
+    expect(result.code).toBe(0);
+    const listed = JSON.parse(result.stdout.join("\n")) as CredentialSummary[];
+    expect(listed).toHaveLength(2);
+    // The unavailable credential is still surfaced (never passed off as deleted/empty).
+    expect(listed.find((entry) => entry.purpose === "portal-session")?.state).toBe("unavailable");
+    expect(listed.find((entry) => entry.purpose === "provider-api")?.state).toBe("available");
+    expect(result.stdout.join("\n")).not.toContain("cli-list-api-canary");
+  });
+
+  it("maps a known active reference to exit 1 / ACTIVE_REFERENCE, never masking it as CONFLICT", async () => {
+    const catalogPath = await makeCorruptPortalCatalog();
+    const profiles = new MemoryProviderProfileRepository();
+    await profiles.upsert({
+      id: "fixture", displayName: "Fixture",
+      baseUrl: "https://inference.invalid/v1",
+      auth: { kind: "bearer", secretRef: "PROFILE_REF" },
+    });
+    const secrets = new MemorySecretStore({ PROFILE_REF: "cli-active-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "provider-api",
+      secretRef: "PROFILE_REF", maskedValue: "act…ref", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const application = buildCredentialApplication({ secrets, metadata, catalogPath, profiles });
+
+    const result = await runCli(application, [
+      "credentials", "remove", "--provider", "fixture",
+      "--credential", record.id, "--purpose", "provider-api",
+    ]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toEqual(["Error: Credential is still referenced by an active binding."]);
+    expect(await secrets.get("PROFILE_REF")).toBe("cli-active-ciphertext-canary");
+  });
+
+  it("removes a healthy, unreferenced credential (exit 0) once the catalog is readable", async () => {
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "cli-healthy-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "provider-api",
+      secretRef, maskedValue: "hea…thy", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const application = buildCredentialApplication({ secrets, metadata });
+
+    const result = await runCli(application, [
+      "credentials", "remove", "--provider", "fixture",
+      "--credential", record.id, "--purpose", "provider-api",
+    ]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toEqual([`Removed credential '${record.id}'.`]);
+    expect(await secrets.get(secretRef)).toBeUndefined();
+    expect(await metadata.get(record.id)).toBeUndefined();
+  });
+
+  it("exits 1 with the catalog cause when the portal store path is an unreadable directory (EISDIR)", async () => {
+    const catalogPath = await makeUnreadableStorePath("portals.json");
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "cli-eisdir-ciphertext-canary" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    // Even a provider-api key must fail closed: while the catalog is unreadable it MIGHT be portal-referenced.
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "provider-api",
+      secretRef, maskedValue: "eis…dir", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const application = buildCredentialApplication({ secrets, metadata, catalogPath });
+
+    const result = await runCli(application, [
+      "credentials", "remove", "--provider", "fixture",
+      "--credential", record.id, "--purpose", "provider-api",
+    ]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toEqual([
+      "Error: Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    ]);
+    const emitted = [...result.stdout, ...result.stderr].join("\n");
+    expect(emitted).not.toContain(catalogPath);
+    expect(emitted).not.toContain("EISDIR");
+    expect(emitted).not.toContain("cli-eisdir-ciphertext-canary");
+    // A read we could not finish must delete nothing.
+    expect(await secrets.get(secretRef)).toBe("cli-eisdir-ciphertext-canary");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+
+  it("projects an EACCES portal-seam fault to the fixed cause, leaking neither its path nor a canary", async () => {
+    const seamCanary = `seam-canary-${randomUUID()}`;
+    const rawPath = `/var/secret/${seamCanary}/portals.json`;
+    const portals = throwingPortalRepository(
+      Object.assign(new Error(`EACCES: permission denied, open '${rawPath}'`), { code: "EACCES" }),
+    );
+    const secretRef = `credential-${randomUUID()}`;
+    const secrets = new MemorySecretStore({ [secretRef]: "cli-eacces-ciphertext" });
+    const metadata = new MemoryCredentialMetadataRepository();
+    const record = await metadata.upsert({
+      id: randomUUID(), providerId: "fixture", purpose: "provider-api",
+      secretRef, maskedValue: "eac…ces", state: "available",
+      createdAt: "2026-09-27T00:00:00.000Z",
+    });
+    const application = buildCredentialApplication({ secrets, metadata, portals });
+
+    const result = await runCli(application, [
+      "credentials", "remove", "--provider", "fixture",
+      "--credential", record.id, "--purpose", "provider-api",
+    ]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toEqual([
+      "Error: Использование ключа невозможно проверить, пока каталог кабинетов недоступен; сначала восстановите каталог.",
+    ]);
+    const emitted = [...result.stdout, ...result.stderr].join("\n");
+    expect(emitted).not.toContain(seamCanary);
+    expect(emitted).not.toContain(rawPath);
+    expect(emitted).not.toContain("EACCES");
+    expect(await secrets.get(secretRef)).toBe("cli-eacces-ciphertext");
+    expect(await metadata.get(record.id)).toBeDefined();
+  });
+});
+
+function buildCredentialApplication(options: {
+  readonly secrets: MemorySecretStore;
+  readonly metadata: MemoryCredentialMetadataRepository;
+  readonly catalogPath?: string;
+  readonly profiles?: MemoryProviderProfileRepository;
+  readonly portals?: MemoryPortalRepository;
+}): ProviderDockApplication {
+  const profiles = options.profiles ?? new MemoryProviderProfileRepository();
+  const portals = options.portals ?? (options.catalogPath === undefined
+    ? new MemoryPortalRepository()
+    : new FilePortalRepository(options.catalogPath));
+  const manager = new CredentialManager({
+    secrets: options.secrets,
+    metadata: options.metadata,
+    bindings: new ApplicationCredentialBindings(profiles, portals),
+  });
+  return new ProviderDockApplication(
+    profiles,
+    new ProviderProbeService(new ProviderAdapterRegistry()),
+    options.secrets,
+    undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+    undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+    manager,
+  );
+}
+
+async function makeCorruptPortalCatalog(): Promise<string> {
+  const path = join(await mkdtemp(join(tmpdir(), "provider-dock-cli-portal-corrupt-")), "portals.json");
+  await writeFile(path, "\u0000\u0000\u0000", { encoding: "utf8" });
+  return path;
+}
+
+// A store path that is actually a directory; reading it as a file raises a raw EISDIR.
+async function makeUnreadableStorePath(basename: string): Promise<string> {
+  const path = join(await mkdtemp(join(tmpdir(), "provider-dock-cli-unreadable-")), basename);
+  await mkdir(path);
+  return path;
+}
+
+// A portal repository whose read rejects with the given raw error (its message may carry a path/canary).
+function throwingPortalRepository(failure: Error): MemoryPortalRepository {
+  const portals = new MemoryPortalRepository();
+  portals.list = async () => { throw failure; };
+  return portals;
+}
 
 function createApplication(fetchImpl: typeof fetch = vi.fn<typeof fetch>()): ProviderDockApplication {
   const secrets = new MemorySecretStore();
