@@ -1,0 +1,31 @@
+{
+  "ok": false,
+  "error": {
+    "name": "Error",
+    "message": "network fault navigation: fixture-fault:unexpected-network: net::ERR_EMPTY_RESPONSE"
+  },
+  "cleanup": {
+    "browserProfileRemoved": true,
+    "rootRemoved": true
+  },
+  "diagnostic": {
+    "browserRuns": [],
+    "storeRuns": [],
+    "spawnRecords": [],
+    "loopbackRequests": [],
+    "browserExceptions": [],
+    "browserNetworkFailures": [
+      {
+        "errorText": "net::ERR_EMPTY_RESPONSE",
+        "url": "2D02FF3EC807AFB038134E2779DE5AE1"
+      }
+    ],
+    "browserHttpFailures": []
+  },
+  "acceptance": {
+    "selections": [],
+    "latePreflight": [],
+    "launches": [],
+    "lifecycle": {}
+  }
+}

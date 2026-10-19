@@ -1,0 +1,91 @@
+{
+  "algorithm": "sha256",
+  "scope": "Published local evidence; manifest excludes itself",
+  "files": [
+    {
+      "path": "browser-negative/cdp-close.json",
+      "bytes": 499,
+      "sha256": "9b3c54c8eb749559d78d3195204adb0d5fe148760f95ba004c39204e91eac8ab"
+    },
+    {
+      "path": "browser-negative/cleanup.json",
+      "bytes": 8576,
+      "sha256": "33202683ed480ed33cd57f66bc52a4e77be8801634214ea2f9bae3377ded4a24"
+    },
+    {
+      "path": "browser-negative/network.json",
+      "bytes": 678,
+      "sha256": "e9bca7bf840e21674a5313f78f88cec296852c62cd04eb211d69af7b5847bf09"
+    },
+    {
+      "path": "browser-negative/runner.json",
+      "bytes": 789,
+      "sha256": "ba21dcdedfbd52d965b2bc8b18f0f468f8a4489f1cd1a51b5d4c2d273b40948c"
+    },
+    {
+      "path": "browser-negative/spawn.json",
+      "bytes": 291,
+      "sha256": "4f15248a575514817ddd50a244a7dfcf1e3983100f37f71265ac0905fc747a5b"
+    },
+    {
+      "path": "browser-normal/report.json",
+      "bytes": 9424,
+      "sha256": "3b356b2e7813e9e6b1db0c1eb7d1b32aa5ea96fc953da3dadfa4eb23044c5138"
+    },
+    {
+      "path": "browser-normal/screenshots/blocked-preview.png",
+      "bytes": 150132,
+      "sha256": "bb00b0c5dbedfe81e0b073ffdcc1500c41fc171b1edbb0f39d29ff7a82a9fee8"
+    },
+    {
+      "path": "browser-normal/screenshots/cancelled.png",
+      "bytes": 154942,
+      "sha256": "745ee6276d325c490d31e6e310022083fd460b9c6cc51b77ca8edf88f18bd2fe"
+    },
+    {
+      "path": "browser-normal/screenshots/ready-preflight.png",
+      "bytes": 154022,
+      "sha256": "52cf6fe9f07c3ab06c66d2ffec91da2dbbf748f9fa78f9403dda69af511bd5c6"
+    },
+    {
+      "path": "browser-normal/screenshots/ready-preview.png",
+      "bytes": 151577,
+      "sha256": "c9fe0aabd729a9d06400e0f7a871573b0a6633bf5ed8c2a90fc194249bbb75a1"
+    },
+    {
+      "path": "browser-normal/screenshots/unknown-preview.png",
+      "bytes": 148259,
+      "sha256": "81109ae1f963f1783d53b2b8b2fba519b39932a2a18debd2df2f65d95d5cbd4b"
+    },
+    {
+      "path": "build-output.txt",
+      "bytes": 130,
+      "sha256": "a4a36ee2236f0c38f44659ec51535b28bd2acc482abb7dcf4d2895dcd16c27ce"
+    },
+    {
+      "path": "regression-before.txt",
+      "bytes": 1835,
+      "sha256": "f2b1fc27b548159bae28a7f9d8d5196c1977c9f266ded4158e1fd8a6d5a938bc"
+    },
+    {
+      "path": "regression-mutation.json",
+      "bytes": 22252,
+      "sha256": "d7124d0f33100f1e3a59236093ad7cb7bf4f22347f4c355526a13afcc61516d8"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 3323,
+      "sha256": "2872bf8ef384e556e7bd4db1f86e6ee325e72f24f77fb5b2f8f87ab376a3e495"
+    },
+    {
+      "path": "typecheck-output.txt",
+      "bytes": 47,
+      "sha256": "0643eb14ef26b84c48f0074c87a0a0036c5e3bc583cb02d041b9c0780614c073"
+    },
+    {
+      "path": "vitest.json",
+      "bytes": 116670,
+      "sha256": "09e6af7211d8ac3b51a4bbc6ef5a223f46899933b6bde332a48fd091cc35f0b4"
+    }
+  ]
+}

@@ -1,5 +1,26 @@
 # Специальные тесты ProviderDock: что проверять и ожидаемый результат
 
+## Локальный повтор — 19 октября 2026
+
+Проверена ветка `omp-integration` после обновления до `9ce3f3b`. Среда: Windows x64, Node.js `24.20.0`, npm `11.19.0`, Vitest `4.1.11`, Microsoft Edge `155.0.4283.62`. Это новый локальный прогон, отдельно от ранее принятого Chrome for Testing baseline.
+
+| Проверка | Фактический результат |
+| --- | --- |
+| Семь OMP/dashboard suites ниже | **228/228 PASS**, 7/7 файлов, без skipped |
+| Dashboard subset в составе общего прогона | **56/56 PASS** |
+| Browser normal | **12/12 PASS**, exit 0, `ok:true`, пять screenshots и `report.json` сохранены |
+| Browser negative | **4/4 PASS**: `spawn`, `cdp-close`, `network`, `cleanup`; runner exit 0, каждый дочерний сценарий exit 1 |
+| Build | exit 0, `ok:true`, `jsEmitted:130` |
+| Typecheck, оба `node --check`, `git diff --check` | exit 0 |
+
+Первый Windows-прогон дал 226/228 PASS: обе новые atomic-replacement проверки получили `OMP_RUN_IO_FAILED`. Отдельный файловый probe подтвердил `EPERM` при rename поверх открытого файла и успешный rename после закрытия дескриптора. Исправлена только fixture в `tests/omp-run-repository.test.ts`: на Windows реальный дескриптор закрывается перед реальным переходом, а метаданные отсоединённого POSIX-дескриптора (`nlink=0`) и EOF после полностью прочитанных fixture-байтов моделируются явно. На POSIX остаётся настоящий rename-over-open; POSIX-прогон в этом повторе не выполнялся. Production-код не менялся, проверки `OMP_RUN_CHANGED` и целой новой записи `STARTING` сохранены. Mutation-проверка временно возвращала `OMP_RUN_UNSAFE_PATH` для `nlink=0`: обе регрессии ожидаемо упали; исходные production-байты затем восстановлены.
+
+В negative-проверках сохранены исходные причины, `ok:false`, отсутствие вложенного успешного `result` и `rootRemoved:true` во всех четырёх отчётах. Для `cleanup` дополнительно подтверждены ошибка cleanup и успешное удаление root через fallback. Normal подтвердил удаление browser profile и fixture root; неожиданных browser JS/network/HTTP failures нет.
+
+Проверяемые артефакты: [summary.json](docs/omp-migration/evidence/2026-10-19-special-tests/summary.json), [полный Vitest report](docs/omp-migration/evidence/2026-10-19-special-tests/vitest.json), [browser normal report](docs/omp-migration/evidence/2026-10-19-special-tests/browser-normal/report.json), [negative runner](docs/omp-migration/evidence/2026-10-19-special-tests/browser-negative/runner.json), [screenshots](docs/omp-migration/evidence/2026-10-19-special-tests/browser-normal/screenshots), [SHA-256 manifest](docs/omp-migration/evidence/2026-10-19-special-tests/manifest.json). В text/JSON заменены локальные workspace/temp/home prefixes; screenshots содержат только synthetic fixture. Manifest хеширует опубликованные файлы, кроме самого себя.
+
+Actual `omp.exe`, native resume, external egress/isolation и живая provider route остаются **NOT PROVEN/BLOCKED**; внешний пилот **NOT STARTED**. Проверки используют fake child и loopback, без live provider credentials и paid requests; A1–A4 этим повтором не открываются.
+
 ## Назначение и статус
 
 ProviderDock — локальный менеджер нескольких provider-профилей и compatibility gateway для coding agents; в этой спецификации описана локальная OMP-интеграция: подготовка маршрута, preflight, запуск и lifecycle run, dashboard и сохранение run records.
@@ -8,7 +29,7 @@ ProviderDock — локальный менеджер нескольких provid
 
 Текущий статус: ветка `omp-integration`; M10-R2 принят для локальных критериев главы 5; browser acceptance на Chrome for Testing 155 принят (normal 12/12, negative 4 фазы); M11-P — `doc-complete`, то есть подготовлены план и evidence schema. Внешний пилот не запускался.
 
-Числа ниже разделяют два среза. Принятый M10-R2 baseline: 7 suite-файлов / 199 тестов PASS. В текущем рабочем дереве повторённый целевой запуск тех же семи suite: 7 файлов / 228 тестов PASS; изменённые локально файлы `tests/omp-run-repository.test.ts` и `tests/omp-integration-harness.test.ts` объясняют отличие от baseline. Текущий повтор по suite:
+Числа ниже разделяют два среза. Принятый M10-R2 baseline: 7 suite-файлов / 199 тестов PASS. Повтор 19 октября 2026: 7 файлов / 228 тестов PASS; последующие изменения `tests/omp-run-repository.test.ts` и `tests/omp-integration-harness.test.ts` объясняют отличие от baseline. Текущий повтор по suite:
 
 | Suite | Что проверяется | Текущий повтор |
 | --- | --- | ---: |
@@ -60,7 +81,7 @@ Normal smoke содержит 12 checks. PASS означает exit code 0, `ok:
 - `node --check scripts/dashboard-ui-smoke.mjs` — exit 0.
 - `git diff --check` — exit 0, без whitespace errors.
 
-В этой сессии build, typecheck и оба `node --check` выполнены успешно. Browser smoke здесь не повторялся: `PROVIDERDOCK_TEST_BROWSER` не задан; принят его зафиксированный результат M10-R2.
+В повторе 19 октября 2026 build, typecheck, оба `node --check` и `git diff --check` выполнены успешно. Browser smoke повторён с `PROVIDERDOCK_TEST_BROWSER`, указывающим на Microsoft Edge `155.0.4283.62`: normal 12/12 и negative 4/4 PASS; отчёты приведены выше.
 
 ## Осталось BLOCKED / NOT PROVEN
 
@@ -99,6 +120,14 @@ PROVIDERDOCK_TEST_BROWSER=/path/to/chrome node scripts/omp-browser-stack-smoke.m
 ```
 
 Normal ожидает 12/12 checks; negative — четыре описанные fault-фазы. Smoke работает на собственной временной fixture и loopback; ему не нужны живые provider credentials или внешний endpoint.
+
+На Windows/PowerShell в этом повторе использованы `npm.cmd`/`npx.cmd` (без изменения execution policy) и:
+
+```powershell
+$env:PROVIDERDOCK_TEST_BROWSER = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+node scripts/omp-browser-stack-smoke.mjs
+node scripts/omp-browser-stack-smoke.mjs --negative
+```
 
 Общие локальные gates:
 

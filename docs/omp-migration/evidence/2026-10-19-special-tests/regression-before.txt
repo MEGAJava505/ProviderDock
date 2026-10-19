@@ -1,0 +1,46 @@
+RUN  v4.1.11 <workspace>
+
+ ❯ tests/omp-run-repository.test.ts (44 tests | 2 failed | 42 skipped) 3479ms
+     × reports an atomic replacement during opened-fstat as a transient changed read 1756ms
+     × reports an atomic replacement during after-read-fstat as a transient changed read 1721ms
+npx.cmd :
+строка:2 знак:1
++ npx.cmd vitest run tests/omp-run-repository.test.ts -t 'reports an at ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/omp-run-repository.test.ts > OMP run durable storage boundary > reports an atomic replacement during opene
+d-fstat as a transient changed read
+ FAIL  tests/omp-run-repository.test.ts > OMP run durable storage boundary > reports an atomic replacement during after
+-read-fstat as a transient changed read
+AssertionError: expected OmpRunStorageError: OMP_RUN_IO_FAILED { code: '…' } to match object { name: 'OmpRunStorageErro
+r', …(1) }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "message": "OMP_RUN_CHANGED",
++ RunError {
+    "name": "OmpRunStorageError",
+  }
+
+ ❯ tests/omp-run-repository.test.ts:191:46
+    189|       });
+    190|
+    191|       await expect(repository.get(run.runId)).rejects.toMatchObject({
+       |                                              ^
+    192|         name: "OmpRunStorageError", message: "OMP_RUN_CHANGED",
+    193|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 42 skipped (44)
+   Start at  10:52:08
+   Duration  3.90s (transform 100ms, setup 0ms, import 149ms, tests 3.48s, environment 0ms)

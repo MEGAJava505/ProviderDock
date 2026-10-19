@@ -1,0 +1,530 @@
+{
+  "numTotalTestSuites": 5,
+  "numPassedTestSuites": 3,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 44,
+  "numPassedTests": 0,
+  "numFailedTests": 2,
+  "numPendingTests": 42,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792389246223,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle persists literal identities and generated UUID/times for a fresh instance",
+          "status": "skipped",
+          "title": "persists literal identities and generated UUID/times for a fresh instance",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle returns undefined/empty only for genuinely missing records/directories",
+          "status": "skipped",
+          "title": "returns undefined/empty only for genuinely missing records/directories",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle returns deeply immutable independent snapshots, not writable repository state",
+          "status": "skipped",
+          "title": "returns deeply immutable independent snapshots, not writable repository state",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle records terminal-open separately from readiness and retains approved details",
+          "status": "skipped",
+          "title": "records terminal-open separately from readiness and retains approved details",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "skipped",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "skipped",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "skipped",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "skipped",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "skipped",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows early FAILED but never resurrects any terminal record",
+          "status": "skipped",
+          "title": "allows early FAILED but never resurrects any terminal record",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows early CANCELLED but never resurrects any terminal record",
+          "status": "skipped",
+          "title": "allows early CANCELLED but never resurrects any terminal record",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows early INTERRUPTED but never resurrects any terminal record",
+          "status": "skipped",
+          "title": "allows early INTERRUPTED but never resurrects any terminal record",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle rejects skipped, backward and duplicate states without modifying bytes",
+          "status": "skipped",
+          "title": "rejects skipped, backward and duplicate states without modifying bytes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle does not infer child failure, readiness, or interruption when reopened",
+          "status": "skipped",
+          "title": "does not infer child failure, readiness, or interruption when reopened",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary reports an atomic replacement during opened-fstat as a transient changed read",
+          "status": "failed",
+          "title": "reports an atomic replacement during opened-fstat as a transient changed read",
+          "duration": 329.60699999999997,
+          "failureMessages": [
+            "Error: expected OmpRunStorageError: OMP_RUN_UNSAFE_PATH { code: '…' } to match object { name: 'OmpRunStorageError', …(1) }\n(1 matching property omitted from actual)\n    at _Assertion.__VITEST_REJECTS__ (file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/@vitest/expect/dist/index.js:1747:17)\n    at _Assertion.propertyGetter (file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/chai/index.js:1570:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/chai/index.js:1659:22)\n    at <workspace>/tests/omp-run-repository.test.ts:203:46\n    at file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary reports an atomic replacement during after-read-fstat as a transient changed read",
+          "status": "failed",
+          "title": "reports an atomic replacement during after-read-fstat as a transient changed read",
+          "duration": 267.61069999999995,
+          "failureMessages": [
+            "Error: expected OmpRunStorageError: OMP_RUN_UNSAFE_PATH { code: '…' } to match object { name: 'OmpRunStorageError', …(1) }\n(1 matching property omitted from actual)\n    at _Assertion.__VITEST_REJECTS__ (file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/@vitest/expect/dist/index.js:1747:17)\n    at _Assertion.propertyGetter (file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/chai/index.js:1570:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/chai/index.js:1659:22)\n    at <workspace>/tests/omp-run-repository.test.ts:203:46\n    at file:///E:/Projects/Antigravity%20Projects/provider__switcher/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary competing repository instances cannot both overwrite the same prior transition",
+          "status": "skipped",
+          "title": "competing repository instances cannot both overwrite the same prior transition",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary persists every successful concurrent create without assuming all contenders succeed",
+          "status": "skipped",
+          "title": "persists every successful concurrent create without assuming all contenders succeed",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary never steals an existing writer lock, even if old, and keeps reads available",
+          "status": "skipped",
+          "title": "never steals an existing writer lock, even if old, and keeps reads available",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary preserves original good bytes and settles cleanup after a write failure",
+          "status": "skipped",
+          "title": "preserves original good bytes and settles cleanup after a write failure",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary preserves original good bytes and settles cleanup after a sync failure",
+          "status": "skipped",
+          "title": "preserves original good bytes and settles cleanup after a sync failure",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary preserves original good bytes and settles cleanup after a rename failure",
+          "status": "skipped",
+          "title": "preserves original good bytes and settles cleanup after a rename failure",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary retries one transient Windows rename sharing failure",
+          "status": "skipped",
+          "title": "retries one transient Windows rename sharing failure",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary fsyncs completed temporary bytes before replacing the original",
+          "status": "skipped",
+          "title": "fsyncs completed temporary bytes before replacing the original",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"\" on get/list/transition without replacing or backing them up",
+          "status": "skipped",
+          "title": "rejects corrupt bytes \"\" on get/list/transition without replacing or backing them up",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"{\" on get/list/transition without replacing or backing them up",
+          "status": "skipped",
+          "title": "rejects corrupt bytes \"{\" on get/list/transition without replacing or backing them up",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"{}\" on get/list/transition without replacing or backing them up",
+          "status": "skipped",
+          "title": "rejects corrupt bytes \"{}\" on get/list/transition without replacing or backing them up",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"\\u0000\" on get/list/transition without replacing or backing them up",
+          "status": "skipped",
+          "title": "rejects corrupt bytes \"\\u0000\" on get/list/transition without replacing or backing them up",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"{\\\"state\\\":\\\"DO-NOT-REPORT\\\"}\" on get/list/transition without replacing or backing them up",
+          "status": "skipped",
+          "title": "rejects corrupt bytes \"{\\\"state\\\":\\\"DO-NOT-REPORT\\\"}\" on get/list/transition without replacing or backing them up",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary refuses oversized otherwise valid JSON and invalid UTF-8 without rewriting either",
+          "status": "skipped",
+          "title": "refuses oversized otherwise valid JSON and invalid UTF-8 without rewriting either",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects schema/history/filename tampering, not just malformed JSON",
+          "status": "skipped",
+          "title": "rejects schema/history/filename tampering, not just malformed JSON",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects invalid or backwards clocks before a persistent mutation",
+          "status": "skipped",
+          "title": "rejects invalid or backwards clocks before a persistent mutation",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects modified staging bytes even when the attacker keeps the temporary inode and length",
+          "status": "skipped",
+          "title": "rejects modified staging bytes even when the attacker keeps the temporary inode and length",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary detects a non-cooperating destination writer before replacing its bytes",
+          "status": "skipped",
+          "title": "detects a non-cooperating destination writer before replacing its bytes",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary bounds directory enumeration instead of returning a partial list or deleting abandoned staging",
+          "status": "skipped",
+          "title": "bounds directory enumeration instead of returning a partial list or deleting abandoned staging",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment rejects traversal/NUL/ADS run IDs before IO and never exposes rejected values",
+          "status": "skipped",
+          "title": "rejects traversal/NUL/ADS run IDs before IO and never exposes rejected values",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment rejects ambiguous/traversing/relative storage and project paths",
+          "status": "skipped",
+          "title": "rejects ambiguous/traversing/relative storage and project paths",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment refuses linked storage directories and linked ancestors, without writing through them",
+          "status": "skipped",
+          "title": "refuses linked storage directories and linked ancestors, without writing through them",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment refuses linked record paths, including dangling links, and never replaces a target",
+          "status": "skipped",
+          "title": "refuses linked record paths, including dangling links, and never replaces a target",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment refuses hard-linked and non-regular records instead of reading/modifying them",
+          "status": "skipped",
+          "title": "refuses hard-linked and non-regular records instead of reading/modifying them",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary rejects invalid identities/mode/path and unapproved create fields without echoing values",
+          "status": "skipped",
+          "title": "rejects invalid identities/mode/path and unapproved create fields without echoing values",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary accepts a valid caller-supplied runId, persists it as the record id, and fails closed on a colliding id",
+          "status": "skipped",
+          "title": "accepts a valid caller-supplied runId, persists it as the record id, and fails closed on a colliding id",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary rejects invalid details without silently storing or dropping arbitrary fields",
+          "status": "skipped",
+          "title": "rejects invalid details without silently storing or dropping arbitrary fields",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary sanitizes diagnostics on write and read, discarding all free-form payloads",
+          "status": "skipped",
+          "title": "sanitizes diagnostics on write and read, discarding all free-form payloads",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389246653,
+      "endTime": 1792389247250.6106,
+      "status": "failed",
+      "message": "",
+      "name": "<workspace>/tests/omp-run-repository.test.ts"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+> provider-dock@0.1.0 build
+> node scripts/build-dist.mjs
+
+{"ok":true,"jsEmitted":130,"replacedPriorDist":true,"recovered":false}

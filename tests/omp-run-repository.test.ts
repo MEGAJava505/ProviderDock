@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
+import type { BigIntStats } from "node:fs";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -165,22 +166,38 @@ describe("OMP run durable storage boundary", () => {
       vi.spyOn(fs, "open").mockImplementation(async (...args) => {
         const handle = await originalOpen(...args);
         if (String(args[0]) !== file || injected) return handle;
-        if (window === "opened-fstat") {
-          const stat = handle.stat.bind(handle);
-          vi.spyOn(handle, "stat").mockImplementation(async (...statArgs) => {
-            if (!injected) {
-              injected = true;
-              await repository.transition(run.runId, "STARTING");
-            }
-            return stat(...statArgs);
-          });
-        } else {
+        const stat = handle.stat.bind(handle);
+        let detachedStat: BigIntStats | undefined;
+        const replace = async () => {
+          injected = true;
+          if (process.platform === "win32") {
+            // Windows refuses rename-over-open with EPERM. Release the real
+            // handle and model only the detached POSIX descriptor's metadata;
+            // the replacement, its validation and the next read remain real IO.
+            detachedStat = Object.assign(await stat({ bigint: true }), { nlink: 0n });
+            await handle.close();
+            vi.spyOn(handle, "close").mockResolvedValue(undefined);
+          }
+          await repository.transition(run.runId, "STARTING");
+          return detachedStat;
+        };
+        vi.spyOn(handle, "stat").mockImplementation(async (...statArgs) => {
+          if (window === "opened-fstat" && !injected) await replace();
+          return detachedStat ?? stat(...statArgs);
+        });
+        if (window === "after-read-fstat") {
           const read = handle.read.bind(handle);
+          let detachedEof: Awaited<ReturnType<typeof read>> | undefined;
           vi.spyOn(handle, "read").mockImplementation(async (...readArgs) => {
+            if (detachedEof) return detachedEof;
             const result = await read(...readArgs);
             if (!injected && result.bytesRead > 0) {
-              injected = true;
-              await repository.transition(run.runId, "STARTING");
+              const detached = await replace();
+              // Only emulate EOF after consuming the entire old fixture.
+              if (detached) {
+                expect(BigInt(result.bytesRead)).toBe(detached.size);
+                detachedEof = { ...result, bytesRead: 0 };
+              }
             }
             return result;
           });

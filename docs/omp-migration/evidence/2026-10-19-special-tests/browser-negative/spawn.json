@@ -1,0 +1,17 @@
+{
+  "ok": false,
+  "error": {
+    "name": "Error",
+    "message": "fixture-fault:spawn: ENOENT"
+  },
+  "cleanup": {
+    "browserProfileRemoved": true,
+    "rootRemoved": true
+  },
+  "acceptance": {
+    "selections": [],
+    "latePreflight": [],
+    "launches": [],
+    "lifecycle": {}
+  }
+}

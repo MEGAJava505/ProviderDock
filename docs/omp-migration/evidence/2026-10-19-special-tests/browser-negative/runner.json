@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "negative": [
+    {
+      "phase": "spawn",
+      "exitCode": 1,
+      "elapsedMs": 865,
+      "evidenceDirectory": "browser-negative",
+      "evidenceReport": "browser-negative/spawn.json"
+    },
+    {
+      "phase": "cdp-close",
+      "exitCode": 1,
+      "elapsedMs": 5022,
+      "evidenceDirectory": "browser-negative",
+      "evidenceReport": "browser-negative/cdp-close.json"
+    },
+    {
+      "phase": "network",
+      "exitCode": 1,
+      "elapsedMs": 5596,
+      "evidenceDirectory": "browser-negative",
+      "evidenceReport": "browser-negative/network.json"
+    },
+    {
+      "phase": "cleanup",
+      "exitCode": 1,
+      "elapsedMs": 15202,
+      "evidenceDirectory": "browser-negative",
+      "evidenceReport": "browser-negative/cleanup.json"
+    }
+  ]
+}

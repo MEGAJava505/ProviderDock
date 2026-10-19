@@ -1,0 +1,26 @@
+{
+  "ok": false,
+  "error": {
+    "name": "Error",
+    "message": "fixture-fault:cdp-close"
+  },
+  "cleanup": {
+    "browserProfileRemoved": true,
+    "rootRemoved": true
+  },
+  "diagnostic": {
+    "browserRuns": [],
+    "storeRuns": [],
+    "spawnRecords": [],
+    "loopbackRequests": [],
+    "browserExceptions": [],
+    "browserNetworkFailures": [],
+    "browserHttpFailures": []
+  },
+  "acceptance": {
+    "selections": [],
+    "latePreflight": [],
+    "launches": [],
+    "lifecycle": {}
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "capturedAtUtc": "2026-10-19T05:59:20.411Z",
+  "baseCommit": "9ce3f3bf506dd6859343e5285941bf85f020257b",
+  "scope": "Local synthetic fixtures and loopback only; no external pilot acceptance",
+  "environment": {
+    "os": "win32",
+    "architecture": "x64",
+    "node": "v24.20.0",
+    "npm": "11.19.0",
+    "vitest": "4.1.11",
+    "browser": {
+      "executable": "msedge.exe",
+      "version": "155.0.4283.62"
+    }
+  },
+  "source": {
+    "test": "tests/omp-run-repository.test.ts",
+    "sha256": "76d5f104465a75735f9856c3cf7dab3ddc15f56e3c8a6c2291f9845653249948"
+  },
+  "suites": [
+    {
+      "file": "tests/omp-integration-harness.test.ts",
+      "status": "passed",
+      "tests": 19
+    },
+    {
+      "file": "tests/omp-launch-service.test.ts",
+      "status": "passed",
+      "tests": 25
+    },
+    {
+      "file": "tests/omp-process-supervisor.test.ts",
+      "status": "passed",
+      "tests": 47
+    },
+    {
+      "file": "tests/omp-run-repository.test.ts",
+      "status": "passed",
+      "tests": 44
+    },
+    {
+      "file": "tests/omp-runtime.test.ts",
+      "status": "passed",
+      "tests": 37
+    },
+    {
+      "file": "tests/provider-dashboard-omp.test.ts",
+      "status": "passed",
+      "tests": 15
+    },
+    {
+      "file": "tests/provider-dashboard-server.test.ts",
+      "status": "passed",
+      "tests": 41
+    }
+  ],
+  "gates": [
+    {
+      "command": "npx vitest run <seven suites listed in Special_tests.md>",
+      "exitCode": 0,
+      "testsPassed": 228,
+      "skipped": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "ok": true,
+      "jsEmitted": 130
+    },
+    {
+      "command": "node --check scripts/omp-browser-stack-smoke.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check scripts/dashboard-ui-smoke.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/omp-browser-stack-smoke.mjs",
+      "exitCode": 0,
+      "ok": true,
+      "checksPassed": 12
+    },
+    {
+      "command": "node scripts/omp-browser-stack-smoke.mjs --negative",
+      "exitCode": 0,
+      "ok": true,
+      "expectedChildExitCodes": [
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "regression": {
+    "before": "226/228 PASS; both atomic-replacement tests failed with OMP_RUN_IO_FAILED on Windows",
+    "cause": "Real rename-over-open returned EPERM; rename succeeded after closing the same descriptor",
+    "fix": "Test fixture only: Windows models detached POSIX metadata and EOF after real fixture bytes; POSIX retains real rename-over-open",
+    "mutation": "Both regressions fail when nlink=0 is classified as OMP_RUN_UNSAFE_PATH; original production bytes restored",
+    "productionSourceChanged": false,
+    "posixExecutionRepeated": false
+  },
+  "externalClaims": {
+    "actualOmpExe": "NOT PROVEN",
+    "nativeResume": "NOT PROVEN",
+    "externalEgressIsolation": "NOT PROVEN",
+    "liveProviderRoute": "NOT PROVEN",
+    "pilot": "NOT STARTED"
+  },
+  "redaction": "Workspace, temp and user-home prefixes replaced in text/JSON; text logs normalized to LF without trailing whitespace; binary screenshots show synthetic fixtures only. No live provider credentials used."
+}

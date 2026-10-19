@@ -1,0 +1,2837 @@
+{
+  "numTotalTestSuites": 32,
+  "numPassedTestSuites": 32,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 228,
+  "numPassedTests": 228,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792389337784,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "bounded loopback startup"
+          ],
+          "fullName": "bounded loopback startup rejects bind refusal and a startup with neither callback nor error",
+          "status": "passed",
+          "title": "rejects bind refusal and a startup with neither callback nor error",
+          "duration": 50.87519999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.1 managed OMP lifecycle (fake child; real omp.exe BLOCKED)"
+          ],
+          "fullName": "M2.1 managed OMP lifecycle (fake child; real omp.exe BLOCKED) CLI launch omp drives a managed tui run to SUCCEEDED with only the fixture marker",
+          "status": "passed",
+          "title": "CLI launch omp drives a managed tui run to SUCCEEDED with only the fixture marker",
+          "duration": 2632.3887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.1 managed OMP lifecycle (fake child; real omp.exe BLOCKED)"
+          ],
+          "fullName": "M2.1 managed OMP lifecycle (fake child; real omp.exe BLOCKED) dashboard preview -> preflight -> launch -> runs drives a managed tui run to SUCCEEDED",
+          "status": "passed",
+          "title": "dashboard preview -> preflight -> launch -> runs drives a managed tui run to SUCCEEDED",
+          "duration": 2838.4393,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.1 managed OMP lifecycle (fake child; real omp.exe BLOCKED)"
+          ],
+          "fullName": "M2.1 managed OMP lifecycle (fake child; real omp.exe BLOCKED) direct supervisor.start in rpc mode reaches a live open state then SUCCEEDED",
+          "status": "passed",
+          "title": "direct supervisor.start in rpc mode reaches a live open state then SUCCEEDED",
+          "duration": 1888.4243999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.2 failure matrix (fake child; not confirmed against real OMP)"
+          ],
+          "fullName": "M2.2 failure matrix (fake child; not confirmed against real OMP) row1: upstream 401/403 fails the run once with no retry or fallback",
+          "status": "passed",
+          "title": "row1: upstream 401/403 fails the run once with no retry or fallback",
+          "duration": 1540.3845999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.2 failure matrix (fake child; not confirmed against real OMP)"
+          ],
+          "fullName": "M2.2 failure matrix (fake child; not confirmed against real OMP) row2: upstream 429 and 5xx fail the run once with no retry or fallback",
+          "status": "passed",
+          "title": "row2: upstream 429 and 5xx fail the run once with no retry or fallback",
+          "duration": 1180.2258999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.2 failure matrix (fake child; not confirmed against real OMP)"
+          ],
+          "fullName": "M2.2 failure matrix (fake child; not confirmed against real OMP) row3: a broken SSE stream mid-response fails the run with no silent completion",
+          "status": "passed",
+          "title": "row3: a broken SSE stream mid-response fails the run with no silent completion",
+          "duration": 504.5511999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.2 failure matrix (fake child; not confirmed against real OMP)"
+          ],
+          "fullName": "M2.2 failure matrix (fake child; not confirmed against real OMP) row4: child exit before RPC readiness fails the run and never fabricates SUCCEEDED",
+          "status": "passed",
+          "title": "row4: child exit before RPC readiness fails the run and never fabricates SUCCEEDED",
+          "duration": 631.7747999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.2 failure matrix (fake child; not confirmed against real OMP)"
+          ],
+          "fullName": "M2.2 failure matrix (fake child; not confirmed against real OMP) row5: cancel of a live run yields CANCELLED and is idempotent after terminal",
+          "status": "passed",
+          "title": "row5: cancel of a live run yields CANCELLED and is idempotent after terminal",
+          "duration": 981.849400000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.2 failure matrix (fake child; not confirmed against real OMP)"
+          ],
+          "fullName": "M2.2 failure matrix (fake child; not confirmed against real OMP) row6: a side-effecting tool that then errors is not retried (exactly one side effect)",
+          "status": "passed",
+          "title": "row6: a side-effecting tool that then errors is not retried (exactly one side effect)",
+          "duration": 465.6800999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M2.3 restart / ownership / truthful status"
+          ],
+          "fullName": "M2.3 restart / ownership / truthful status a restart marks an orphaned live run INTERRUPTED and leaves a completed run untouched",
+          "status": "passed",
+          "title": "a restart marks an orphaned live run INTERRUPTED and leaves a completed run untouched",
+          "duration": 1160.4220000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3.3 strict upstream contract gate (loopback rejects non-conforming requests)"
+          ],
+          "fullName": "M3.3 strict upstream contract gate (loopback rejects non-conforming requests) rejects wrong method/path/protocol/model/marker-auth without leaking the marker, and admits only a conforming request",
+          "status": "passed",
+          "title": "rejects wrong method/path/protocol/model/marker-auth without leaking the marker, and admits only a conforming request",
+          "duration": 70.91350000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3.3 tool-turn read digest tracks the actual bytes (substitution goes RED)"
+          ],
+          "fullName": "M3.3 tool-turn read digest tracks the actual bytes (substitution goes RED) reports sha256 of the real file, and a substituted fixture changes the reported marker",
+          "status": "passed",
+          "title": "reports sha256 of the real file, and a substituted fixture changes the reported marker",
+          "duration": 983.8487000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3.3 dashboard run-management surface (fake child; real omp.exe BLOCKED)"
+          ],
+          "fullName": "M3.3 dashboard run-management surface (fake child; real omp.exe BLOCKED) a failing run launched through the dashboard reaches FAILED and the runs list reports it",
+          "status": "passed",
+          "title": "a failing run launched through the dashboard reaches FAILED and the runs list reports it",
+          "duration": 473.6402999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3.3 dashboard run-management surface (fake child; real omp.exe BLOCKED)"
+          ],
+          "fullName": "M3.3 dashboard run-management surface (fake child; real omp.exe BLOCKED) cancel through the dashboard endpoint yields CANCELLED, is idempotent, and 404s an unknown run",
+          "status": "passed",
+          "title": "cancel through the dashboard endpoint yields CANCELLED, is idempotent, and 404s an unknown run",
+          "duration": 378.96169999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3.3 dashboard run-management surface (fake child; real omp.exe BLOCKED)"
+          ],
+          "fullName": "M3.3 dashboard run-management surface (fake child; real omp.exe BLOCKED) does not lose a cancel of its own run published before ownership is registered (real HTTP + supervisor + temp repo)",
+          "status": "passed",
+          "title": "does not lose a cancel of its own run published before ownership is registered (real HTTP + supervisor + temp repo)",
+          "duration": 139.5699999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3.3 project-settings prohibition (OmpRuntime.preflight on fixture projects)"
+          ],
+          "fullName": "M3.3 project-settings prohibition (OmpRuntime.preflight on fixture projects) rejects a fixture project carrying any unreviewed agent settings, and admits a clean one",
+          "status": "passed",
+          "title": "rejects a fixture project carrying any unreviewed agent settings, and admits a clean one",
+          "duration": 63.710399999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3.3 real-binary status (BLOCKED — controlled fake child only)"
+          ],
+          "fullName": "M3.3 real-binary status (BLOCKED — controlled fake child only) drives a .mjs fake child, never the pinned omp.exe",
+          "status": "passed",
+          "title": "drives a .mjs fake child, never the pinned omp.exe",
+          "duration": 0.25609999999869615,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "M3-FINAL.3 dashboard emergency-stop surface (real supervisor + temp repo + HTTP)"
+          ],
+          "fullName": "M3-FINAL.3 dashboard emergency-stop surface (real supervisor + temp repo + HTTP) keeps a faulted live child non-terminal over HTTP; only its own close settles one FAILED with the original cause",
+          "status": "passed",
+          "title": "keeps a faulted live child non-terminal over HTTP; only its own close settles one FAILED with the original cause",
+          "duration": 574.5936000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389340359,
+      "endTime": 1792389356921.5935,
+      "status": "passed",
+      "message": "",
+      "name": "<workspace>/tests/omp-integration-harness.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService preflights one exact explicit route",
+          "status": "passed",
+          "title": "preflights one exact explicit route",
+          "duration": 24.95069999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService does not reach runtime when the stored Doctor snapshot is absent",
+          "status": "passed",
+          "title": "does not reach runtime when the stored Doctor snapshot is absent",
+          "duration": 3.212199999999939,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService reports a safe upgrade diagnostic for legacy acceptance files",
+          "status": "passed",
+          "title": "reports a safe upgrade diagnostic for legacy acceptance files",
+          "duration": 1.5636999999996988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService fails closed before runtime when no fingerprint-bound decision exists",
+          "status": "passed",
+          "title": "fails closed before runtime when no fingerprint-bound decision exists",
+          "duration": 0.7199000000000524,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService rejects a stale profile fingerprint and never derives origin approval",
+          "status": "passed",
+          "title": "rejects a stale profile fingerprint and never derives origin approval",
+          "duration": 1.0743000000002212,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService rejects accepted-route field or smoke-artifact drift before runtime",
+          "status": "passed",
+          "title": "rejects accepted-route field or smoke-artifact drift before runtime",
+          "duration": 3.0288000000000466,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService rejects route decisions whose local-smoke provenance is absent from the evidence snapshot",
+          "status": "passed",
+          "title": "rejects route decisions whose local-smoke provenance is absent from the evidence snapshot",
+          "duration": 1.3247000000001208,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService rejects a route whose exact model lacks a passed smoke claim",
+          "status": "passed",
+          "title": "rejects a route whose exact model lacks a passed smoke claim",
+          "duration": 1.0165999999999258,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService uses the accepted exact base URL and protocol mapping for an auto profile",
+          "status": "passed",
+          "title": "uses the accepted exact base URL and protocol mapping for an auto profile",
+          "duration": 1.8636000000001332,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService rejects an accepted auto route that the pinned compiler cannot represent",
+          "status": "passed",
+          "title": "rejects an accepted auto route that the pinned compiler cannot represent",
+          "duration": 2.2008999999998196,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService fails auto protocols closed without runtime preflight",
+          "status": "passed",
+          "title": "fails auto protocols closed without runtime preflight",
+          "duration": 0.5457999999998719,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService requires all explicit identities and the OMP acknowledgement",
+          "status": "passed",
+          "title": "requires all explicit identities and the OMP acknowledgement",
+          "duration": 0.9029000000000451,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService launches only after preflight and returns safe run identity",
+          "status": "passed",
+          "title": "launches only after preflight and returns safe run identity",
+          "duration": 1.4389999999998508,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService returns only a safe diagnostic when preflight or launch fails",
+          "status": "passed",
+          "title": "returns only a safe diagnostic when preflight or launch fails",
+          "duration": 1.9746000000000095,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService delegates safe run history and restart reconciliation",
+          "status": "passed",
+          "title": "delegates safe run history and restart reconciliation",
+          "duration": 1.022399999999834,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService routes one immutable selection through preflight and start even when sources change between reads",
+          "status": "passed",
+          "title": "routes one immutable selection through preflight and start even when sources change between reads",
+          "duration": 2.160899999999856,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService"
+          ],
+          "fullName": "OmpLaunchService does not reach supervisor.start when runtime preflight fails",
+          "status": "passed",
+          "title": "does not reach supervisor.start when runtime preflight fails",
+          "duration": 1.2391999999999825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService",
+            "route preview"
+          ],
+          "fullName": "OmpLaunchService route preview explains a correct decision as pilot-ready without preflight or side effects",
+          "status": "passed",
+          "title": "explains a correct decision as pilot-ready without preflight or side effects",
+          "duration": 1.3933000000001812,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService",
+            "route preview"
+          ],
+          "fullName": "OmpLaunchService route preview explains a missing route decision as fully blocked with no evidence",
+          "status": "passed",
+          "title": "explains a missing route decision as fully blocked with no evidence",
+          "duration": 1.3016999999999825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService",
+            "route preview"
+          ],
+          "fullName": "OmpLaunchService route preview never reports ready for broken v2 local-smoke evidence",
+          "status": "passed",
+          "title": "never reports ready for broken v2 local-smoke evidence",
+          "duration": 1.150300000000243,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService",
+            "route preview"
+          ],
+          "fullName": "OmpLaunchService route preview marks a stale Doctor credential fingerprint as unknown/stale, never ready",
+          "status": "passed",
+          "title": "marks a stale Doctor credential fingerprint as unknown/stale, never ready",
+          "duration": 1.0162999999997737,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService",
+            "route preview"
+          ],
+          "fullName": "OmpLaunchService route preview marks matching local smoke without a real pilot as unknown local-smoke-only",
+          "status": "passed",
+          "title": "marks matching local smoke without a real pilot as unknown local-smoke-only",
+          "duration": 1.2003999999997177,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService",
+            "route preview"
+          ],
+          "fullName": "OmpLaunchService route preview degrades a corrupt/legacy evidence source to a safe non-ready preview",
+          "status": "passed",
+          "title": "degrades a corrupt/legacy evidence source to a safe non-ready preview",
+          "duration": 1.0050999999998567,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OmpLaunchService",
+            "route preview"
+          ],
+          "fullName": "OmpLaunchService route preview blocks a missing, disabled, or empty selection without reading sources or throwing",
+          "status": "passed",
+          "title": "blocks a missing, disabled, or empty selection without reading sources or throwing",
+          "duration": 1.8501999999998588,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "joint: switching the active provider-api key invalidates OMP evidence"
+          ],
+          "fullName": "joint: switching the active provider-api key invalidates OMP evidence degrades a ready preview to non-ready and blocks launch after the key switch",
+          "status": "passed",
+          "title": "degrades a ready preview to non-ready and blocks launch after the key switch",
+          "duration": 7.769600000000082,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389341318,
+      "endTime": 1792389341385.7695,
+      "status": "passed",
+      "message": "",
+      "name": "<workspace>/tests/omp-launch-service.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) persistently fails when preflight rejects the route before spawn",
+          "status": "passed",
+          "title": "persistently fails when preflight rejects the route before spawn",
+          "duration": 265.04409999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) persistently fails when preparation fails and never spawns",
+          "status": "passed",
+          "title": "persistently fails when preparation fails and never spawns",
+          "duration": 1063.4404000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) rejects structurally invalid selections before creating a run",
+          "status": "passed",
+          "title": "rejects structurally invalid selections before creating a run",
+          "duration": 198.80989999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) records spawn failure without exposing the raw error",
+          "status": "passed",
+          "title": "records spawn failure without exposing the raw error",
+          "duration": 1119.2000000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) records early exit before readiness as an initialization failure",
+          "status": "passed",
+          "title": "records early exit before readiness as an initialization failure",
+          "duration": 1191.9932999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) does not treat an RPC exit code 0 before readiness as SUCCEEDED",
+          "status": "passed",
+          "title": "does not treat an RPC exit code 0 before readiness as SUCCEEDED",
+          "duration": 1522.4773999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) does not treat an RPC exit code 0 after readiness but before a running state as SUCCEEDED",
+          "status": "passed",
+          "title": "does not treat an RPC exit code 0 after readiness but before a running state as SUCCEEDED",
+          "duration": 2119.3455000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) treats an RPC exit code 0 after a confirmed running state as SUCCEEDED",
+          "status": "passed",
+          "title": "treats an RPC exit code 0 after a confirmed running state as SUCCEEDED",
+          "duration": 796.2217999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) fails closed and stops the child when RPC initialization times out",
+          "status": "passed",
+          "title": "fails closed and stops the child when RPC initialization times out",
+          "duration": 1022.1432999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) reaches READY only from RPC evidence, then RUNNING with the projected session",
+          "status": "passed",
+          "title": "reaches READY only from RPC evidence, then RUNNING with the projected session",
+          "duration": 313.2452000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps TUI on the real terminal and never claims RPC readiness",
+          "status": "passed",
+          "title": "keeps TUI on the real terminal and never claims RPC readiness",
+          "duration": 263.66530000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) records late failure after a successful initialization",
+          "status": "passed",
+          "title": "records late failure after a successful initialization",
+          "duration": 362.01870000000054,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) cancels an RPC run through the private abort command and records CANCELLED",
+          "status": "passed",
+          "title": "cancels an RPC run through the private abort command and records CANCELLED",
+          "duration": 365.98599999999897,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) cancels a TUI run by stopping only its own child process",
+          "status": "passed",
+          "title": "cancels a TUI run by stopping only its own child process",
+          "duration": 255.59059999999954,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) cancels a run requested before the child is spawned",
+          "status": "passed",
+          "title": "cancels a run requested before the child is spawned",
+          "duration": 121.78049999999894,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) holds a cancel as non-terminal CANCELLING while preflight outlives the grace, then settles CANCELLED on release",
+          "status": "passed",
+          "title": "holds a cancel as non-terminal CANCELLING while preflight outlives the grace, then settles CANCELLED on release",
+          "duration": 200.2469000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) does not lose a cancel of its own run published before ownership is registered",
+          "status": "passed",
+          "title": "does not lose a cancel of its own run published before ownership is registered",
+          "duration": 103.95509999999922,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) holds a cancel as non-terminal CANCELLING while prepare outlives the grace, then settles CANCELLED on release",
+          "status": "passed",
+          "title": "holds a cancel as non-terminal CANCELLING while prepare outlives the grace, then settles CANCELLED on release",
+          "duration": 262.192500000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps repeated cancels during a pre-spawn hang non-terminal and settles CANCELLED exactly once",
+          "status": "passed",
+          "title": "keeps repeated cancels during a pre-spawn hang non-terminal and settles CANCELLED exactly once",
+          "duration": 282.3580000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) reports a non-terminal unconfirmed stop, keeps observing, and settles CANCELLED on the child's own close",
+          "status": "passed",
+          "title": "reports a non-terminal unconfirmed stop, keeps observing, and settles CANCELLED on the child's own close",
+          "duration": 454.47589999999946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps an undeliverable kill on a live TUI child non-terminal, then settles CANCELLED on its own close",
+          "status": "passed",
+          "title": "keeps an undeliverable kill on a live TUI child non-terminal, then settles CANCELLED on its own close",
+          "duration": 672.7718999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps an undeliverable kill non-terminal when cancelling an RPC child before readiness",
+          "status": "passed",
+          "title": "keeps an undeliverable kill non-terminal when cancelling an RPC child before readiness",
+          "duration": 533.9431999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps an undeliverable kill on a running RPC child non-terminal, then settles CANCELLED on its close",
+          "status": "passed",
+          "title": "keeps an undeliverable kill on a running RPC child non-terminal, then settles CANCELLED on its close",
+          "duration": 451.85639999999876,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps an initialization-timeout child stoppable until close",
+          "status": "passed",
+          "title": "keeps an initialization-timeout child stoppable until close",
+          "duration": 502.4372999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) defers the terminal until close when a live RPC child faults on an invalid JSON frame",
+          "status": "passed",
+          "title": "defers the terminal until close when a live RPC child faults on an invalid JSON frame",
+          "duration": 250.61299999999937,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) defers the terminal until close when a live RPC child faults on a ready frame with an unsupported protocol version",
+          "status": "passed",
+          "title": "defers the terminal until close when a live RPC child faults on a ready frame with an unsupported protocol version",
+          "duration": 328.7668999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) defers the terminal until close when a live RPC child faults on a stdin stream error",
+          "status": "passed",
+          "title": "defers the terminal until close when a live RPC child faults on a stdin stream error",
+          "duration": 231.92909999999938,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) defers the terminal until close when a live RPC child faults on an oversized frame",
+          "status": "passed",
+          "title": "defers the terminal until close when a live RPC child faults on an oversized frame",
+          "duration": 186.77000000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) defers the terminal until close when a live RPC child faults on a get_state control write that throws after readiness",
+          "status": "passed",
+          "title": "defers the terminal until close when a live RPC child faults on a get_state control write that throws after readiness",
+          "duration": 282.3730999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) defers the terminal until close when a live RPC child faults on a missing stdout pipe",
+          "status": "passed",
+          "title": "defers the terminal until close when a live RPC child faults on a missing stdout pipe",
+          "duration": 185.5132999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps an init-timeout child non-terminal when kill returns-false, settling on its close",
+          "status": "passed",
+          "title": "keeps an init-timeout child non-terminal when kill returns-false, settling on its close",
+          "duration": 294.8174999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps an init-timeout child non-terminal when kill throws, settling on its close",
+          "status": "passed",
+          "title": "keeps an init-timeout child non-terminal when kill throws, settling on its close",
+          "duration": 248.96350000000166,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps a cancel authoritative when late fault frames arrive after the cancel (RPC)",
+          "status": "passed",
+          "title": "keeps a cancel authoritative when late fault frames arrive after the cancel (RPC)",
+          "duration": 376.5854999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) blocks a late READY/state frame from reviving a cancelling RPC run",
+          "status": "passed",
+          "title": "blocks a late READY/state frame from reviving a cancelling RPC run",
+          "duration": 281.60529999999926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) reconciles a fault-triggered unconfirmed stop to INTERRUPTED after restart without signalling its pid",
+          "status": "passed",
+          "title": "reconciles a fault-triggered unconfirmed stop to INTERRUPTED after restart without signalling its pid",
+          "duration": 299.2254999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) treats errors on a live child as non-fatal and a post-close error as a no-op (one terminal only)",
+          "status": "passed",
+          "title": "treats errors on a live child as non-fatal and a post-close error as a no-op (one terminal only)",
+          "duration": 309.2233000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps a run tracked and non-terminal when kill() throws synchronously",
+          "status": "passed",
+          "title": "keeps a run tracked and non-terminal when kill() throws synchronously",
+          "duration": 263.7582999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) reconciles an unconfirmed CANCELLING run to INTERRUPTED after restart without signalling its pid",
+          "status": "passed",
+          "title": "reconciles an unconfirmed CANCELLING run to INTERRUPTED after restart without signalling its pid",
+          "duration": 295.2573000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) keeps failure evidence across a dashboard restart and never resurrects terminal runs",
+          "status": "passed",
+          "title": "keeps failure evidence across a dashboard restart and never resurrects terminal runs",
+          "duration": 226.65719999999783,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) returns the terminal record for a repeated cancel without re-signalling",
+          "status": "passed",
+          "title": "returns the terminal record for a repeated cancel without re-signalling",
+          "duration": 163.42799999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) cancels one live run without disturbing another concurrent run",
+          "status": "passed",
+          "title": "cancels one live run without disturbing another concurrent run",
+          "duration": 283.4527999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) serializes sibling run-store writes so a fail-fast lock never drops a cancel",
+          "status": "passed",
+          "title": "serializes sibling run-store writes so a fail-fast lock never drops a cancel",
+          "duration": 284.779599999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP process supervisor lifecycle (fake children only)"
+          ],
+          "fullName": "OMP process supervisor lifecycle (fake children only) interrupts every orphaned non-terminal run and preserves terminal runs after restart",
+          "status": "passed",
+          "title": "interrupts every orphaned non-terminal run and preserves terminal runs after restart",
+          "duration": 747.1144999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP private RPC -> public lifecycle boundary"
+          ],
+          "fullName": "OMP private RPC -> public lifecycle boundary keeps only verified lifecycle fields, never model headers or arbitrary text",
+          "status": "passed",
+          "title": "keeps only verified lifecycle fields, never model headers or arbitrary text",
+          "duration": 0.2569000000003143,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP private RPC -> public lifecycle boundary"
+          ],
+          "fullName": "OMP private RPC -> public lifecycle boundary does not trust unsolicited, wrong-route, or malformed state",
+          "status": "passed",
+          "title": "does not trust unsolicited, wrong-route, or malformed state",
+          "duration": 0.25720000000001164,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP private RPC -> public lifecycle boundary"
+          ],
+          "fullName": "OMP private RPC -> public lifecycle boundary does not expose upstream failure strings and ignores non-control frames",
+          "status": "passed",
+          "title": "does not expose upstream failure strings and ignores non-control frames",
+          "duration": 0.1518999999971129,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP private RPC -> public lifecycle boundary"
+          ],
+          "fullName": "OMP private RPC -> public lifecycle boundary projects readiness and idle abort without echoing extra fields",
+          "status": "passed",
+          "title": "projects readiness and idle abort without echoing extra fields",
+          "duration": 0.16350000000238651,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389338874,
+      "endTime": 1792389358862.257,
+      "status": "passed",
+      "message": "",
+      "name": "<workspace>/tests/omp-process-supervisor.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle persists literal identities and generated UUID/times for a fresh instance",
+          "status": "passed",
+          "title": "persists literal identities and generated UUID/times for a fresh instance",
+          "duration": 162.50290000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle returns undefined/empty only for genuinely missing records/directories",
+          "status": "passed",
+          "title": "returns undefined/empty only for genuinely missing records/directories",
+          "duration": 13.200600000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle returns deeply immutable independent snapshots, not writable repository state",
+          "status": "passed",
+          "title": "returns deeply immutable independent snapshots, not writable repository state",
+          "duration": 140.51459999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle records terminal-open separately from readiness and retains approved details",
+          "status": "passed",
+          "title": "records terminal-open separately from readiness and retains approved details",
+          "duration": 2347.871,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "passed",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "duration": 1837.6963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "passed",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "duration": 2029.0545000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "passed",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "duration": 1151.967700000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "passed",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "duration": 697.2163,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows caller-evidenced progress/exit via \"STARTING\"",
+          "status": "passed",
+          "title": "allows caller-evidenced progress/exit via \"STARTING\"",
+          "duration": 654.6129999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows early FAILED but never resurrects any terminal record",
+          "status": "passed",
+          "title": "allows early FAILED but never resurrects any terminal record",
+          "duration": 261.53600000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows early CANCELLED but never resurrects any terminal record",
+          "status": "passed",
+          "title": "allows early CANCELLED but never resurrects any terminal record",
+          "duration": 226.15769999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle allows early INTERRUPTED but never resurrects any terminal record",
+          "status": "passed",
+          "title": "allows early INTERRUPTED but never resurrects any terminal record",
+          "duration": 181.51980000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle rejects skipped, backward and duplicate states without modifying bytes",
+          "status": "passed",
+          "title": "rejects skipped, backward and duplicate states without modifying bytes",
+          "duration": 233.21429999999964,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run persistence and lifecycle"
+          ],
+          "fullName": "OMP run persistence and lifecycle does not infer child failure, readiness, or interruption when reopened",
+          "status": "passed",
+          "title": "does not infer child failure, readiness, or interruption when reopened",
+          "duration": 92.34799999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary reports an atomic replacement during opened-fstat as a transient changed read",
+          "status": "passed",
+          "title": "reports an atomic replacement during opened-fstat as a transient changed read",
+          "duration": 162.02589999999873,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary reports an atomic replacement during after-read-fstat as a transient changed read",
+          "status": "passed",
+          "title": "reports an atomic replacement during after-read-fstat as a transient changed read",
+          "duration": 144.14960000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary competing repository instances cannot both overwrite the same prior transition",
+          "status": "passed",
+          "title": "competing repository instances cannot both overwrite the same prior transition",
+          "duration": 272.5666999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary persists every successful concurrent create without assuming all contenders succeed",
+          "status": "passed",
+          "title": "persists every successful concurrent create without assuming all contenders succeed",
+          "duration": 73.95539999999892,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary never steals an existing writer lock, even if old, and keeps reads available",
+          "status": "passed",
+          "title": "never steals an existing writer lock, even if old, and keeps reads available",
+          "duration": 88.70079999999871,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary preserves original good bytes and settles cleanup after a write failure",
+          "status": "passed",
+          "title": "preserves original good bytes and settles cleanup after a write failure",
+          "duration": 130.89509999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary preserves original good bytes and settles cleanup after a sync failure",
+          "status": "passed",
+          "title": "preserves original good bytes and settles cleanup after a sync failure",
+          "duration": 98.07359999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary preserves original good bytes and settles cleanup after a rename failure",
+          "status": "passed",
+          "title": "preserves original good bytes and settles cleanup after a rename failure",
+          "duration": 112.81580000000031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary retries one transient Windows rename sharing failure",
+          "status": "passed",
+          "title": "retries one transient Windows rename sharing failure",
+          "duration": 121.41679999999906,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary fsyncs completed temporary bytes before replacing the original",
+          "status": "passed",
+          "title": "fsyncs completed temporary bytes before replacing the original",
+          "duration": 103.90750000000116,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"\" on get/list/transition without replacing or backing them up",
+          "status": "passed",
+          "title": "rejects corrupt bytes \"\" on get/list/transition without replacing or backing them up",
+          "duration": 47.943999999999505,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"{\" on get/list/transition without replacing or backing them up",
+          "status": "passed",
+          "title": "rejects corrupt bytes \"{\" on get/list/transition without replacing or backing them up",
+          "duration": 64.68239999999969,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"{}\" on get/list/transition without replacing or backing them up",
+          "status": "passed",
+          "title": "rejects corrupt bytes \"{}\" on get/list/transition without replacing or backing them up",
+          "duration": 58.51310000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"\\u0000\" on get/list/transition without replacing or backing them up",
+          "status": "passed",
+          "title": "rejects corrupt bytes \"\\u0000\" on get/list/transition without replacing or backing them up",
+          "duration": 89.8065000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects corrupt bytes \"{\\\"state\\\":\\\"DO-NOT-REPORT\\\"}\" on get/list/transition without replacing or backing them up",
+          "status": "passed",
+          "title": "rejects corrupt bytes \"{\\\"state\\\":\\\"DO-NOT-REPORT\\\"}\" on get/list/transition without replacing or backing them up",
+          "duration": 74.85469999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary refuses oversized otherwise valid JSON and invalid UTF-8 without rewriting either",
+          "status": "passed",
+          "title": "refuses oversized otherwise valid JSON and invalid UTF-8 without rewriting either",
+          "duration": 274.6111000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects schema/history/filename tampering, not just malformed JSON",
+          "status": "passed",
+          "title": "rejects schema/history/filename tampering, not just malformed JSON",
+          "duration": 126.09649999999965,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects invalid or backwards clocks before a persistent mutation",
+          "status": "passed",
+          "title": "rejects invalid or backwards clocks before a persistent mutation",
+          "duration": 47.143200000000434,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary rejects modified staging bytes even when the attacker keeps the temporary inode and length",
+          "status": "passed",
+          "title": "rejects modified staging bytes even when the attacker keeps the temporary inode and length",
+          "duration": 123.84640000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary detects a non-cooperating destination writer before replacing its bytes",
+          "status": "passed",
+          "title": "detects a non-cooperating destination writer before replacing its bytes",
+          "duration": 120.82480000000032,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run durable storage boundary"
+          ],
+          "fullName": "OMP run durable storage boundary bounds directory enumeration instead of returning a partial list or deleting abandoned staging",
+          "status": "passed",
+          "title": "bounds directory enumeration instead of returning a partial list or deleting abandoned staging",
+          "duration": 1031.6461,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment rejects traversal/NUL/ADS run IDs before IO and never exposes rejected values",
+          "status": "passed",
+          "title": "rejects traversal/NUL/ADS run IDs before IO and never exposes rejected values",
+          "duration": 1.9338000000007014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment rejects ambiguous/traversing/relative storage and project paths",
+          "status": "passed",
+          "title": "rejects ambiguous/traversing/relative storage and project paths",
+          "duration": 4.910300000001371,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment refuses linked storage directories and linked ancestors, without writing through them",
+          "status": "passed",
+          "title": "refuses linked storage directories and linked ancestors, without writing through them",
+          "duration": 6.340099999999438,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment refuses linked record paths, including dangling links, and never replaces a target",
+          "status": "passed",
+          "title": "refuses linked record paths, including dangling links, and never replaces a target",
+          "duration": 189.8095000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run path containment"
+          ],
+          "fullName": "OMP run path containment refuses hard-linked and non-regular records instead of reading/modifying them",
+          "status": "passed",
+          "title": "refuses hard-linked and non-regular records instead of reading/modifying them",
+          "duration": 85.76770000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary rejects invalid identities/mode/path and unapproved create fields without echoing values",
+          "status": "passed",
+          "title": "rejects invalid identities/mode/path and unapproved create fields without echoing values",
+          "duration": 3.20430000000124,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary accepts a valid caller-supplied runId, persists it as the record id, and fails closed on a colliding id",
+          "status": "passed",
+          "title": "accepts a valid caller-supplied runId, persists it as the record id, and fails closed on a colliding id",
+          "duration": 156.5550000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary rejects invalid details without silently storing or dropping arbitrary fields",
+          "status": "passed",
+          "title": "rejects invalid details without silently storing or dropping arbitrary fields",
+          "duration": 41.840000000000146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "OMP run input boundary"
+          ],
+          "fullName": "OMP run input boundary sanitizes diagnostics on write and read, discarding all free-form payloads",
+          "status": "passed",
+          "title": "sanitizes diagnostics on write and read, discarding all free-form payloads",
+          "duration": 115.78919999999925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389338754,
+      "endTime": 1792389352759.7893,
+      "status": "passed",
+      "message": "",
+      "name": "<workspace>/tests/omp-run-repository.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects a route whose active profile binding changed after selection",
+          "status": "passed",
+          "title": "rejects a route whose active profile binding changed after selection",
+          "duration": 163.8501,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects a credential rotated after route selection but before OMP preparation",
+          "status": "passed",
+          "title": "rejects a credential rotated after route selection but before OMP preparation",
+          "duration": 24.20609999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation preflights without launching, writing files, or exposing credentials",
+          "status": "passed",
+          "title": "preflights without launching, writing files, or exposing credentials",
+          "duration": 12.951999999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects missing executable before reading the vault",
+          "status": "passed",
+          "title": "rejects missing executable before reading the vault",
+          "duration": 13.782199999999875,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects wrong checksum before reading the vault",
+          "status": "passed",
+          "title": "rejects wrong checksum before reading the vault",
+          "duration": 21.613700000000108,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects wrong pin before reading the vault",
+          "status": "passed",
+          "title": "rejects wrong pin before reading the vault",
+          "duration": 19.64519999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation requires new permission acknowledgement instead of adopting legacy approvals",
+          "status": "passed",
+          "title": "requires new permission acknowledgement instead of adopting legacy approvals",
+          "duration": 4.088600000000042,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation classifies missing cwd, ambiguous model and unresolved protocol locally",
+          "status": "passed",
+          "title": "classifies missing cwd, ambiguous model and unresolved protocol locally",
+          "duration": 6.9547000000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation redacts vault errors and never falls back to ambient credentials",
+          "status": "passed",
+          "title": "redacts vault errors and never falls back to ambient credentials",
+          "duration": 27.27480000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation creates isolated non-secret config with only selected child credentials and safe pilot flags",
+          "status": "passed",
+          "title": "creates isolated non-secret config with only selected child credentials and safe pilot flags",
+          "duration": 687.4665,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation makes per-run immutable configs but provider/account-scoped session storage",
+          "status": "passed",
+          "title": "makes per-run immutable configs but provider/account-scoped session storage",
+          "duration": 1971.6083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects a symlinked managed root without writing through it",
+          "status": "passed",
+          "title": "rejects a symlinked managed root without writing through it",
+          "duration": 4.675099999999929,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rehashes the executable at prepare time to catch drift after preflight",
+          "status": "passed",
+          "title": "rehashes the executable at prepare time to catch drift after preflight",
+          "duration": 19.629499999999553,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .omp/config.yml without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .omp/config.yml without loading or quarantining them",
+          "duration": 10.857300000000123,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .omp/config.yml without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .omp/config.yml without loading or quarantining them",
+          "duration": 10.457400000000234,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env without loading or quarantining them",
+          "duration": 11.195900000000165,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.local without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.local without loading or quarantining them",
+          "duration": 10.730599999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.development without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.development without loading or quarantining them",
+          "duration": 11.685799999999745,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.development.local without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.development.local without loading or quarantining them",
+          "duration": 12.24389999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.production without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.production without loading or quarantining them",
+          "duration": 11.610799999999927,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.production.local without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.production.local without loading or quarantining them",
+          "duration": 11.729200000000219,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.test without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.test without loading or quarantining them",
+          "duration": 94.62580000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.test.local without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.test.local without loading or quarantining them",
+          "duration": 12.839000000000397,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .env.staging.local without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .env.staging.local without loading or quarantining them",
+          "duration": 29.173099999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .omp/settings.json without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .omp/settings.json without loading or quarantining them",
+          "duration": 154.02830000000085,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .claude/settings.json without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .claude/settings.json without loading or quarantining them",
+          "duration": 14.573600000000624,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .claude/settings.local.json without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .claude/settings.local.json without loading or quarantining them",
+          "duration": 13.66190000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .codex/config.toml without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .codex/config.toml without loading or quarantining them",
+          "duration": 15.148600000000442,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .cursor/settings.json without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .cursor/settings.json without loading or quarantining them",
+          "duration": 15.701799999999821,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .gemini/settings.json without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .gemini/settings.json without loading or quarantining them",
+          "duration": 16.275499999999738,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings opencode.json without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings opencode.json without loading or quarantining them",
+          "duration": 17.546400000000176,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings opencode.jsonc without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings opencode.jsonc without loading or quarantining them",
+          "duration": 147.27710000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .opencode/opencode.json without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .opencode/opencode.json without loading or quarantining them",
+          "duration": 19.093800000000556,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation refuses unreviewed bootstrap settings .opencode/opencode.jsonc without loading or quarantining them",
+          "status": "passed",
+          "title": "refuses unreviewed bootstrap settings .opencode/opencode.jsonc without loading or quarantining them",
+          "duration": 19.40979999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects known unusable storage scope-file in preflight",
+          "status": "passed",
+          "title": "rejects known unusable storage scope-file in preflight",
+          "duration": 5.559499999999389,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects known unusable storage runs-file in preflight",
+          "status": "passed",
+          "title": "rejects known unusable storage runs-file in preflight",
+          "duration": 5.821600000000217,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed OMP runtime preflight and preparation"
+          ],
+          "fullName": "managed OMP runtime preflight and preparation rejects known unusable storage sessions-junction in preflight",
+          "status": "passed",
+          "title": "rejects known unusable storage sessions-junction in preflight",
+          "duration": 8.248399999999492,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389339002,
+      "endTime": 1792389342660.2483,
+      "status": "passed",
+      "message": "",
+      "name": "<workspace>/tests/omp-runtime.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API prevalidates an explicit OMP route and returns only safe fields",
+          "status": "passed",
+          "title": "prevalidates an explicit OMP route and returns only safe fields",
+          "duration": 62.70320000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API requires the separate OMP acknowledgement before preflight",
+          "status": "passed",
+          "title": "requires the separate OMP acknowledgement before preflight",
+          "duration": 17.809200000000146,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API launches through OMP without calling legacy launchers",
+          "status": "passed",
+          "title": "launches through OMP without calling legacy launchers",
+          "duration": 10.704799999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API returns a safe diagnostic when OMP launch fails",
+          "status": "passed",
+          "title": "returns a safe diagnostic when OMP launch fails",
+          "duration": 8.861400000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API lists and cancels safe OMP run records",
+          "status": "passed",
+          "title": "lists and cancels safe OMP run records",
+          "duration": 16.688499999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API returns 404 when cancelling an unknown OMP run so the UI cannot show a false success",
+          "status": "passed",
+          "title": "returns 404 when cancelling an unknown OMP run so the UI cannot show a false success",
+          "duration": 9.096300000000156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API surfaces an unconfirmed cancel as a non-terminal CANCELLING record, never a false success",
+          "status": "passed",
+          "title": "surfaces an unconfirmed cancel as a non-terminal CANCELLING record, never a false success",
+          "duration": 7.327199999999948,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API reconciles OMP ownership when the dashboard starts",
+          "status": "passed",
+          "title": "reconciles OMP ownership when the dashboard starts",
+          "duration": 1.4609000000000378,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API rejects OMP requests when no OMP launcher is configured",
+          "status": "passed",
+          "title": "rejects OMP requests when no OMP launcher is configured",
+          "duration": 9.679200000000037,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API explains an OMP route without an acknowledgement and returns only the allowlisted view",
+          "status": "passed",
+          "title": "explains an OMP route without an acknowledgement and returns only the allowlisted view",
+          "duration": 11.005300000000261,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API returns honest 'ready' Doctor evidence over HTTP without an OMP run",
+          "status": "passed",
+          "title": "returns honest 'ready' Doctor evidence over HTTP without an OMP run",
+          "duration": 27.879399999999805,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API returns honest 'blocked' Doctor evidence over HTTP without an OMP run",
+          "status": "passed",
+          "title": "returns honest 'blocked' Doctor evidence over HTTP without an OMP run",
+          "duration": 9.130200000000059,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API rejects a preview that smuggles a project path, credential, or acknowledgement",
+          "status": "passed",
+          "title": "rejects a preview that smuggles a project path, credential, or acknowledgement",
+          "duration": 7.011600000000271,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API drops any non-allowlisted preview field so a secret or absolute path cannot leak",
+          "status": "passed",
+          "title": "drops any non-allowlisted preview field so a secret or absolute path cannot leak",
+          "duration": 7.4000999999998385,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer OMP API"
+          ],
+          "fullName": "ProviderDashboardServer OMP API requires an OMP launcher before it will preview a route",
+          "status": "passed",
+          "title": "requires an OMP launcher before it will preview a route",
+          "duration": 5.958900000000085,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389340054,
+      "endTime": 1792389340266.959,
+      "status": "passed",
+      "message": "",
+      "name": "<workspace>/tests/provider-dashboard-omp.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer serves a token-scoped loopback dashboard and a non-secret snapshot",
+          "status": "passed",
+          "title": "serves a token-scoped loopback dashboard and a non-secret snapshot",
+          "duration": 70.66469999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer exposes the four compatibility surfaces in the provider snapshot and dashboard asset",
+          "status": "passed",
+          "title": "exposes the four compatibility surfaces in the provider snapshot and dashboard asset",
+          "duration": 16.364000000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer shows managed credential masks in the snapshot without exposing their values",
+          "status": "passed",
+          "title": "shows managed credential masks in the snapshot without exposing their values",
+          "duration": 11.05099999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer keeps the dashboard snapshot usable when credential metadata cannot be read",
+          "status": "passed",
+          "title": "keeps the dashboard snapshot usable when credential metadata cannot be read",
+          "duration": 15.697900000000118,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer does not expose the local portal recovery backup path",
+          "status": "passed",
+          "title": "does not expose the local portal recovery backup path",
+          "duration": 11.888100000000122,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer keeps the snapshot available when the portal store is corrupt",
+          "status": "passed",
+          "title": "keeps the snapshot available when the portal store is corrupt",
+          "duration": 7.510600000000068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer blocks cross-origin mutations before calling the application",
+          "status": "passed",
+          "title": "blocks cross-origin mutations before calling the application",
+          "duration": 8.99330000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer routes provider save, probe, and explicit Doctor actions",
+          "status": "passed",
+          "title": "routes provider save, probe, and explicit Doctor actions",
+          "duration": 31.885099999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer routes secret and profile configuration without returning secret values",
+          "status": "passed",
+          "title": "routes secret and profile configuration without returning secret values",
+          "duration": 64.31529999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer reports managed-secret write and delete conflicts without exposing a submitted key",
+          "status": "passed",
+          "title": "reports managed-secret write and delete conflicts without exposing a submitted key",
+          "duration": 11.088500000000295,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer returns a native folder selection for Launch workspace",
+          "status": "passed",
+          "title": "returns a native folder selection for Launch workspace",
+          "duration": 6.683599999999842,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer keeps the dashboard available when the OS secret vault is unavailable",
+          "status": "passed",
+          "title": "keeps the dashboard available when the OS secret vault is unavailable",
+          "duration": 6.37900000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer starts client launches asynchronously and reports terminal status",
+          "status": "passed",
+          "title": "starts client launches asynchronously and reports terminal status",
+          "duration": 19.03800000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer resolves an omitted launch approval from the stored preference",
+          "status": "passed",
+          "title": "resolves an omitted launch approval from the stored preference",
+          "duration": 6.084299999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer serves agent session history without exposing filesystem paths and deletes safely",
+          "status": "passed",
+          "title": "serves agent session history without exposing filesystem paths and deletes safely",
+          "duration": 14.36279999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer starts a resume launch from selected agent history",
+          "status": "passed",
+          "title": "starts a resume launch from selected agent history",
+          "duration": 6.291400000000067,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer ships browser JavaScript that parses without external dependencies",
+          "status": "passed",
+          "title": "ships browser JavaScript that parses without external dependencies",
+          "duration": 5.12729999999965,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "ProviderDashboardServer"
+          ],
+          "fullName": "ProviderDashboardServer starts the TTL-aware metadata health monitor without blocking startup",
+          "status": "passed",
+          "title": "starts the TTL-aware metadata health monitor without blocking startup",
+          "duration": 1.915899999999965,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints adds a provider key, returns only its mask, and forwards the value once",
+          "status": "passed",
+          "title": "adds a provider key, returns only its mask, and forwards the value once",
+          "duration": 6.568500000000313,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints rejects an add request that smuggles route or secret-reference fields",
+          "status": "passed",
+          "title": "rejects an add request that smuggles route or secret-reference fields",
+          "duration": 6.471000000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints answers 501 when no credential manager is configured",
+          "status": "passed",
+          "title": "answers 501 when no credential manager is configured",
+          "duration": 5.411200000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints rejects an unknown credential purpose",
+          "status": "passed",
+          "title": "rejects an unknown credential purpose",
+          "duration": 5.2908000000002176,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints accepts a portal-session credential as a distinct purpose",
+          "status": "passed",
+          "title": "accepts a portal-session credential as a distinct purpose",
+          "duration": 6.203899999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints activates a stored credential and returns its mask",
+          "status": "passed",
+          "title": "activates a stored credential and returns its mask",
+          "duration": 5.925799999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints does not let an activate request smuggle a new secret value",
+          "status": "passed",
+          "title": "does not let an activate request smuggle a new secret value",
+          "duration": 5.352699999999913,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints maps a not-found activation to 400 without leaking internals",
+          "status": "passed",
+          "title": "maps a not-found activation to 400 without leaking internals",
+          "duration": 8.595800000000054,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints rejects a malformed credential id",
+          "status": "passed",
+          "title": "rejects a malformed credential id",
+          "duration": 5.625,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints removes an inactive credential",
+          "status": "passed",
+          "title": "removes an inactive credential",
+          "duration": 6.840599999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints refuses to remove an active or in-use credential",
+          "status": "passed",
+          "title": "refuses to remove an active or in-use credential",
+          "duration": 6.279100000000199,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints does not let a remove request carry a secret value",
+          "status": "passed",
+          "title": "does not let a remove request carry a secret value",
+          "duration": 6.125299999999697,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints surfaces an unavailable vault instead of failing silently",
+          "status": "passed",
+          "title": "surfaces an unavailable vault instead of failing silently",
+          "duration": 6.910200000000259,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "managed credential endpoints"
+          ],
+          "fullName": "managed credential endpoints rejects non-POST verbs on credential endpoints",
+          "status": "passed",
+          "title": "rejects non-POST verbs on credential endpoints",
+          "duration": 5.30580000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "dashboard launch history layout"
+          ],
+          "fullName": "dashboard launch history layout renders launch route tabs as a readable two-column grid",
+          "status": "passed",
+          "title": "renders launch route tabs as a readable two-column grid",
+          "duration": 0.4060000000004038,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "dashboard launch history layout"
+          ],
+          "fullName": "dashboard launch history layout wires launch history to the selected provider",
+          "status": "passed",
+          "title": "wires launch history to the selected provider",
+          "duration": 0.36149999999997817,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "credential removal guard over real HTTP"
+          ],
+          "fullName": "credential removal guard over real HTTP answers 409 CREDENTIAL_CONFLICT with a stable, secret-free cause and deletes nothing when the catalog is corrupt",
+          "status": "passed",
+          "title": "answers 409 CREDENTIAL_CONFLICT with a stable, secret-free cause and deletes nothing when the catalog is corrupt",
+          "duration": 11.182600000000093,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "credential removal guard over real HTTP"
+          ],
+          "fullName": "credential removal guard over real HTTP still maps a known active reference to 409 CREDENTIAL_ACTIVE_REFERENCE, keeping the ciphertext",
+          "status": "passed",
+          "title": "still maps a known active reference to 409 CREDENTIAL_ACTIVE_REFERENCE, keeping the ciphertext",
+          "duration": 7.239799999999832,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "credential removal guard over real HTTP"
+          ],
+          "fullName": "credential removal guard over real HTTP removes a healthy, unreferenced credential (200) with a secret-free body once the catalog is readable",
+          "status": "passed",
+          "title": "removes a healthy, unreferenced credential (200) with a secret-free body once the catalog is readable",
+          "duration": 6.637900000000172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "credential removal guard over real HTTP"
+          ],
+          "fullName": "credential removal guard over real HTTP blocks a cross-origin remove before the manager runs, deleting nothing",
+          "status": "passed",
+          "title": "blocks a cross-origin remove before the manager runs, deleting nothing",
+          "duration": 4.5925000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "credential removal guard over real HTTP"
+          ],
+          "fullName": "credential removal guard over real HTTP rejects a strict-schema violation that smuggles a secret value, deleting nothing",
+          "status": "passed",
+          "title": "rejects a strict-schema violation that smuggles a secret value, deleting nothing",
+          "duration": 5.249499999999898,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "credential removal guard over real HTTP"
+          ],
+          "fullName": "credential removal guard over real HTTP answers 409 CREDENTIAL_CONFLICT when the portal store path is an unreadable directory (EISDIR)",
+          "status": "passed",
+          "title": "answers 409 CREDENTIAL_CONFLICT when the portal store path is an unreadable directory (EISDIR)",
+          "duration": 6.8452000000002045,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "credential removal guard over real HTTP"
+          ],
+          "fullName": "credential removal guard over real HTTP projects an EACCES portal-seam fault to 409 CREDENTIAL_CONFLICT, leaking neither path nor canary",
+          "status": "passed",
+          "title": "projects an EACCES portal-seam fault to 409 CREDENTIAL_CONFLICT, leaking neither path nor canary",
+          "duration": 5.571600000000217,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1792389341316,
+      "endTime": 1792389341767.5715,
+      "status": "passed",
+      "message": "",
+      "name": "<workspace>/tests/provider-dashboard-server.test.ts"
+    }
+  ]
+}
