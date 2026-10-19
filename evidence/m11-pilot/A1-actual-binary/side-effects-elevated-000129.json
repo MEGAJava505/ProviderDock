@@ -1,0 +1,134 @@
+{
+  "actualLaunches": 0,
+  "actualOmpSideEffects": null,
+  "appContainer": {
+    "capabilities": 0,
+    "createdForNegativeHelperOnly": true,
+    "nativeProfileTempUsed": true,
+    "profileDeleteHresult": 0,
+    "scopeNote": "Temporary Windows AppContainer profile and owned directory ACL grants were used for the inert helper; no system firewall rule or global audit policy was changed."
+  },
+  "createdArtifacts": [
+    {
+      "alias": "OWNED_ETW_SELFTEST/Process.etl",
+      "bytes": 4456448,
+      "public": false,
+      "sha256": "4c01ac792298a2c41595e891323c5ac4511fd53808c67696b6416d8a9655c378"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Process.xml",
+      "bytes": 34168043,
+      "public": false,
+      "sha256": "ca8cef005fd58aadbeee1ebc223ab927548b9ff5229a4d616b6aca1b59ba7e40"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Process-summary.txt",
+      "bytes": 4834,
+      "public": false,
+      "sha256": "37639ebf3586e264ae89a5dce61c251f15c640dbe9310605973db45d766ab8cf"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Transport.etl",
+      "bytes": 3932160,
+      "public": false,
+      "sha256": "302c0eb7021fd5c492743548187b2c088e0fb37a53c5999b267ee92b165bb3de"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Transport.xml",
+      "bytes": 16928940,
+      "public": false,
+      "sha256": "3c16a83dc2984d8c7e24defffa14bb9f8a2945deb3b040d0d9f4d7a7429936b2"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Transport-summary.txt",
+      "bytes": 26273,
+      "public": false,
+      "sha256": "ed2747d426ae87a764303b499501e877f58f26cfdd8d26890ccf4ab2699ebfd0"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/WFP.etl",
+      "bytes": 262144,
+      "public": false,
+      "sha256": "1798f292c1d0e4a2d2de4d4b91d5a54a93232fb6d7603fc0d03af6190a4f39ac"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/WFP.xml",
+      "bytes": 3282,
+      "public": false,
+      "sha256": "3eead40fa61f5aac6c5ca1a5630e18d1fa06f2c042304ef6d9a320f1145a4aef"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/WFP-summary.txt",
+      "bytes": 1014,
+      "public": false,
+      "sha256": "d487a9e861bc39a0916d38fc550432ce08bfdfe50be4631f31c40ce68bfe0318"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/DNS.etl",
+      "bytes": 2621440,
+      "public": false,
+      "sha256": "a290f808b006150cc4ef0901285e05e9386d035df3c9b21b879ed8e8c07c3751"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/DNS.xml",
+      "bytes": 199550,
+      "public": false,
+      "sha256": "55114ae3efa03e47747834e310afa266b57de7ff58d52fd68fa921f71ec0c131"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/DNS-summary.txt",
+      "bytes": 3625,
+      "public": false,
+      "sha256": "9119b1cbb0c282863f26fdf59981020ed2edef3283101c257bc23ea3fc71abd6"
+    },
+    {
+      "alias": "inspect-elevated.ps1",
+      "bytes": 4865,
+      "sha256": "98669e87fafe760ccfc129f9805e09a5821c6690b50cc19380a06963489632f3"
+    },
+    {
+      "alias": "run-selftest.ps1",
+      "bytes": 5414,
+      "sha256": "c62161508c64a408513b003312d644ed0d435f90107957b081ac1711b0cbdd36"
+    },
+    {
+      "alias": "loopback-client.ps1",
+      "bytes": 743,
+      "sha256": "0485cd91229a181fc35edb30e1a3e6e1137ef6b00fd91be47702f1647a6320c0"
+    },
+    {
+      "alias": "negative-controller.py",
+      "bytes": 2632,
+      "sha256": "13e1611759da744e0ba4ab770c85e791228e53fde34ea19b531255cdaf233275"
+    },
+    {
+      "alias": "negative-probe.mjs",
+      "bytes": 633,
+      "sha256": "34e80e3a1c02eb3090011e2644261ae8c67bd48d160569418327dbb6d6e68fc7"
+    }
+  ],
+  "evidenceId": "M11-20261019-000129",
+  "existingEvidenceChanged": 0,
+  "existingEvidenceFiles": 176,
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "knownHelperPostcheck": {
+    "checkedPids": [
+      10672,
+      27492,
+      31168,
+      28932,
+      6752
+    ],
+    "helperProcessesRemaining": 0,
+    "observedAtUtc": "2026-10-19T16:43:41.9741882Z",
+    "remaining": [],
+    "scope": "Known self-test controller/helper PIDs only; actual OMP not launched"
+  },
+  "limitation": "No whole-host filesystem snapshot was taken. Only the listed owned writes, temporary self-test profile and explicit cleanup are attested.",
+  "ownedStorageAlias": "OWNED_SELFTEST_ROOT",
+  "phase": "A1-rerun-elevated",
+  "previousBlockedCommit": "eea301384d2b49f211740271ac70bf37062830e6",
+  "runId": "M11-A1-ELEVATED-20261019-000120",
+  "scope": "Self-test infrastructure only; no actual OMP side-effect claim",
+  "sessionsStopped": true
+}

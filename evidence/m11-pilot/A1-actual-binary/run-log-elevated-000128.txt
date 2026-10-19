@@ -1,0 +1,13 @@
+runId: M11-A1-ELEVATED-20261019-000120
+handoffCommit: df5391199daf944f59d871e45db27018c85859a0
+previous evidence retained unchanged: eea301384d2b49f211740271ac70bf37062830e6
+2026-10-19T16:41:55.6042431Z Elevated collector PID 10672: IsAdmin=True; High; SeSystemProfilePrivilege enabled via native token API
+2026-10-19T16:41:55.5866305Z Self-test started; four owned sessions created and queried Running before inert helpers
+Synthetic cmd PID 27492: exit 7; ProcessStart and ProcessStop payloads validated offline; parent PID 10672
+Loopback client PID 31168: sent 64 and received 64 bytes; server received 64 and echoed 64; requests=1
+Negative controller PID 28932; AppContainer helper PID 6752: exit 1, no socket result, stderrBytes=647
+2026-10-19T16:42:09.5679611Z STOP: self-test failed; actual OMP launch forbidden; actualLaunches=0
+All four owned sessions stopped (exit 0), ETL decoded (exit 0); all EventsLost=0 and BuffersLost=0; WFP provider events=0
+Known helper PID postcheck: none remain; fresh self-test AppContainer profile deletion HRESULT=0
+Actual authorization/window, fresh actual fixture preflight and actual launch not performed; no live inference requests or cost.
+No automatic self-test retry performed. Raw ETL/XML retained only in owned private directory.

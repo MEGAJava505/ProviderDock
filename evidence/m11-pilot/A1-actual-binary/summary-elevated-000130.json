@@ -1,0 +1,57 @@
+{
+  "a1": "NOT PROVEN",
+  "a4": "BLOCKED",
+  "actualExitCode": null,
+  "actualLaunchAuthorizationScope": "The single bounded OMP launch remains unused; this package does not authorize inference or A4.",
+  "actualLaunches": 0,
+  "actualNetworkCounters": null,
+  "actualOrphanCount": null,
+  "actualPreflightPerformed": false,
+  "actualProcessTree": null,
+  "artifacts": [
+    "token-readback-elevated-000121.json",
+    "provider-metadata-elevated-000122.json",
+    "monitoring-config-elevated-000123.json",
+    "self-test-elevated-000124.json",
+    "run-log-elevated-000128.txt",
+    "side-effects-elevated-000129.json",
+    "summary-elevated-000130.json",
+    "integrity-hashes-elevated-000131.txt"
+  ],
+  "authorizationArtifactIssued": false,
+  "blockers": [
+    {
+      "id": "NEGATIVE-HELPER",
+      "reason": "Fresh zero-capability AppContainer helper exited 1 with no socket result; 647 stderr bytes counted but not retained, so AccessDenied/10013 is NOT PROVEN."
+    },
+    {
+      "id": "WFP-COVERAGE",
+      "reason": "Four ETL files decoded, but WFP provider event count is zero. Denied-attempt coverage is unproven."
+    },
+    {
+      "id": "DECODER-COVERAGE",
+      "reason": "tracerpt reported schema mismatches; transport byte aggregation and separate LogBuffersLost/RealTimeBuffersLost readback are not validated."
+    }
+  ],
+  "elevationProof": "PASS for self-test ETW collector",
+  "endUtc": "2026-10-19T16:42:09.5679611Z",
+  "evidenceId": "M11-20261019-000130",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "inferenceCostUsd": 0,
+  "launchBudgetConsumed": false,
+  "liveInferenceRequests": 0,
+  "loopback": "PASS: 64 byte request and 64 byte echo measured by application",
+  "nextRequirement": "Owner authorization for a corrected inert self-test after STOP. Retain bounded private negative-helper stderr, diagnose/fix the harness, validate WFP denied-attempt coverage and decoder/loss diagnostics. Do not launch OMP until the entire self-test and new actual preflight pass.",
+  "opensA4Gate": false,
+  "ownedEtwSessions": 4,
+  "phase": "A1-rerun-elevated",
+  "previousBlockedCommit": "eea301384d2b49f211740271ac70bf37062830e6",
+  "prior176EvidenceFilesUnchanged": true,
+  "retries": 0,
+  "runId": "M11-A1-ELEVATED-20261019-000120",
+  "selfTest": "FAIL: negative helper did not produce a denial result",
+  "startUtc": "2026-10-19T16:41:55.5866305Z",
+  "status": "BLOCKED",
+  "stoppedAtStep": 4,
+  "syntheticChild": "PASS: exit 7 and recorded parent linkage"
+}

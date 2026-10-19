@@ -1,0 +1,11 @@
+# evidenceId: M11-20261019-000131
+# runId: M11-A1-ELEVATED-20261019-000120
+# status: BLOCKED at self-test; actualLaunches=0
+# SHA-256 of final public UTF-8 LF bytes; excludes this manifest only
+57cd2587dff0659f466ba3d1976b7a4820e9bf308d4167b8350206f36ab2ad3c  token-readback-elevated-000121.json
+497cd6289de47261690625f6163200176e158789b9f083d7952f05bd630b80db  provider-metadata-elevated-000122.json
+e08483705db8a4d095330b824bd4322106a9bc85cfde8e8145232aae19b9cad5  monitoring-config-elevated-000123.json
+6ee0d19d8fccc7cd10d965c61e73e2a025cf394856797ba7698c7243a3c8795e  self-test-elevated-000124.json
+fc3c957ed460c461721fa459067676b6a781004211650d5a38e8e57f9e1c0332  run-log-elevated-000128.txt
+62807c2341bac1ca0be26a1fea8cb354a1bc12e58e73a73e130fbd3eada8ea0d  side-effects-elevated-000129.json
+605f29df1baf8dae63de472133805917f2a453b7fe6609abc6bce80a402d8715  summary-elevated-000130.json

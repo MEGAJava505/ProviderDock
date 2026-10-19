@@ -1,0 +1,889 @@
+{
+  "beforeActualLaunch": true,
+  "consumer": "tracerpt offline XML decode after each owned session stop",
+  "controllerPid": 10672,
+  "evidenceId": "M11-20261019-000123",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "limitations": [
+    "Some decoded records did not match schema; no complete decoder coverage claimed.",
+    "Separate LogBuffersLost/RealTimeBuffersLost fields were not read back. ETL header EventsLost/BuffersLost and logman buffer-loss output were observed.",
+    "No WFP provider events were captured; only trace headers were present."
+  ],
+  "phase": "A1-rerun-elevated",
+  "previousBlockedCommit": "eea301384d2b49f211740271ac70bf37062830e6",
+  "privateTraceInventory": [
+    {
+      "alias": "OWNED_ETW_SELFTEST/Process.etl",
+      "bytes": 4456448,
+      "public": false,
+      "sha256": "4c01ac792298a2c41595e891323c5ac4511fd53808c67696b6416d8a9655c378"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Process.xml",
+      "bytes": 34168043,
+      "public": false,
+      "sha256": "ca8cef005fd58aadbeee1ebc223ab927548b9ff5229a4d616b6aca1b59ba7e40"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Process-summary.txt",
+      "bytes": 4834,
+      "public": false,
+      "sha256": "37639ebf3586e264ae89a5dce61c251f15c640dbe9310605973db45d766ab8cf"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Transport.etl",
+      "bytes": 3932160,
+      "public": false,
+      "sha256": "302c0eb7021fd5c492743548187b2c088e0fb37a53c5999b267ee92b165bb3de"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Transport.xml",
+      "bytes": 16928940,
+      "public": false,
+      "sha256": "3c16a83dc2984d8c7e24defffa14bb9f8a2945deb3b040d0d9f4d7a7429936b2"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/Transport-summary.txt",
+      "bytes": 26273,
+      "public": false,
+      "sha256": "ed2747d426ae87a764303b499501e877f58f26cfdd8d26890ccf4ab2699ebfd0"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/WFP.etl",
+      "bytes": 262144,
+      "public": false,
+      "sha256": "1798f292c1d0e4a2d2de4d4b91d5a54a93232fb6d7603fc0d03af6190a4f39ac"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/WFP.xml",
+      "bytes": 3282,
+      "public": false,
+      "sha256": "3eead40fa61f5aac6c5ca1a5630e18d1fa06f2c042304ef6d9a320f1145a4aef"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/WFP-summary.txt",
+      "bytes": 1014,
+      "public": false,
+      "sha256": "d487a9e861bc39a0916d38fc550432ce08bfdfe50be4631f31c40ce68bfe0318"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/DNS.etl",
+      "bytes": 2621440,
+      "public": false,
+      "sha256": "a290f808b006150cc4ef0901285e05e9386d035df3c9b21b879ed8e8c07c3751"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/DNS.xml",
+      "bytes": 199550,
+      "public": false,
+      "sha256": "55114ae3efa03e47747834e310afa266b57de7ff58d52fd68fa921f71ec0c131"
+    },
+    {
+      "alias": "OWNED_ETW_SELFTEST/DNS-summary.txt",
+      "bytes": 3625,
+      "public": false,
+      "sha256": "9119b1cbb0c282863f26fdf59981020ed2edef3283101c257bc23ea3fc71abd6"
+    }
+  ],
+  "providerMetadataRef": "provider-metadata-elevated-000122.json",
+  "runId": "M11-A1-ELEVATED-20261019-000120",
+  "scriptInventory": [
+    {
+      "alias": "inspect-elevated.ps1",
+      "bytes": 4865,
+      "sha256": "98669e87fafe760ccfc129f9805e09a5821c6690b50cc19380a06963489632f3"
+    },
+    {
+      "alias": "run-selftest.ps1",
+      "bytes": 5414,
+      "sha256": "c62161508c64a408513b003312d644ed0d435f90107957b081ac1711b0cbdd36"
+    },
+    {
+      "alias": "loopback-client.ps1",
+      "bytes": 743,
+      "sha256": "0485cd91229a181fc35edb30e1a3e6e1137ef6b00fd91be47702f1647a6320c0"
+    },
+    {
+      "alias": "negative-controller.py",
+      "bytes": 2632,
+      "sha256": "13e1611759da744e0ba4ab770c85e791228e53fde34ea19b531255cdaf233275"
+    },
+    {
+      "alias": "negative-probe.mjs",
+      "bytes": 633,
+      "sha256": "34e80e3a1c02eb3090011e2644261ae8c67bd48d160569418327dbb6d6e68fc7"
+    }
+  ],
+  "sessions": [
+    {
+      "allDecodedEvents": 25154,
+      "bufferSizeKb": 256,
+      "buffersLost": 0,
+      "decoderExit": 0,
+      "decoderWarningSchemaMismatch": true,
+      "eventIdVersionCounts": [
+        {
+          "count": 26,
+          "eventId": "1",
+          "version": "4"
+        },
+        {
+          "count": 218,
+          "eventId": "10",
+          "version": "0"
+        },
+        {
+          "count": 2,
+          "eventId": "13",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "14",
+          "version": "0"
+        },
+        {
+          "count": 24,
+          "eventId": "2",
+          "version": "2"
+        },
+        {
+          "count": 13039,
+          "eventId": "21",
+          "version": "0"
+        },
+        {
+          "count": 313,
+          "eventId": "3",
+          "version": "1"
+        },
+        {
+          "count": 266,
+          "eventId": "4",
+          "version": "1"
+        },
+        {
+          "count": 947,
+          "eventId": "5",
+          "version": "0"
+        },
+        {
+          "count": 916,
+          "eventId": "6",
+          "version": "0"
+        },
+        {
+          "count": 2199,
+          "eventId": "7",
+          "version": "0"
+        },
+        {
+          "count": 7187,
+          "eventId": "8",
+          "version": "0"
+        },
+        {
+          "count": 14,
+          "eventId": "9",
+          "version": "0"
+        }
+      ],
+      "eventsLost": 0,
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "Process",
+      "level": 255,
+      "logBuffersLostSeparately": null,
+      "maxFileMb": 64,
+      "maximumBuffers": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000120-591e65fb8f-Process",
+      "providerEventCount": 25152,
+      "providerGuid": "22fb2cd6-0e7b-422b-a0c7-2fad1fd0e716",
+      "queryBeforeHelpersExit": 0,
+      "queryBeforeStopExit": 0,
+      "realTimeBuffersLostSeparately": null,
+      "runningBeforeHelpers": true,
+      "stopExit": 0
+    },
+    {
+      "allDecodedEvents": 10341,
+      "bufferSizeKb": 256,
+      "buffersLost": 0,
+      "decoderExit": 0,
+      "decoderWarningSchemaMismatch": true,
+      "eventIdVersionCounts": [
+        {
+          "count": 45,
+          "eventId": "0",
+          "version": "0"
+        },
+        {
+          "count": 19,
+          "eventId": "1001",
+          "version": "0"
+        },
+        {
+          "count": 12,
+          "eventId": "1002",
+          "version": "0"
+        },
+        {
+          "count": 12,
+          "eventId": "1003",
+          "version": "0"
+        },
+        {
+          "count": 12,
+          "eventId": "1004",
+          "version": "0"
+        },
+        {
+          "count": 13,
+          "eventId": "1008",
+          "version": "1"
+        },
+        {
+          "count": 16,
+          "eventId": "1009",
+          "version": "1"
+        },
+        {
+          "count": 19,
+          "eventId": "1013",
+          "version": "2"
+        },
+        {
+          "count": 1,
+          "eventId": "1017",
+          "version": "1"
+        },
+        {
+          "count": 12,
+          "eventId": "1031",
+          "version": "1"
+        },
+        {
+          "count": 8,
+          "eventId": "1033",
+          "version": "1"
+        },
+        {
+          "count": 4,
+          "eventId": "1034",
+          "version": "1"
+        },
+        {
+          "count": 7,
+          "eventId": "1038",
+          "version": "1"
+        },
+        {
+          "count": 7,
+          "eventId": "1043",
+          "version": "2"
+        },
+        {
+          "count": 11,
+          "eventId": "1044",
+          "version": "1"
+        },
+        {
+          "count": 54,
+          "eventId": "1051",
+          "version": "0"
+        },
+        {
+          "count": 326,
+          "eventId": "1064",
+          "version": "2"
+        },
+        {
+          "count": 110,
+          "eventId": "1065",
+          "version": "0"
+        },
+        {
+          "count": 98,
+          "eventId": "1066",
+          "version": "0"
+        },
+        {
+          "count": 335,
+          "eventId": "1074",
+          "version": "1"
+        },
+        {
+          "count": 305,
+          "eventId": "1090",
+          "version": "0"
+        },
+        {
+          "count": 8,
+          "eventId": "1104",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1105",
+          "version": "0"
+        },
+        {
+          "count": 9,
+          "eventId": "1111",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1123",
+          "version": "1"
+        },
+        {
+          "count": 2,
+          "eventId": "1156",
+          "version": "0"
+        },
+        {
+          "count": 261,
+          "eventId": "1157",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1158",
+          "version": "0"
+        },
+        {
+          "count": 44,
+          "eventId": "1159",
+          "version": "2"
+        },
+        {
+          "count": 51,
+          "eventId": "1160",
+          "version": "0"
+        },
+        {
+          "count": 70,
+          "eventId": "1161",
+          "version": "1"
+        },
+        {
+          "count": 168,
+          "eventId": "1169",
+          "version": "1"
+        },
+        {
+          "count": 868,
+          "eventId": "1170",
+          "version": "1"
+        },
+        {
+          "count": 21,
+          "eventId": "1173",
+          "version": "0"
+        },
+        {
+          "count": 7,
+          "eventId": "1176",
+          "version": "0"
+        },
+        {
+          "count": 4,
+          "eventId": "1183",
+          "version": "0"
+        },
+        {
+          "count": 5,
+          "eventId": "1188",
+          "version": "0"
+        },
+        {
+          "count": 13,
+          "eventId": "1191",
+          "version": "0"
+        },
+        {
+          "count": 13,
+          "eventId": "1192",
+          "version": "0"
+        },
+        {
+          "count": 22,
+          "eventId": "1193",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1194",
+          "version": "0"
+        },
+        {
+          "count": 12,
+          "eventId": "1202",
+          "version": "6"
+        },
+        {
+          "count": 224,
+          "eventId": "1206",
+          "version": "0"
+        },
+        {
+          "count": 15,
+          "eventId": "1214",
+          "version": "0"
+        },
+        {
+          "count": 4,
+          "eventId": "1215",
+          "version": "2"
+        },
+        {
+          "count": 9,
+          "eventId": "1223",
+          "version": "0"
+        },
+        {
+          "count": 13,
+          "eventId": "1224",
+          "version": "0"
+        },
+        {
+          "count": 54,
+          "eventId": "1229",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1245",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1246",
+          "version": "1"
+        },
+        {
+          "count": 94,
+          "eventId": "1300",
+          "version": "3"
+        },
+        {
+          "count": 440,
+          "eventId": "1319",
+          "version": "1"
+        },
+        {
+          "count": 341,
+          "eventId": "1320",
+          "version": "1"
+        },
+        {
+          "count": 11,
+          "eventId": "1327",
+          "version": "1"
+        },
+        {
+          "count": 61,
+          "eventId": "1330",
+          "version": "0"
+        },
+        {
+          "count": 226,
+          "eventId": "1332",
+          "version": "5"
+        },
+        {
+          "count": 65,
+          "eventId": "1341",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1343",
+          "version": "0"
+        },
+        {
+          "count": 1659,
+          "eventId": "1367",
+          "version": "1"
+        },
+        {
+          "count": 229,
+          "eventId": "1370",
+          "version": "1"
+        },
+        {
+          "count": 7,
+          "eventId": "1371",
+          "version": "0"
+        },
+        {
+          "count": 4,
+          "eventId": "1379",
+          "version": "0"
+        },
+        {
+          "count": 6,
+          "eventId": "1383",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1384",
+          "version": "0"
+        },
+        {
+          "count": 54,
+          "eventId": "1386",
+          "version": "0"
+        },
+        {
+          "count": 25,
+          "eventId": "1391",
+          "version": "1"
+        },
+        {
+          "count": 15,
+          "eventId": "1396",
+          "version": "1"
+        },
+        {
+          "count": 16,
+          "eventId": "1397",
+          "version": "0"
+        },
+        {
+          "count": 10,
+          "eventId": "1398",
+          "version": "0"
+        },
+        {
+          "count": 58,
+          "eventId": "1426",
+          "version": "1"
+        },
+        {
+          "count": 57,
+          "eventId": "1429",
+          "version": "1"
+        },
+        {
+          "count": 43,
+          "eventId": "1452",
+          "version": "0"
+        },
+        {
+          "count": 1770,
+          "eventId": "1454",
+          "version": "0"
+        },
+        {
+          "count": 28,
+          "eventId": "1455",
+          "version": "0"
+        },
+        {
+          "count": 20,
+          "eventId": "1465",
+          "version": "1"
+        },
+        {
+          "count": 14,
+          "eventId": "1466",
+          "version": "0"
+        },
+        {
+          "count": 17,
+          "eventId": "1467",
+          "version": "0"
+        },
+        {
+          "count": 19,
+          "eventId": "1476",
+          "version": "0"
+        },
+        {
+          "count": 9,
+          "eventId": "1477",
+          "version": "1"
+        },
+        {
+          "count": 4,
+          "eventId": "1479",
+          "version": "0"
+        },
+        {
+          "count": 16,
+          "eventId": "1480",
+          "version": "1"
+        },
+        {
+          "count": 168,
+          "eventId": "1482",
+          "version": "1"
+        },
+        {
+          "count": 1,
+          "eventId": "1516",
+          "version": "0"
+        },
+        {
+          "count": 6,
+          "eventId": "1518",
+          "version": "0"
+        },
+        {
+          "count": 10,
+          "eventId": "1527",
+          "version": "1"
+        },
+        {
+          "count": 344,
+          "eventId": "1542",
+          "version": "0"
+        },
+        {
+          "count": 108,
+          "eventId": "1544",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1546",
+          "version": "0"
+        },
+        {
+          "count": 7,
+          "eventId": "1547",
+          "version": "0"
+        },
+        {
+          "count": 7,
+          "eventId": "1548",
+          "version": "1"
+        },
+        {
+          "count": 12,
+          "eventId": "1549",
+          "version": "0"
+        },
+        {
+          "count": 65,
+          "eventId": "1550",
+          "version": "1"
+        },
+        {
+          "count": 57,
+          "eventId": "1551",
+          "version": "1"
+        },
+        {
+          "count": 1,
+          "eventId": "1553",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1566",
+          "version": "0"
+        },
+        {
+          "count": 7,
+          "eventId": "1577",
+          "version": "0"
+        },
+        {
+          "count": 65,
+          "eventId": "1585",
+          "version": "0"
+        },
+        {
+          "count": 18,
+          "eventId": "1587",
+          "version": "0"
+        },
+        {
+          "count": 2,
+          "eventId": "1589",
+          "version": "0"
+        },
+        {
+          "count": 398,
+          "eventId": "1601",
+          "version": "0"
+        },
+        {
+          "count": 261,
+          "eventId": "1602",
+          "version": "0"
+        },
+        {
+          "count": 7,
+          "eventId": "1603",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1613",
+          "version": "0"
+        },
+        {
+          "count": 2,
+          "eventId": "1620",
+          "version": "0"
+        },
+        {
+          "count": 19,
+          "eventId": "1625",
+          "version": "0"
+        },
+        {
+          "count": 78,
+          "eventId": "1626",
+          "version": "0"
+        },
+        {
+          "count": 1,
+          "eventId": "1636",
+          "version": "0"
+        },
+        {
+          "count": 43,
+          "eventId": "1637",
+          "version": "0"
+        }
+      ],
+      "eventsLost": 0,
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "Transport",
+      "level": 255,
+      "logBuffersLostSeparately": null,
+      "maxFileMb": 64,
+      "maximumBuffers": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000120-591e65fb8f-Transport",
+      "providerEventCount": 10339,
+      "providerGuid": "2f07e2ee-15db-40f1-90ef-9d7ba282188a",
+      "queryBeforeHelpersExit": 0,
+      "queryBeforeStopExit": 0,
+      "realTimeBuffersLostSeparately": null,
+      "runningBeforeHelpers": true,
+      "stopExit": 0
+    },
+    {
+      "allDecodedEvents": 2,
+      "bufferSizeKb": 256,
+      "buffersLost": 0,
+      "decoderExit": 0,
+      "decoderWarningSchemaMismatch": true,
+      "eventIdVersionCounts": [],
+      "eventsLost": 0,
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "WFP",
+      "level": 255,
+      "logBuffersLostSeparately": null,
+      "maxFileMb": 64,
+      "maximumBuffers": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000120-591e65fb8f-WFP",
+      "providerEventCount": 0,
+      "providerGuid": "0c478c5b-0351-41b1-8c58-4a6737da32e3",
+      "queryBeforeHelpersExit": 0,
+      "queryBeforeStopExit": 0,
+      "realTimeBuffersLostSeparately": null,
+      "runningBeforeHelpers": true,
+      "stopExit": 0
+    },
+    {
+      "allDecodedEvents": 96,
+      "bufferSizeKb": 256,
+      "buffersLost": 0,
+      "decoderExit": 0,
+      "decoderWarningSchemaMismatch": true,
+      "eventIdVersionCounts": [
+        {
+          "count": 4,
+          "eventId": "1001",
+          "version": "0"
+        },
+        {
+          "count": 5,
+          "eventId": "1015",
+          "version": "1"
+        },
+        {
+          "count": 10,
+          "eventId": "3006",
+          "version": "0"
+        },
+        {
+          "count": 10,
+          "eventId": "3008",
+          "version": "0"
+        },
+        {
+          "count": 10,
+          "eventId": "3009",
+          "version": "2"
+        },
+        {
+          "count": 10,
+          "eventId": "3010",
+          "version": "1"
+        },
+        {
+          "count": 5,
+          "eventId": "3011",
+          "version": "2"
+        },
+        {
+          "count": 10,
+          "eventId": "3016",
+          "version": "2"
+        },
+        {
+          "count": 10,
+          "eventId": "3018",
+          "version": "2"
+        },
+        {
+          "count": 10,
+          "eventId": "3019",
+          "version": "2"
+        },
+        {
+          "count": 10,
+          "eventId": "3020",
+          "version": "2"
+        }
+      ],
+      "eventsLost": 0,
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "DNS",
+      "level": 255,
+      "logBuffersLostSeparately": null,
+      "maxFileMb": 64,
+      "maximumBuffers": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000120-591e65fb8f-DNS",
+      "providerEventCount": 94,
+      "providerGuid": "1c95126e-7eea-49a9-a3fe-a378b03ddb4d",
+      "queryBeforeHelpersExit": 0,
+      "queryBeforeStopExit": 0,
+      "realTimeBuffersLostSeparately": null,
+      "runningBeforeHelpers": true,
+      "stopExit": 0
+    }
+  ],
+  "status": "SELF-TEST BLOCKED; not authorized for actual launch",
+  "tokenReadbackRef": "token-readback-elevated-000121.json",
+  "tools": {
+    "logman": "10.0.26100.8875",
+    "tracerpt": "10.0.26100.8875",
+    "wevtutil": "10.0.26100.8875"
+  }
+}

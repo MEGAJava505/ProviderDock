@@ -1,0 +1,47 @@
+{
+  "actualLaunches": 0,
+  "endUtc": "2026-10-19T16:41:56.0038282Z",
+  "evidenceId": "M11-20261019-000121",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "highOrSystem": true,
+  "isActualOmpToken": false,
+  "isAdmin": true,
+  "notes": [
+    "SeSystemProfilePrivilege enabled explicitly in the collector token using AdjustTokenPrivileges, then verified by GetTokenInformation(TokenPrivileges).",
+    "Localized whoami state is retained as raw state text; it is not compared with the English word Enabled.",
+    "An earlier inspection falsely stopped on the localized word for Enabled. That harness defect was corrected before this self-test; no OMP launch occurred.",
+    "SeProfileSingleProcessPrivilege is present but Disabled; no claim that all listed optional privileges are enabled."
+  ],
+  "phase": "A1-rerun-elevated",
+  "pid": 10672,
+  "previousBlockedCommit": "eea301384d2b49f211740271ac70bf37062830e6",
+  "privilegeVerification": "GetTokenInformation(TokenPrivileges), SE_PRIVILEGE_ENABLED bit",
+  "privileges": [
+    {
+      "Name": "SeSystemProfilePrivilege",
+      "State": "\u0432\u043a\u043b\u044e\u0447\u0435\u043d"
+    },
+    {
+      "Name": "SeProfileSingleProcessPrivilege",
+      "State": "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d"
+    },
+    {
+      "Name": "SeDebugPrivilege",
+      "State": "\u0432\u043a\u043b\u044e\u0447\u0435\u043d"
+    }
+  ],
+  "runId": "M11-A1-ELEVATED-20261019-000120",
+  "selectedGroups": [
+    {
+      "Attributes": "",
+      "Sid": "S-1-16-12288"
+    },
+    {
+      "Attributes": "\u041e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u0430\u044f \u0433\u0440\u0443\u043f\u043f\u0430, \u0412\u043a\u043b\u044e\u0447\u0435\u043d\u044b \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e, \u0412\u043a\u043b\u044e\u0447\u0435\u043d\u043d\u0430\u044f \u0433\u0440\u0443\u043f\u043f\u0430, \u0412\u043b\u0430\u0434\u0435\u043b\u0435\u0446 \u0433\u0440\u0443\u043f\u043f\u044b",
+      "Sid": "S-1-5-32-544"
+    }
+  ],
+  "startUtc": "2026-10-19T16:41:55.6042431Z",
+  "status": "PASS for observed self-test collector process only",
+  "systemProfileEnabled": true
+}

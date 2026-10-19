@@ -1,0 +1,221 @@
+{
+  "actualLaunches": 0,
+  "endUtc": "2026-10-19T16:42:09.5679611Z",
+  "evidenceId": "M11-20261019-000124",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "knownHelperPostcheck": {
+    "checkedPids": [
+      10672,
+      27492,
+      31168,
+      28932,
+      6752
+    ],
+    "helperProcessesRemaining": 0,
+    "observedAtUtc": "2026-10-19T16:43:41.9741882Z",
+    "remaining": [],
+    "scope": "Known self-test controller/helper PIDs only; actual OMP not launched"
+  },
+  "loopback": {
+    "client": {
+      "pid": 31168,
+      "receivedBytes": 64,
+      "requests": 1,
+      "sentBytes": 64,
+      "status": "PASS"
+    },
+    "clientPid": 31168,
+    "durationMs": 481.2011,
+    "measurementSource": "Known-size application echo, client/server agreement",
+    "osTransportByteAggregationValidated": false,
+    "port": 50085,
+    "requests": 1,
+    "serverPid": 10672,
+    "serverReceivedBytes": 64,
+    "serverSentBytes": 64,
+    "status": "PASS",
+    "transportEventsForClient": [
+      {
+        "eventId": 1391,
+        "fields": [
+          "Endpoint",
+          "Status",
+          "ProcessId",
+          "CompartmentId",
+          "AddressFamily",
+          "ProcessStartKey"
+        ],
+        "version": 1
+      },
+      {
+        "eventId": 1391,
+        "fields": [
+          "Endpoint",
+          "Status",
+          "ProcessId",
+          "CompartmentId",
+          "AddressFamily",
+          "ProcessStartKey"
+        ],
+        "version": 1
+      },
+      {
+        "eventId": 1013,
+        "fields": [
+          "Endpoint",
+          "LocalAddressLength",
+          "LocalAddress",
+          "Status",
+          "ProcessId",
+          "CompartmentId",
+          "AddressFamily",
+          "ProcessStartKey"
+        ],
+        "version": 2
+      },
+      {
+        "eventId": 1001,
+        "fields": [
+          "Status",
+          "Endpoint",
+          "AddressFamily",
+          "Pid"
+        ],
+        "version": 0
+      },
+      {
+        "eventId": 1033,
+        "fields": [
+          "LocalAddressLength",
+          "LocalAddress",
+          "RemoteAddressLength",
+          "RemoteAddress",
+          "Status",
+          "ProcessId",
+          "Compartment",
+          "Tcb",
+          "ProcessStartKey"
+        ],
+        "version": 1
+      },
+      {
+        "eventId": 1043,
+        "fields": [
+          "LocalAddressLength",
+          "LocalAddress",
+          "RemoteAddressLength",
+          "RemoteAddress",
+          "Status",
+          "ProcessId",
+          "Compartment",
+          "Tcb",
+          "ProcessStartKey",
+          "Inspect"
+        ],
+        "version": 2
+      },
+      {
+        "eventId": 1044,
+        "fields": [
+          "LocalAddressLength",
+          "LocalAddress",
+          "RemoteAddressLength",
+          "RemoteAddress",
+          "Status",
+          "ProcessId",
+          "Compartment",
+          "Tcb",
+          "ProcessStartKey"
+        ],
+        "version": 1
+      }
+    ]
+  },
+  "lossDiagnostics": [
+    {
+      "buffersLost": 0,
+      "eventsLost": 0,
+      "kind": "Process"
+    },
+    {
+      "buffersLost": 0,
+      "eventsLost": 0,
+      "kind": "Transport"
+    },
+    {
+      "buffersLost": 0,
+      "eventsLost": 0,
+      "kind": "WFP"
+    },
+    {
+      "buffersLost": 0,
+      "eventsLost": 0,
+      "kind": "DNS"
+    }
+  ],
+  "negativeControllerPid": 28932,
+  "negativeDirectTcp": {
+    "actualLaunches": 0,
+    "attestation": {
+      "activeProcessLimit": 1,
+      "capabilityCount": 0,
+      "childProcessCreationDenied": false,
+      "inheritedHandlesRestrictedToStdio": true,
+      "integrityRid": 4096,
+      "isAppContainer": true,
+      "jobKillOnClose": true,
+      "packageIdentityMatches": true
+    },
+    "exitCode": 1,
+    "pid": 6752,
+    "policy": "Fresh AppContainer, zero network capabilities; active process limit 1; no actual OMP",
+    "profileDeleteHresult": 0,
+    "status": "BLOCKED",
+    "stderrBytes": 647,
+    "stdoutBytes": 0,
+    "target": "192.0.2.1:443 (TEST-NET-1)"
+  },
+  "negativeInterpretation": "No socket result was produced. Exit 1 with 647 stderr bytes is a helper failure, not proof of network denial. Raw stderr bytes were counted but not retained by the helper; exact failure cause is unproven.",
+  "phase": "A1-rerun-elevated",
+  "previousBlockedCommit": "eea301384d2b49f211740271ac70bf37062830e6",
+  "retryPerformed": false,
+  "runId": "M11-A1-ELEVATED-20261019-000120",
+  "selfTestPassed": false,
+  "startUtc": "2026-10-19T16:41:55.5866305Z",
+  "status": "BLOCKED",
+  "syntheticChild": {
+    "exitCode": 7,
+    "expectedExitCode": 7,
+    "imageSha256": "15cd209c995b7d3009c91ca40892d5b8f1fb162f3e5f10716642ea278e8e0d7b",
+    "parentPid": 10672,
+    "pathAlias": "WINDOWS_CMD",
+    "pid": 27492,
+    "recordedStartStop": [
+      {
+        "eventId": 1,
+        "payload": {
+          "CreateTime": "2026-10-19T16:41:58.435289400Z",
+          "MandatoryLabel": "S-1-16-12288",
+          "ParentProcessID": "10672",
+          "ParentProcessSequenceNumber": "14352",
+          "ProcessID": "27492",
+          "ProcessSequenceNumber": "14374",
+          "ProcessTokenIsElevated": "1"
+        },
+        "version": 4
+      },
+      {
+        "eventId": 2,
+        "payload": {
+          "CreateTime": "2026-10-19T16:41:58.435289400Z",
+          "ExitCode": "7",
+          "ExitTime": "2026-10-19T16:41:58.534847700Z",
+          "ProcessID": "27492",
+          "ProcessSequenceNumber": "14374"
+        },
+        "version": 2
+      }
+    ],
+    "status": "PASS"
+  }
+}
