@@ -153,6 +153,49 @@ describe("OMP run persistence and lifecycle", () => {
 });
 
 describe("OMP run durable storage boundary", () => {
+  it.each(["opened-fstat", "after-read-fstat"] as const)(
+    "reports an atomic replacement during %s as a transient changed read",
+    async (window) => {
+      const { repository, directory, input } = await fixture();
+      const run = await repository.create(input);
+      const file = join(directory, `${run.runId}.json`);
+      const originalOpen = fs.open;
+      let injected = false;
+
+      vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+        const handle = await originalOpen(...args);
+        if (String(args[0]) !== file || injected) return handle;
+        if (window === "opened-fstat") {
+          const stat = handle.stat.bind(handle);
+          vi.spyOn(handle, "stat").mockImplementation(async (...statArgs) => {
+            if (!injected) {
+              injected = true;
+              await repository.transition(run.runId, "STARTING");
+            }
+            return stat(...statArgs);
+          });
+        } else {
+          const read = handle.read.bind(handle);
+          vi.spyOn(handle, "read").mockImplementation(async (...readArgs) => {
+            const result = await read(...readArgs);
+            if (!injected && result.bytesRead > 0) {
+              injected = true;
+              await repository.transition(run.runId, "STARTING");
+            }
+            return result;
+          });
+        }
+        return handle;
+      });
+
+      await expect(repository.get(run.runId)).rejects.toMatchObject({
+        name: "OmpRunStorageError", message: "OMP_RUN_CHANGED",
+      });
+      expect(injected).toBe(true);
+      expect((await repository.get(run.runId))?.state).toBe("STARTING");
+    },
+  );
+
   it("competing repository instances cannot both overwrite the same prior transition", async () => {
     const { repository, directory, input } = await fixture();
     const run = await repository.create(input);

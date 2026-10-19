@@ -95,6 +95,36 @@ let diagnostic;
 let cleanupError;
 let browserSpawnError;
 let cleanupState = { browserProfileRemoved: false, rootRemoved: false };
+let startupBlocker;
+
+async function listenWithDeadline(server, start, label, timeoutMs = 1_000) {
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    let timer;
+    const cleanup = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      server.off("listening", onListening);
+      server.off("error", onError);
+    };
+    const settle = error => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (error) reject(error); else resolve();
+    };
+    const onListening = () => settle();
+    const onError = error => settle(new Error(`${label} failed: ${error?.code ?? error?.message ?? error}`));
+    server.once("listening", onListening);
+    server.once("error", onError);
+    timer = setTimeout(() => settle(new Error(`${label} deadline exceeded`)), timeoutMs);
+    try { start(); } catch (error) { settle(error); }
+  });
+}
+
+async function closeListeningServer(server) {
+  if (!server?.listening) return;
+  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+}
 
 async function startLoopback() {
   loopback = createServer((request, response) => {
@@ -119,7 +149,26 @@ async function startLoopback() {
       response.end(JSON.stringify({ id: "m10-fixture", choices: [{ message: { role: "assistant", content: "ok" } }] }));
     });
   });
-  await new Promise(resolve => loopback.listen(0, "127.0.0.1", resolve));
+  try {
+    const fault = process.env.PROVIDERDOCK_OMP_BROWSER_STARTUP_FAULT;
+    if (fault === "refusal") {
+      startupBlocker = createServer();
+      await listenWithDeadline(startupBlocker, () => startupBlocker.listen(0, "127.0.0.1"), "startup blocker");
+      const blockedPort = startupBlocker.address().port;
+      await listenWithDeadline(loopback, () => loopback.listen(blockedPort, "127.0.0.1"), "loopback startup");
+    } else if (fault === "hang") {
+      await listenWithDeadline(loopback, () => undefined, "loopback startup", 250);
+    } else {
+      await listenWithDeadline(loopback, () => loopback.listen(0, "127.0.0.1"), "loopback startup");
+    }
+  } catch (error) {
+    await closeListeningServer(loopback).catch(() => undefined);
+    await closeListeningServer(startupBlocker).catch(() => undefined);
+    startupBlocker = undefined;
+    throw error;
+  }
+  await closeListeningServer(startupBlocker).catch(() => undefined);
+  startupBlocker = undefined;
   return loopback.address().port;
 }
 
@@ -723,7 +772,7 @@ try {
   }
   try { await withDeadline(dashboard?.stop(), "dashboard stop"); } catch (error) { cleanupError ??= error; }
   try {
-    if (loopback) await withDeadline(new Promise((resolve, reject) => loopback.close(error => error ? reject(error) : resolve())), "loopback stop");
+    if (loopback?.listening) await withDeadline(new Promise((resolve, reject) => loopback.close(error => error ? reject(error) : resolve())), "loopback stop");
   } catch (error) { cleanupError ??= error; }
   try {
     if (browserDirectory) {

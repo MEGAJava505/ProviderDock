@@ -201,6 +201,28 @@ function assertRegular(stat: BigIntStats): void {
   if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1n) throw new RunError("OMP_RUN_UNSAFE_PATH");
 }
 
+async function assertReadIdentity(
+  file: string,
+  expected: BigIntStats,
+  observed: BigIntStats,
+): Promise<void> {
+  // An open descriptor may outlive the directory entry that named it. POSIX then
+  // reports nlink=0 for that still-regular inode; classify the confirmed atomic
+  // replacement as a retryable change, while keeping every unsafe replacement
+  // fail-closed through the path's current lstat.
+  if (!observed.isFile() || observed.isSymbolicLink() || observed.nlink > 1n) {
+    throw new RunError("OMP_RUN_UNSAFE_PATH");
+  }
+  if (observed.nlink === 0n) {
+    const current = await optionalStat(file);
+    if (!current) throw new RunError("OMP_RUN_CHANGED");
+    assertRegular(current);
+    if (sameIdentity(current, observed)) throw new RunError("OMP_RUN_UNSAFE_PATH");
+    throw new RunError("OMP_RUN_CHANGED");
+  }
+  if (!sameFile(observed, expected)) throw new RunError("OMP_RUN_CHANGED");
+}
+
 async function optionalStat(path: string): Promise<BigIntStats | undefined> {
   try { return await fs.lstat(path, { bigint: true }); }
   catch (error) {
@@ -358,8 +380,7 @@ export class FileOmpRunRepository implements OmpRunRepository {
     const handle = await fs.open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
     try {
       const opened = await handle.stat({ bigint: true });
-      assertRegular(opened);
-      if (!sameFile(opened, stat)) throw new RunError("OMP_RUN_CHANGED");
+      await assertReadIdentity(file, stat, opened);
       // Fixed allocation and bounded reads even if a non-cooperating writer grows the file.
       const buffer = Buffer.alloc(maximumRecordBytes + 1);
       let length = 0;
@@ -370,8 +391,8 @@ export class FileOmpRunRepository implements OmpRunRepository {
       }
       if (length > maximumRecordBytes) throw new RunError("OMP_RUN_LIMIT_EXCEEDED");
       const after = await handle.stat({ bigint: true });
-      assertRegular(after);
-      if (BigInt(length) !== stat.size || !sameFile(after, stat)) throw new RunError("OMP_RUN_CHANGED");
+      await assertReadIdentity(file, stat, after);
+      if (BigInt(length) !== stat.size) throw new RunError("OMP_RUN_CHANGED");
       const bytes = buffer.subarray(0, length);
       if (bytes.includes(0)) throw new RunError("OMP_RUN_INVALID_DATA");
       const record = validateRecord(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)), runId);

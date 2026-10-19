@@ -98,6 +98,65 @@ const stacks: Stack[] = [];
 const servers: ProviderDashboardServer[] = [];
 const loopbacks: Server[] = [];
 
+async function listenWithDeadline(
+  server: EventEmitter,
+  start: () => void,
+  label: string,
+  timeoutMs = 1_000,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      server.off("listening", onListening);
+      server.off("error", onError);
+    };
+    const settle = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (error) reject(error); else resolve();
+    };
+    const onListening = () => settle();
+    const onError = (error: NodeJS.ErrnoException) => settle(
+      new Error(`${label} failed: ${error.code ?? error.message}`),
+    );
+    server.once("listening", onListening);
+    server.once("error", onError);
+    timer = setTimeout(() => settle(new Error(`${label} deadline exceeded`)), timeoutMs);
+    try { start(); } catch (error) { settle(error instanceof Error ? error : new Error(String(error))); }
+  });
+}
+
+async function closeListeningServer(server: Server): Promise<void> {
+  if (!server.listening) return;
+  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+}
+
+describe("bounded loopback startup", () => {
+  it("rejects bind refusal and a startup with neither callback nor error", async () => {
+    const occupied = createServer();
+    const refused = createServer();
+    await listenWithDeadline(occupied, () => { occupied.listen(0, "127.0.0.1"); }, "occupied startup");
+    const port = (occupied.address() as AddressInfo).port;
+    try {
+      await expect(listenWithDeadline(refused, () => { refused.listen(port, "127.0.0.1"); }, "refused startup", 250))
+        .rejects.toThrow("refused startup failed: EADDRINUSE");
+      expect(refused.listenerCount("error")).toBe(0);
+
+      const hanging = new EventEmitter();
+      await expect(listenWithDeadline(hanging, () => undefined, "hanging startup", 25))
+        .rejects.toThrow("hanging startup deadline exceeded");
+      expect(hanging.listenerCount("listening")).toBe(0);
+      expect(hanging.listenerCount("error")).toBe(0);
+    } finally {
+      await closeListeningServer(refused);
+      await closeListeningServer(occupied);
+    }
+  });
+});
+
 // The exact pinned wire contract the compiled route produces (see omp-config-compiler:
 // apiMapping openai-chat-completions -> openai-completions => /v1/chat/completions, bearer
 // => Authorization: Bearer <marker>, selector model id "exact-model"). The loopback is a
@@ -196,7 +255,12 @@ async function startLoopback(requests: RecordedRequest[]): Promise<{ server: Ser
       res.end(JSON.stringify({ id: "cmpl-fixture", choices: [{ message: { role: "assistant", content: "ok" } }] }));
     });
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    await listenWithDeadline(server, () => { server.listen(0, "127.0.0.1"); }, "loopback startup");
+  } catch (error) {
+    await closeListeningServer(server).catch(() => undefined);
+    throw error;
+  }
   loopbacks.push(server);
   return { server, port: (server.address() as AddressInfo).port };
 }
