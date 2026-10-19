@@ -1,110 +1,169 @@
 # Текущий статус M11
 
-**A1 NOT PROVEN; A4 BLOCKED на шаге 1.** Пакет `a901dd0` принят как честная фиксация prelaunch BLOCKED. Разрешённый единственный actual launch не израсходован; исполнимого текущего окна нет. Повышение прав / установка мониторинга ещё не разрешены этим handoff.
+**A1 NOT PROVEN; A4 BLOCKED на шаге 1.** Пакет `a901dd0` принят как честная фиксация prelaunch BLOCKED (вердикт `c8bdee6`); единственный разрешённый actual launch не израсходован (`actualLaunches=0`). Владелец (gateway-owner MEGAJava505) разрешил elevated Administrator на своей Windows-машине для одного A1-rerun. Координатор команд на машине пользователя не выполняет: исполняет пользователь, координатор проверяет опубликованный evidence.
 
-Прежние разделы «M11 runbook опубликован» и вердикт `30f95f7` — в [архиве проверки evidence](archive/2026-10-19-m11-evidence-handoff-archive.md). [Приёмка P2-коррекций](archive/2026-10-19-a1-rerun-handoff-archive.md) остаётся в силе.
+Прежний вердикт BLOCKED перенесён в [архив](archive/2026-10-19-a1-elevated-handoff-archive.md). [Приёмка P2](archive/2026-10-19-a1-rerun-handoff-archive.md) и [исходное задание A1-rerun](archive/2026-10-19-a1-blocked-handoff-archive.md) остаются в силе.
 
-<a id="задание-a1-rerun--19-октября-2026"></a>
-Прежнее [задание A1-rerun от 19 октября 2026](archive/2026-10-19-a1-blocked-handoff-archive.md#задание-a1-rerun--19-октября-2026) перенесено дословно в архив. Якорь сохранён для старых ссылок. Требования bounded run из архива сохраняются; актуальные prerequisites и статус приведены ниже.
+## Задание A1-rerun elevated — 19 октября 2026
 
-## Результат проверки A1-rerun BLOCKED координатором — 19 октября 2026
+### 1. Кто исполняет и границы
 
-**Вердикт: BLOCKED честный в пределах опубликованного пакета; признаков фабрикации actual telemetry и P1 не обнаружено. A1 остаётся NOT PROVEN, A4 BLOCKED, `opensA4Gate:false`.** Preflight выявил отказ среды до actual launch; попытка не потрачена впустую — её бюджет вообще не израсходован (`actualLaunches=0`, `budgetConsumed:false`). Это приёмка фиксации BLOCKED, а не PASS A1 или разрешение A4. Историческое `reviewAcceptance:PENDING` в evidence не переписывается; текущая приёмка записана здесь.
+Исполнитель — пользователь на своей Windows-машине в **elevated PowerShell** (Run as Administrator, UAC подтверждён). Агент/координатор не имеет доступа к этой машине и не выполняет ни одной команды; его роль — задание, проверка evidence и вердикт.
 
-Проверена точная пара `12a956e83cab3ae8e836422fab9ef889529e46bd..a901dd0a04ad9fd8c81a429042f939d30ac2d2c5` после `git fetch origin omp-integration`, в отдельном checkout `/tmp/providerdock-a1-blocked-review-20261019` на `a901dd0`. Основной checkout и его `.git` не изменялись. Имена `000099–000107` ниже относительны к [A1 evidence](../../evidence/m11-pilot/A1-actual-binary/).
+Разрешение покрывает ровно один повторный прогон A1:
 
-### Append-only, integrity и redaction
+- один bounded launch pinned `omp.exe` **18.0.4**, SHA-256 **`1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba`**;
+- inert fixture, deadline ≤45 с;
+- `actualLaunches=1`, `retries=0`, live requests/cost=0;
+- без provider route, без credentials, без inference и платных запросов;
+- A4 этим заданием **не открывается**.
 
-- `git diff --stat 12a956e..a901dd0`: **9 новых файлов, 2098 insertions, 0 deletions**; name-status содержит только `A`. Все **163** прежних файла `evidence/m11-pilot/`, включая manifests, сравнены побайтово через `git show` в обеих ревизиях и с checkout: **0 изменённых, 0 отсутствующих**. Теперь файлов 172.
-- SHA-256 `integrity-hashes-rerun-000107.txt` точно совпал с переданным отдельно: **`5293cac447ee706d27031a682c125d1d6602cb1dcfbb3bff0f5737cdf907102e`**. `sha256sum -c integrity-hashes-rerun-000107.txt`: **8/8 OK**, missing/mismatch 0; manifest исключает только себя.
-- **7/7 внутренних `integrityHash` совпали**: удаляется только верхний `integrityHash`, recursive key sort `localeCompare('en')`, arrays preserved, pretty2 UTF-8 + LF, SHA-256. Проверка Node **24.22.0 / ICU 78.3 / Unicode 17.0**; producer декларирует **24.20.0 / 78.3 / 17.0**. Duplicate JSON keys не обнаружены. Проверены hash исходного handoff в authorization, config bindings и canonical policy hash; совпадают.
-- **Redaction PASS для всех 9 новых public JSON/TXT**: проверены secret/key/JWT/private-key/Bearer patterns, raw authorization/cookies/headers, credential assignments, Windows/POSIX абсолютные пользовательские пути, email, account/SID/известный owner literal, URL/IP; ручной просмотр всех полей не выявил раскрытых значений. Authorization refs, Windows token terminology, aliases и hashes не являются секретами. Это не blanket PASS старых файлов, закрытых source logs/DPAPI mapping или произвольного неизвестного секрета.
+Старые 172 evidence-файла (`evidence/m11-pilot/**`) не изменяются; новые записи — только append-only.
 
-### Что именно подтверждает BLOCKED
+### 2. Шаг 1 — elevation proof
 
-Три варианта — **три `logman create trace … -ets` с разными providers**, а не три независимых ETW-продукта. `wpr` и `tracerpt` перечислены как доступные tools, но их отдельные попытки capture не заявлены. В authorization/config есть три ссылки на причины, а в `preflight-000101` и `network-counters-000103` — отдельные normalized observations:
+Цель: доказать, что реально elevated именно тот процесс, который создаёт и читает ETW-сессии, а не только членство в группе.
 
-| Observation / provider | UTC start → end | Результат |
+```powershell
+whoami /groups | Select-String -Pattern 'S-1-5-32-544','S-1-5-32-559','Mandatory Label'
+whoami /priv   | Select-String -Pattern 'SeSystemProfilePrivilege','SeDebugPrivilege','SeProfileSingleProcessPrivilege'
+[Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent() |
+  Select-Object @{n='IsAdmin';e={$_.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)}}
+```
+
+Зафиксировать: SID групп, состояние привилегий (`Enabled`/`Disabled`), integrity level (`High`/`System`), `IsAdmin`. Если процесса не elevated — **STOP**: дальнейшие шаги не выполнять.
+
+### 3. Шаг 2 — provider metadata
+
+```powershell
+logman query providers "Microsoft-Windows-Kernel-Process"
+logman query providers "Microsoft-Windows-TCPIP"
+logman query providers "Microsoft-Windows-WFP"
+logman query providers "Microsoft-Windows-DNS-Client"
+wevtutil gp "Microsoft-Windows-Kernel-Process" /ge:true /gm:true
+```
+
+Зафиксировать GUID, доступные Event IDs, version, keywords/levels. Эти значения — источник истины для фильтров; не подставлять Event IDs из памяти.
+
+### 4. Шаг 3 — owned ETW sessions
+
+Создать уникальные сессии под run id (пример; флаги уточнить по metadata шага 2):
+
+```powershell
+$run = 'M11-A1-RERUN-ELEVATED-20261019-000108'
+logman create trace "PD-A1-$run-Process"   -p "Microsoft-Windows-Kernel-Process" 0xffffffffffffffff 0x5 -o "C:\<OWNED>\etw\$run-process.etl" -ets
+logman create trace "PD-A1-$run-Transport" -p "Microsoft-Windows-TCPIP"           0xffffffffffffffff 0x5 -o "C:\<OWNED>\etw\$run-transport.etl" -ets
+logman create trace "PD-A1-$run-WFP"       -p "Microsoft-Windows-WFP"             0xffffffffffffffff 0x5 -o "C:\<OWNED>\etw\$run-wfp.etl" -ets
+logman query -ets
+```
+
+Требования: сессии включены **до** создания helper/actual процессов; вывод `logman query -ets` подтверждает `Running`; consumer/decoder проверен до запуска; файлы ETL — в owned-каталоге, не в пользовательских данных.
+
+### 5. Шаг 4 — self-test ДО actual launch
+
+Без PASS этого шага actual launch запрещён.
+
+```powershell
+# 5.1 синтетический launcher -> child с известным exit code
+$h = Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList '/c','exit','7' -PassThru -Wait
+$h.ExitCode   # ожидается 7
+
+# 5.2 положительный локальный обмен известного размера (loopback, inert)
+$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$listener.Start()
+$port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+# отдельным процессом: отправить 64 байта, получить эхо, закрыть
+# зафиксировать: bytes sent/received, request count, длительность
+
+# 5.3 отрицательный direct TCP (вне allowlist) -> отказ
+try { (New-Object System.Net.Sockets.TcpClient).Connect('<NON_ALLOWLISTED_HOST>', <PORT>) }
+catch { $_.Exception.InnerException.SocketErrorCode }   # ожидается AccessDenied / 10013
+```
+
+Проверить после остановки/слива сессий:
+
+```powershell
+logman stop "PD-A1-$run-Process" -ets
+logman stop "PD-A1-$run-Transport" -ets
+logman stop "PD-A1-$run-WFP" -ets
+tracerpt "C:\<OWNED>\etw\$run-process.etl" -o "C:\<OWNED>\etw\$run-process.xml" -of XML -y
+# в сводке tracerpt: Events Lost = 0; отдельно проверить LogBuffersLost/RealTimeBuffersLost
+```
+
+Self-test PASS только если: child exit code совпал; ProcessStart/ProcessStop с parent linkage реально записаны; локальный обмен измерен; negative TCP дал отказ; `EventsLost=0`; decoder读到 ожидаемые события. Иначе — **BLOCKED**, actual launch не выполнять, бюджет не расходовать.
+
+### 6. Шаг 5 — authorization и preflight
+
+Перед запуском создать:
+
+- `authorization-rerun-elevated-000108.json` — phase/evidenceId, authorizationRef (это разрешение владельца с цитатой scope), supersedes (`authorization-rerun-000099.json`), scope/project, responsible/approver/observationOwner, `issuedAtUtc`, будущее короткое `utcTimeWindow`, monitoringPlan (инструменты/версии/config ref+hash/sessions/фильтры/потеря событий), stopCriterion, expectedResult, sideEffectPolicy, binary (version/path alias/SHA-256), launch (argv/cwd/env policy), limits, integrityHash, status.
+- `token-readback-000109.json` — вывод шага 1: SID групп, привилегии, integrity, IsAdmin, время.
+- `provider-metadata-000110.json` — GUID/Event IDs/versions по шагу 2.
+- `monitoring-config-elevated-000111.json` — точные сессии, providers, флаги, пути ETL, consumer, self-test config.
+- `preflight-elevated-000113.json` — `Get-FileHash -Algorithm SHA256` pinned binary без исполнения, environment attestation (fresh profile/Job), policy allow/deny, свободные порты/каталоги.
+
+Значения `<...>` заполняет пользователь; выдуманные лимиты, route ID или credential class недопустимы.
+
+### 7. Шаг 6 — один actual launch
+
+В утверждённом UTC-окне, при живых сессиях:
+
+```powershell
+$omp = '<PINNED_OMP_PATH>'
+(Get-FileHash -Algorithm SHA256 $omp).Hash   # должен совпасть с 1944c6e2...
+$p = Start-Process -FilePath $omp -ArgumentList @('<ALLOWLISTED_ARGS>') `
+      -WorkingDirectory '<OWNED_FIXTURE_CWD>' -PassThru
+$p.WaitForExit(45000)
+$p.ExitCode
+```
+
+Собрать:
+
+- `process-tree-elevated-000114.json`: parent/controller PID → omp.exe PID → все child/descendant; для каждого PID + creation time, parent PID, spawn/exit UTC, path + SHA-256, exit code, orphan check после teardown, Job peak;
+- `network-counters-elevated-000115.json`: attempted/allowed/denied, connections, sent/received bytes, requests; источник, единицы, baseline/final/delta, scope (actual/descendants/controller/helpers/probes), дедупликация;
+- `run-log-elevated-000116.txt`: хронология UTC, команды, exit codes, stop/teardown;
+- `side-effects-elevated-000117.json`: только owned fixture, перечень созданных/изменённых путей, отсутствие внешних эффектов;
+- `summary-elevated-000118.json`: итог, PASS/BLOCKED, ссылки на все артефакты;
+- `integrity-hashes-elevated-000119.txt`: SHA-256 всех новых файлов + манифест.
+
+Teardown: остановить сессии, проверить отсутствие процессов `omp.exe`/helpers, закрыть сокеты/broker, подтвердить orphan=0, сохранить ETL/XML вне пользовательских данных.
+
+### 8. Критерии приёмки
+
+1. Elevation proof: процесс elevated, нужные привилегии Enabled, integrity High/System.
+2. Provider metadata зафиксирована; сессии `Running` до запуска; decoder проверен.
+3. Self-test PASS: child exit code, parent linkage, локальный обмен, negative TCP, `EventsLost=0`.
+4. Launch exit 0 ≤45 с в утверждённом окне; hash бинаря совпал.
+5. Process tree полный: parent → omp.exe → все children с PID/creation time/path/SHA-256/exit; orphan=0.
+6. Network counters измерены, 0 unexpected egress; allowlist соблюдён.
+7. Side effects только owned fixture; пользовательские данные не изменены.
+8. Integrity: все SHA-256 совпадают; redaction чист (нет секретов, токенов, raw headers, cookies, абсолютных путей, email).
+
+### 9. Stop-правила
+
+Self-test fail, `EventsLost>0`, unexpected child/egress, cap breach, timeout, hash mismatch, side effect вне owned fixture, потеря сессии/consumer — **STOP**: зафиксировать `BLOCKED`/`NOT PROVEN`, не повторять без нового разрешения. Actual launch не выполнять, если preflight/self-test неполон.
+
+### 10. После выполнения
+
+```powershell
+git add evidence/m11-pilot
+git commit -m "evidence(m11): record elevated A1 rerun"
+git push origin omp-integration
+```
+
+Прислать координатору: hash коммита и SHA-256 манифеста `integrity-hashes-elevated-000119.txt`. Дальше — независимое ревью Astra; при приёмке A1 цепочка закрывается и открывается шаг 1 для A4 (fresh environment, scoped credential, pinned модель, caps) по [readiness checklist 000096](../../evidence/m11-pilot/A4-provider-route/readiness-checklist-p2-000096.json).
+
+### 11. Сводная таблица команд
+
+| Шаг | Команда (пример) | Что зафиксировать |
 |---|---|---|
-| `PREFLIGHT-ETW-1` / `Microsoft-Windows-Kernel-Process` | 14:13:23.3585251 → 14:13:23.8851249 | `0x80070005`, signed exit `-2147024891`, Access denied / requested administrator context; `ready:false` |
-| `PREFLIGHT-ETW-2` / `Microsoft-Windows-TCPIP` | 14:13:23.8891256 → 14:13:24.0334196 | Тот же HRESULT/exit и явная причина; `ready:false` |
-| `PREFLIGHT-ETW-3` / `Microsoft-Windows-WFP` | 14:13:24.0334196 → 14:13:24.1692991 | Тот же HRESULT/exit и явная причина; `ready:false` |
-
-Дата всех observations — 2026-10-19 UTC. `0x80070005` доказывает записанный отказ доступа, но **не устанавливает конкретную отсутствующую группу/privilege**: token/elevation/privilege readback в пакете отсутствует. Название «realtime» в prose также не доказывает активный realtime consumer: в command templates нет `-rt`, сессии вообще не стартовали. Для следующего конфига режим capture/consumer следует задать и проверить явно.
-
-`preflight` проверил наличие/размер pinned binary (190118912 bytes) и его SHA-256 без исполнения; версия 18.0.4 взята из прежнего accepted evidence, runtime version заново не измерялась. В 14:13:58.1103413 записан inventory: Procmon не найден в PATH и пяти проверенных каталогах (не утверждается отсутствие на всём диске), собственных ETW-сессий/ETL не наблюдалось. В 14:14:42.7459086 — Sysmon channel не найден, Security metadata query unauthorized, Kernel-Process Analytic disabled; восемь WFP Operational events `1030` не выдаются за network capture. Read-only metadata/inventory не заменяет монитор.
-
-`run-log-000104` хронологичен: три отказа → inventory → channels → BLOCK в 14:18:16.164Z. Authorization оформлена **после monitor preflight**, явно `NOT ISSUED FOR EXECUTION`; её будущее на момент записи окно **14:23:16.164–14:25:16.164Z** было prospective, `windowArmed:false` и не использовано. Это не задним числом выданное разрешение actual run. Fresh fixture/profile/Job, watchdog, token readback, negative probes и exact launch bindings не подготовлены; их отсутствие обозначено, готовность не заявлена.
-
-**Actual `omp.exe` по пакету не запускался.** Общий `runId` буквально равен `M11-A1-RERUN-20261019-000099`, а не строке `not-started`: это correlation ID preflight/планируемого запуска. Состояние not-started однозначно выражено `actualLaunches=0`, `actualProcessIdentity:null`, `actualCaptureWindow:null`, `exitCode:null`, `duration:null`, `boundedActualLaunch:NOT RUN`; launch argv помечен `NOT EXECUTED`. Exit codes `-2147024891` относятся только к `logman`.
-
-В `process-tree-000102` пустые nodes/edges прямо названы отсутствием capture, не доказательством zero descendants; orphan count и Job peak — `null`. В `network-counters-000103` все baseline/final/delta у семи counters во всех шести scopes — `null`, events пусты, external bytes/unexpected egress/loss/billing неизвестны; обе negative probes `NOT RUN`. В `side-effects-000105` нули относятся к launch/action accounting и наблюдавшимся preflight artifacts, а не к runtime telemetry. Его PASS ограничен owned preflight accounting; прямо указаны отсутствие system-wide file/registry capture и невозможность исключить все OS diagnostics. Summary сохраняет эти границы, A1 NOT PROVEN и A4 BLOCKED.
-
-**Предел независимой проверки:** координатор проверил публичные bytes, хеши, ссылки и согласованность observations. Private normalized sources, collector invoker, DPAPI mapping, Windows token/OS state и сам binary здесь недоступны; их hashes не заменяют чтение исходников или независимое наблюдение. Отсутствие запуска и отказ среды приняты как непротиворечивый owner report, а не доказаны отдельным системным монитором. Оснований назвать это фабрикацией не обнаружено.
-
-### Разблокировка: права и проверка до actual launch
-
-1. **Владелец выбирает и отдельно разрешает изменение контекста/системы.** Практический путь ETW — collector/controller orchestration из **elevated Administrator** terminal/service. Членство в `Administrators` при filtered UAC token само по себе недостаточно. Actual `omp.exe` всё равно создаётся в свежем ограниченном AppContainer/Job, без наследования административного token, credentials или лишних handles; elevated collector не означает elevated payload.
-2. **Альтернатива без полного admin token — только проверенная делегация.** `Performance Log Users` может дать управление обычными ETW-сессиями, но не гарантирует доступ ко всем kernel/system/WFP providers и consumer/session ACL. Для выбранного kernel/system tracing режима проверить **`SeSystemProfilePrivilege` (Profile system performance)** и её enable в token, если режим её требует. Не считать эту privilege универсальным требованием каждого manifest provider или заменой остальных access checks. Назначение групп/прав, изменение ACL/audit policy и установка service требуют отдельного разрешения; в текущем пакете их не делали.
-3. **До helper и до `omp.exe` снять фактический token readback того процесса, который будет создавать/читать trace.** Локально `whoami /groups` и `whoami /priv`; программно `GetTokenInformation` для `TokenElevation`, `TokenElevationType`, integrity level и privileges. Проверить enabled `Administrators` (не deny-only), `Performance Log Users` при делегации, наличие/состояние нужной `SeSystemProfilePrivilege`; `AdjustTokenPrivileges` не должен возвращать `ERROR_NOT_ALL_ASSIGNED`. Команды выполняются в целевом collector-контексте; interactive admin membership не доказывает права service/child. В public evidence экспортировать только role/boolean/privilege status, без user/account/SID dump.
-4. **Проверить эффективный доступ, а не только группы:** перечислить нужные providers, создать каждую уникальную owned session, включить provider, подключить consumer/прочитать output, запросить состояние и counters потерь, flush/stop своей тестовой session. Записать API/command return codes, HRESULT/Win32 error, token context, session/config hashes и export readback. Любой Access denied, неизвестный источник или неполное покрытие → BLOCKED **до actual launch**. Успешный `logman query` без реально полученных событий недостаточен.
-
-### Разблокировка: конкретный capture contract
-
-До запуска собрать на целевой Windows build provider metadata через `logman query providers <provider>` и, где manifest доступен, `wevtutil gp <provider> /ge:true /gm:true`; для остальных — TDH/event schema из collector. Зафиксировать provider name/GUID, Event ID + Version + Task/Opcode, keywords/level, схему полей, session mode/buffers и decoder version/hash. IDs и keywords должны соответствовать **реальной build**, а не быть угаданы по имени provider. Disabled Event Log Analytic channel не запрещает автоматически отдельную ETW session; существование Operational channel не доказывает нужный stream.
-
-Минимальная конфигурация — owned sessions `PD-A1-<newRunId>-Process`, `PD-A1-<newRunId>-Transport`, `PD-A1-<newRunId>-WFP` (либо одна multi-provider session с той же полнотой). Они включаются **до** создания helpers/actual; capture продолжается до teardown и orphan check. Для немедленного stop нужен проверенный realtime consumer/controller, а не только посмертный ETL. Зафиксировать `-rt`/`EVENT_TRACE_REAL_TIME_MODE` при таком режиме, owned ETL/output, consumer readiness и отсутствие потерь. Имена — шаблоны следующего config, не наблюдения нынешнего пакета.
-
-| Источник | Обязательные события и поля / пределы |
-|---|---|
-| **`Microsoft-Windows-Kernel-Process`** | ProcessStart/ProcessStop (обычно manifest Event IDs **1/2**, подтвердить ID/version на build), image linkage при необходимости через ImageLoad. Требуются UTC timestamp с описанным clock conversion, payload PID, parent PID, creation time/process start key для защиты от PID reuse, image alias, actual/controller/child relationship, exit timestamp и status. Header emitter PID не подменяет payload PID. SHA-256 image вычислить отдельно и связать с наблюдаемым образом; недостающее exit status дополнить `GetExitCodeProcess` от retained handle. Parent edge выводится из реального start payload; отдельный «parent event» не выдумывается. Нужны все короткоживущие descendants, не только polling snapshot. |
-| **`Microsoft-Windows-TCPIP` + UDP-capable transport source при необходимости** | Connect/accept/disconnect/failure, send/receive; IPv4/IPv6 и UDP. Проверить покрытие TCPIP на этой build; если UDP отсутствует, добавить kernel network trace (`EVENT_TRACE_FLAG_NETWORK_TCPIP`, TCP/UDP event classes) или другой проверенный transport source. Поля: process identity/correlation, UTC, protocol/family/direction, local/remote address+port aliases, connection/flow ID, status/error, byte length. Определить слой bytes и учёт retransmits, единицы и дедупликацию. Одни TCP events не закрывают UDP/DNS или отказ до стека. |
-| **`Microsoft-Windows-WFP` либо эквивалентный validated WFP/audit stream** | Наблюдаемые allow/block decisions на нужных ALE/connect/receive-accept и transport layers для v4/v6, TCP/UDP: application/process identity, UTC, layer/filter ID, direction, protocol/tuple aliases, decision/reason/error, flow/activity correlation. Если этот provider не экспортирует нужные решения, нужен другой доказанный источник; восемь Operational `1030` недостаточны. Security `5156/5157` (connection allow/block), `5152/5153` (packet drops), `5158/5159` (bind) — возможное дополнение при отдельно разрешённом audit policy и праве чтения; они не дают сами по себе application requests/bytes или все API failures. |
-| **Controller/API/broker observations + DNS source** | Реальные Winsock API result/error для denied-before-stack, broker reject-before-dispatch и application request counters с correlation IDs. DNS: validated `Microsoft-Windows-DNS-Client` query/result events или эквивалентное наблюдение, плюс UDP/TCP transport; поля имени назначения публикуются как aliases. Зафиксировать ограничения DNS cache/service PID attribution. Лог broker не покрывает обходящие его прямые вызовы actual процесса. Для каждого bypass path должен быть доказан источник наблюдения, иначе coverage=false и BLOCKED. |
-
-Каждый counter содержит source/event refs, unit/layer, baseline/final/delta, UTC interval, scope (actual/descendants/controller/helpers/probes отдельно) и правило дедупликации. `attempted=allowed+denied` допустимо только на одном полном decision layer; requests не выводятся из TCP packets. Пустой stream без положительного self-test не равен нулевому трафику. Event/buffer/consumer loss и gaps проверяются до, во время и после capture; неизвестность или потеря запрещает PASS.
-
-### Обязательный self-test: сначала helper, затем разрешение actual launch
-
-1. Под тем же collector/config/consumer запустить owned **синтетический launcher → короткоживущий child**, при необходимости grandchild, с заранее известным exit code. Это не `omp.exe`, не процесс внутри actual Job с cap=1; helper scope отдельно перечислен. Проверить в реально сохранённом и повторно прочитанном export **creation, exit и parent edges**, PID+creation identity, UTC, image/hash linkage и exit codes всех helper nodes. Сопоставить с launcher handles/API timestamps; polling-only, один start без exit, потеря short-lived child или пустой export → FAIL.
-2. На owned inert endpoints без внешней сети проверить положительный локальный transport обмен с известным payload size и request count (со сверкой transport-layer overhead/retransmits), отрицательный direct TCP с **WSAEACCES/10013 → EACCES** в требуемом AppContainer/policy и unlisted route **reject-before-network** с измеренной нулевой dispatch delta. Покрыть заявленные IPv4/IPv6, UDP/DNS и bypass paths; helpers и их временная точная allowlist не расширяют actual allowlist. Ранний API deny может не создать WFP event — нужен API observation, а не выдуманный WFP record. Не обращаться к внешним DNS/адресам.
-3. Проверить export decoder, bounded buffers, EventsLost/LogBuffersLost/RealTimeBuffersLost и consumer errors/lag (или эквивалентные diagnostics), readiness и stop/teardown. Helper PID/Job cleanup и no-orphan check реальны. После теста сохранить его отдельные counters; для actual снять новый baseline. Если sessions перезапущены или изменены rights/config/decoder, readiness/self-test проверяется повторно в фактическом контексте.
-4. Только при **PASS всех self-tests**, полном coverage, свежих token/Job/policy/binary readbacks и проверенном независимом watchdog оформить конкретный новый authorization record и **будущее UTC окно**. Историческое `000099` не редактировать и не активировать задним числом. Любая неполнота self-test означает **BLOCKED, actualLaunches=0**, единственный actual launch остаётся неиспользованным. Actual launch без мониторинга запрещён.
-
-### Допустимые альтернативы и решение владельца
-
-| Вариант | Что требуется и что остаётся доказать |
-|---|---|
-| **ETW из elevated-контекста** | Предпочтительный путь: владелец разрешает запуск collector/orchestration от Administrator, затем выполняет token/provider/self-tests выше. Elevation не гарантирует покрытие; payload остаётся ограниченным. |
-| **Sysmon** | Установка/настройка требует **Administrator**, kernel driver и работающую service; если уже установлен, возможен read-only доступ к разрешённому журналу без elevation клиента. Проверить config/hash/filters и события **1 ProcessCreate, 5 ProcessTerminate, 3 NetworkConnect (явно включить), 22 DNSQuery** на данной версии. ProcessGuid/ParentProcessGuid и image hashes помогают дереву. Event 5 не заменяет exit code; Event 3 не покрывает все denied/API attempts, bytes или request counts. Нужны дополнительные источники и тот же self-test; установка Sysmon сама по себе не снимает BLOCKED. |
-| **AppContainer controller с журналированием, без ETW** | Может дать CreateProcess/Job/token/exit API observations, broker requests/bytes и pre-stack errors на **реально перехваченных** путях. Допустим только если доказаны полнота lifecycle и наблюдение всех прямых network/bypass путей actual/descendants. Job cap/token policy и постоянные нули этого не доказывают. Нынешний controller такой полноты не имеет; без дополнительного проверенного механизма A1 остаётся NOT PROVEN, launch запрещён. |
-| **Process Monitor** | Загрузка драйвера требует **Administrator** (или заранее установленного/управляемого администратором driver/service). Проверить process create/exit, network/I/O events, filters, export и dropped events. Полезен для lifecycle и side effects; не гарантирует все pre-stack denies, DNS attribution и application requests. Потребуются API/broker источники и проверка полного coverage. Это не обход отсутствия admin rights. |
-| **Не менять права/систему** | Принять сохранение **A1 NOT PROVEN / A4 BLOCKED**, без actual launch. Это корректный конечный результат при недоступном полном мониторинге. |
-
-**Решение gateway-owner:** разрешить elevated ETW pipeline; либо отдельно разрешить установку/настройку Sysmon (при необходимости Procmon) с дополнением недостающего покрытия; либо оставить A1 NOT PROVEN и A4 закрытым. Делегированный ETW/controller без admin допустим только после тех же доказательств полноты, не как обещанный обход прав. Это перечень решений, не запрос повторного разрешения уже одобренного bounded A1: его один launch остаётся разрешённым по scope, но технические prerequisites и новое будущее окно обязательны. Этот review не устанавливает инструменты, не меняет группы/audit/firewall и не выполняет Windows-команды.
-
-### Следующая передача, ограничения и проверка документации
-
-Следующий пакет — append-only **после `000107`**, первый возможный ID `000108` после проверки занятости; все **172** нынешних evidence-файла неизменяемы. Новые authorization/config/self-test/preflight и capture records должны перечислять точные sources, aliases и hashes. Сохранить исходный bounded contract из [архива задания](archive/2026-10-19-a1-blocked-handoff-archive.md): pinned **18.0.4 / `1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba`**, один actual launch, ≤45s, retries=0, fresh AppContainer/Job cap=1/kill-on-close, независимый watchdog, без credentials/provider route/live/paid, teardown в окне. Успех collectors не является PASS actual A1; после запуска нужна приёмка всего evidence.
-
-Даже полный принятый A1 снимает только блокировку **шага 1 подготовки A4**, а не разрешает A4 execution. Далее действуют [readiness 000096](../../evidence/m11-pilot/A4-provider-route/readiness-checklist-p2-000096.json) и [A4 checklist](archive/2026-10-19-m11-p2-handoff-archive.md#точный-чек-лист-снятия-блокировки-a4): fresh bindings, scoped credential/issuer revocation, pinned model/tariff, enforceable caps, отдельная authorization и будущее окно. До этого live requests/cost=0; A2/A3 остаются историческими inert PASS.
-
-Документационная проверка: diff просмотрен; `git diff --check` чист; прежнее задание в новом архиве сверено побайтово с `a901dd0`; локальные ссылки текущего handoff и вводной архива проверены. Изменены только этот handoff и новый архив, evidence/код/тесты не менялись. Windows-сценарий и права/провайдеры/self-test **не запускались и остаются непроверенными на целевой машине**; требования выше — условия следующей проверки, а не выполненные наблюдения. Сеть использовалась только для `git fetch`; commit/push не выполнялись. Санни переносит эти два документа поверх `a901dd0` и делает commit самостоятельно.
-
-Ответ владельца ниже сохранён как историческая запись. Его ожидание приёмки P2 уже закрыто; текущие A1/A4 статусы находятся в начале этого handoff. Слова «чек-лист выше» в историческом ответе относятся к [архивному A4 checklist](archive/2026-10-19-m11-p2-handoff-archive.md#точный-чек-лист-снятия-блокировки-a4).
-
-## Ответ владельца evidence на P2 — 19 октября 2026
-
-Ветка синхронизирована с вердиктом 1f6df6d. Исходные 147 evidence-файлов и предыдущий текст этого handoff сохранены. Текущий owner-status: [pilot-status-p2-000097.json](../../evidence/m11-pilot/pilot-status-p2-000097.json); проверка и полный manifest — validation-p2-000098.json и integrity-hashes-p2-000098.txt рядом с ним. Это ответ владельца, а не новая приёмка Astra.
-
-| Замечание | Append-only ответ | Итог и ограничение |
-|---|---|---|
-| P2-1 | A1-actual-binary/timing-correction-p2-1-000090.json | Probe 08:17:52–08:17:53 относится к прежнему inert-разрешению 000036 (08:00:33.050–10:00:33.050, восемь проверок из восьми). Запись 000044 с началом 08:18:37.258 относится к actual-повтору 08:18:47–08:18:54. Окна не расширялись; точное UTC время conversation approval не выдумывается. |
-| P2-2 | A1-actual-binary/summary-p2-correction-000091.json | Bounded launch подтверждён; observed process tree и измеренный attempted egress остаются NOT PROVEN. Сохранившиеся local observations не содержат этих данных; в Security нет событий нужного окна, Sysmon log отсутствует. Константы controller counters не заменяют monitor. Новый actual-запуск не выполнялся и требует отдельного разрешения. |
-| P2-3 | phase6-rollback-observation/summary-p2-correction-000092.json | Финальный интервал: 08:29:52.396–08:29:58Z. Ранний restore (дополнительная local reflog запись 08:14:26Z), teardown 08:28:42Z и residual postcheck 08:28:42.8521095Z перечислены отдельно. Они не представлены действиями после позднего 000070. |
-| P2-4 | redaction-owner-decision-000089.json; alias summaries 000094/000095 | Для новых records используются CONTROL_ROUTE_ALIAS_01, DENIED_ROUTE_ALIAS_01, PILOT_PROFILE_ALIAS_01, PILOT_PROVIDER_ROUTE_ALIAS_01 и PILOT_CREDENTIAL_ALIAS_01. Mapping хранится вне checkout под DPAPI CurrentUser; ACL ограничен текущим пользователем/SYSTEM, encrypted roundtrip проверен. Исторические literal IDs остаются только в прежних файлах; безусловный strict identifier-redaction PASS для них не заявляется. Имена каталогов evidence являются структурными путями, а не действующими profile bindings. |
-| P2-5 | A4-provider-route/summary-p2-correction-000093.json | Attestation явно историческая, accepted:false и validForA4Execution:false; прежний AppContainer удалён в 08:28:42Z. Нужна новая среда с provider-specific route, ownership и monitors перед actual A4. |
-
-A2/A3 сохраняют PASS только собственного исторического idle/inert сценария и не открывают A4. Полный A1 остаётся NOT PROVEN; приёмка correction-цепочки ожидается. Phase 6 имеет исправленное owner observation window, также без подмены независимой приёмки.
-
-Для продолжения чек-листа подготовлен A4-provider-route/readiness-checklist-p2-000096.json. Шаг 1 ещё заблокирован; credential import, запрос каталога, inference и issuer operations не выполнялись. Никакая новая A4 authorization не выдана: действующий лимит запросов/затрат равен нулю, selectedModel/issuer expiry/cost enforcement/будущее UTC window/fresh isolation ещё не подтверждены. Неизвестные поля не заполнены предположениями. Механизм будущего импорта — ровно DPAPI/process-env/скрытый ввод/finally из чек-листа выше; local vault removal не считается issuer revocation.
+| Elevation | `whoami /groups`, `whoami /priv` | SID, привилегии, integrity, IsAdmin |
+| Providers | `logman query providers "<name>"`, `wevtutil gp` | GUID, Event IDs, versions |
+| Sessions | `logman create trace ... -ets`, `logman query -ets` | имена, Running, пути ETL |
+| Self-test | `Start-Process cmd /c exit 7`, loopback exchange, negative TCP | exit code, bytes/requests, SocketErrorCode 10013, EventsLost=0 |
+| Preflight | `Get-FileHash -Algorithm SHA256` | hash pinned binary |
+| Launch | `Start-Process ... -PassThru`, `WaitForExit(45000)` | exit code, UTC окно |
+| Tree | `Get-CimInstance Win32_Process` + ETL events | PID/creation/parent/path/SHA-256 |
+| Network | `tracerpt` + consumer counters | attempted/allowed/denied, bytes, requests |
+| Teardown | `logman stop ... -ets`, orphan check | orphan=0, сессии остановлены |
+| Публикация | `git add/commit/push` | hash коммита, SHA-256 манифеста |
