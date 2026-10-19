@@ -1,0 +1,163 @@
+{
+  "actualLaunches": 0,
+  "after": {
+    "activeOwnTraceSessionMentioned": false,
+    "actualFixtureCreated": false,
+    "immutableEvidenceFiles": 163,
+    "newActualJobCreated": false,
+    "newActualProfileCreated": false,
+    "newPublicEvidenceFiles": 9,
+    "traceFiles": 0
+  },
+  "artifactLocations": [
+    "authorization-rerun-000099.json",
+    "monitoring-config-rerun-000100.json",
+    "preflight-rerun-000101.json",
+    "process-tree-rerun-000102.json",
+    "network-counters-rerun-000103.json",
+    "run-log-rerun-000104.txt",
+    "side-effects-rerun-000105.json",
+    "summary-rerun-000106.json",
+    "integrity-hashes-rerun-000107.txt"
+  ],
+  "authorizationRef": "authorization-rerun-000099.json",
+  "before": {
+    "actualFixturePresent": false,
+    "immutableEvidenceFiles": 163,
+    "newActualJobPresent": false,
+    "newActualProfilePresent": false
+  },
+  "changes": [
+    {
+      "acl": {
+        "allowRules": 2,
+        "ownerMatches": true,
+        "protected": true,
+        "unexpected": 0
+      },
+      "alias": "MONITOR_PREFLIGHT_SCOPE_ALIAS_02",
+      "allowed": true,
+      "kind": "Owned private directory and three normalized observations",
+      "sourceHashes": [
+        {
+          "alias": "MONITOR_ETW_OBSERVATION_ALIAS_02",
+          "publicExport": false,
+          "sha256": "04e6cfa9d794e257665e4240a3c31718760cd2070ed77886fff2b5af3ec69b4b"
+        },
+        {
+          "alias": "MONITOR_INVENTORY_ALIAS_02",
+          "publicExport": false,
+          "sha256": "af33332fbb1beafd76056d3162fb583ef2160647c8cee4bc91d2c5f193e399e2"
+        },
+        {
+          "alias": "MONITOR_CHANNEL_DETAIL_ALIAS_02",
+          "publicExport": false,
+          "sha256": "915b3b7cf176ae29e572ec1836fe9c5a5339fc1d9adc08f52fd8b9f026f50248"
+        }
+      ]
+    },
+    {
+      "alias": "LOCAL_DPAPI_ALIAS_REGISTRY_02",
+      "allowed": true,
+      "ciphertextSha256": "fcf1d25e1b39ce3a0df7b2bc940fb230b82cb5cb261b7380ef37b18df43e5694",
+      "credentialValuesRead": false,
+      "directoryAcl": {
+        "allowRules": 2,
+        "ownerMatches": true,
+        "protected": true,
+        "unexpected": 0
+      },
+      "existingVaultEntriesReadOrModified": false,
+      "kind": "New encrypted path metadata only; outside checkout",
+      "mechanism": "Windows DPAPI CurrentUser; path metadata only",
+      "outsideCheckout": true,
+      "privateSourceAcl": {
+        "allowRules": 2,
+        "ownerMatches": true,
+        "protected": true,
+        "unexpected": 0
+      },
+      "registryAlias": "LOCAL_DPAPI_ALIAS_REGISTRY_02",
+      "roundtripVerified": true
+    }
+  ],
+  "claimScope": "Bounded preflight artifact accounting only; no actual-runtime side-effect assessment",
+  "cleanup": {
+    "actualResources": "None created",
+    "monitorSessions": "No own preflight session remained in successful logman query -ets; no ETL generated",
+    "otherProcessesTerminated": false,
+    "privateEvidence": "Retained with protected ACL",
+    "protectedAliasMetadata": "Retained encrypted; no credential material"
+  },
+  "evidenceId": "M11-20261019-000105",
+  "externalFileChanges": {
+    "allowed": [
+      "New isolated encrypted metadata registry outside checkout"
+    ],
+    "exhaustiveSystemWideScan": false,
+    "limitation": "No system-wide file/registry capture; OS-managed diagnostic records cannot be exhaustively excluded",
+    "method": "Owned paths checked plus operator action accounting",
+    "unexpectedObserved": 0
+  },
+  "immutableBaseline": {
+    "commit": "12a956e83cab3ae8e836422fab9ef889529e46bd",
+    "files": 163,
+    "manifestEntryChecks": 162,
+    "mismatches": 0,
+    "missing": 0,
+    "selfManifestByteCheck": true
+  },
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-rerun-000107.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "078b629eeebc85ca26a314e381d878a134145b2f7ccc20d04cb06790c01ca3df"
+  },
+  "limitations": [
+    "No actual process created; runtime process, network, token, Job and orphan measurements are unavailable.",
+    "No retrospective reuse of historical isolation or counters."
+  ],
+  "liveCredentialActions": 0,
+  "observationOwner": "Codex executing assistant and evidence owner",
+  "observedUtcWindow": {
+    "end": "2026-10-19T14:14:42.7459086Z",
+    "start": "2026-10-19T14:13:23.3206681Z"
+  },
+  "phase": "A1-rerun",
+  "project": "ProviderDock/omp-integration/M11",
+  "providerActions": 0,
+  "rawFramesHeadersPayloadsExported": false,
+  "recordedAtUtc": "2026-10-19T14:18:16.164Z",
+  "redaction": {
+    "limitations": [
+      "Does not rescan or alter immutable historical records",
+      "No raw ETL/PML source exists; no actual runtime telemetry"
+    ],
+    "method": "Full in-memory and on-disk forbidden value/path/IP/header/secret pattern scan plus normalized-source field review",
+    "rawSourcesPublic": false,
+    "result": "PASS",
+    "scope": "Exactly nine new JSON/TXT public records"
+  },
+  "registryAndSystemPolicy": {
+    "auditPolicyChanges": 0,
+    "firewallChanges": 0,
+    "globalToolInstalls": 0,
+    "groupMembershipChanges": 0,
+    "newAppContainerProfiles": 0,
+    "scope": "Operator command/action accounting; no global registry diff or system-wide file monitor"
+  },
+  "runId": "M11-A1-RERUN-20261019-000099",
+  "source": "Current local preflight command observations; not actual OMP telemetry",
+  "status": "PASS"
+}

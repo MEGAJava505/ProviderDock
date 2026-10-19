@@ -1,0 +1,89 @@
+{
+  "actualCaptureWindow": null,
+  "actualLaunches": 0,
+  "actualProcessIdentity": null,
+  "artifactLocations": [
+    "authorization-rerun-000099.json",
+    "monitoring-config-rerun-000100.json",
+    "preflight-rerun-000101.json",
+    "process-tree-rerun-000102.json",
+    "network-counters-rerun-000103.json",
+    "run-log-rerun-000104.txt",
+    "side-effects-rerun-000105.json",
+    "summary-rerun-000106.json",
+    "integrity-hashes-rerun-000107.txt"
+  ],
+  "authorizationRef": "authorization-rerun-000099.json",
+  "binaryLinkage": {
+    "actualProcessEventRef": null,
+    "fileSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "pathAlias": "PINNED_OMP_BINARY_ALIAS_02"
+  },
+  "controllerProcessIdentity": null,
+  "durationSeconds": null,
+  "edges": [],
+  "emptyTreeMeaning": "No actual lifecycle capture occurred; empty arrays are not evidence of zero descendants",
+  "eventLoss": null,
+  "evidenceId": "M11-20261019-000102",
+  "exitCode": null,
+  "expectedProcesses": null,
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-rerun-000107.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "028b84d727417c4aa3eecd57773b6aa42004211c77f0e91f52e91ef25cb670ec"
+  },
+  "job": {
+    "breakawayAllowedPolicy": false,
+    "configuredActiveLimit": 1,
+    "created": false,
+    "killOnClosePolicy": true,
+    "measuredPeakActiveProcesses": null,
+    "membership": null,
+    "readback": null
+  },
+  "limitations": [
+    "No actual process created; runtime process, network, token, Job and orphan measurements are unavailable.",
+    "No retrospective reuse of historical isolation or counters."
+  ],
+  "monitorConfigRef": "monitoring-config-rerun-000100.json",
+  "monitorConfigSha256": "50d8da4ef23660fa6de9de27e51a03249424de9aa2e3b1ae3368c7149a63dd66",
+  "nodes": [],
+  "observationOwner": "Codex executing assistant and evidence owner",
+  "observedUtcWindow": {
+    "end": "2026-10-19T14:14:42.7459086Z",
+    "start": "2026-10-19T14:13:23.3206681Z"
+  },
+  "orphanCheck": {
+    "count": null,
+    "identities": [],
+    "mechanism": null,
+    "observedAtUtc": null,
+    "reason": "No actual process or Job created; no runtime orphan assertion",
+    "status": "NOT APPLICABLE"
+  },
+  "phase": "A1-rerun",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-19T14:18:16.164Z",
+  "runId": "M11-A1-RERUN-20261019-000099",
+  "source": "Current local preflight command observations; not actual OMP telemetry",
+  "status": "NOT PROVEN",
+  "stopReason": "Prelaunch monitor-readiness failure",
+  "teardown": {
+    "reason": "No actual Job/profile/process created",
+    "status": "NOT APPLICABLE"
+  },
+  "treeComplete": false,
+  "unexpectedProcesses": null
+}

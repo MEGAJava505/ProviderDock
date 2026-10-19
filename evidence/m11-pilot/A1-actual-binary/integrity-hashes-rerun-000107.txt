@@ -1,0 +1,14 @@
+# evidenceId: M11-20261019-000107
+# runId: M11-A1-RERUN-20261019-000099
+# authorizationRef: authorization-rerun-000099.json
+# observationOwner: Codex executing assistant and evidence owner
+# createdAtUtc: 2026-10-19T14:18:16.164Z
+# algorithm: SHA-256 of final public UTF-8 LF bytes; excludes this manifest only; all eight new artifacts covered
+76f0b567fe97df7fb46e23c9d51840b60ed4cd3f401c2101a89674db299030f2  authorization-rerun-000099.json
+50d8da4ef23660fa6de9de27e51a03249424de9aa2e3b1ae3368c7149a63dd66  monitoring-config-rerun-000100.json
+e4d9ba5f19d2dff6acad7960bf10584be2a07c22fc592ca8a79af2635418211d  preflight-rerun-000101.json
+6344e7c754bd1743af7ad242a50da1ed7b060536eabe8d7005a6b8fdd0f4d351  process-tree-rerun-000102.json
+c387290e12298fd413b865f51498fa71232de8a408e568b371859833c0971518  network-counters-rerun-000103.json
+1fae92796b90c998d9e7ed7fedd7cc6b5354fb40802ed7ede0d634aa3cf96bdc  run-log-rerun-000104.txt
+b890a81335ff82d922fc4fc851e2d7c708e97390149b62a86c793ad0643957df  side-effects-rerun-000105.json
+86a823e5e6515594fef97cb7d764ed9edf7af8dea00a192b7301795b7256c952  summary-rerun-000106.json

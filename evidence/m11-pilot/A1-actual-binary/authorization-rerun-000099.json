@@ -1,0 +1,380 @@
+{
+  "actualLaunchesConsumed": 0,
+  "approver": "Requesting gateway-owner identified in referenced current handoff; no reviewer approval claimed",
+  "artifactLocations": [
+    "authorization-rerun-000099.json",
+    "monitoring-config-rerun-000100.json",
+    "preflight-rerun-000101.json",
+    "process-tree-rerun-000102.json",
+    "network-counters-rerun-000103.json",
+    "run-log-rerun-000104.txt",
+    "side-effects-rerun-000105.json",
+    "summary-rerun-000106.json",
+    "integrity-hashes-rerun-000107.txt"
+  ],
+  "authorizationRef": {
+    "conversationApprovalUtc": null,
+    "reason": "Current explicit user instruction and committed handoff; exact conversation approval timestamp unavailable",
+    "scopeQuote": "ровно один bounded launch actual `omp.exe` с мониторингом процессов и сети, без credentials, provider route и live/paid.",
+    "section": "Задание A1-rerun — 19 октября 2026",
+    "source": "docs/omp-migration/AGENT_HANDOFF.md",
+    "sourceCommit": "12a956e83cab3ae8e836422fab9ef889529e46bd",
+    "sourceSha256": "52259f2a18a821a046a2159bdc6179359ff6d41c5c4a778e9c3640be203f777a"
+  },
+  "binary": {
+    "pathAlias": "PINNED_OMP_BINARY_ALIAS_02",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "version": "18.0.4",
+    "versionEvidenceRef": "actual-launch-pass-000047.json",
+    "versionNotReexecuted": true
+  },
+  "blockers": [
+    {
+      "events": [
+        "PREFLIGHT-ETW-1",
+        "PREFLIGHT-ETW-2",
+        "PREFLIGHT-ETW-3"
+      ],
+      "id": "B1",
+      "reason": "All three tested realtime ETW collector starts failed with HRESULT 0x80070005 (access denied); no monitor became ready."
+    },
+    {
+      "events": [
+        "PREFLIGHT-INVENTORY",
+        "PREFLIGHT-CHANNELS"
+      ],
+      "id": "B2",
+      "reason": "No complete alternative observed: Procmon absent in PATH and five common locations; Sysmon channel not found; Kernel-Process Analytic disabled; Security metadata query unauthorized. WFP Operational contains only eight event-ID-1030 records in queried inventory, not a validated complete capture."
+    },
+    {
+      "events": [],
+      "id": "B3",
+      "reason": "Controller/Job configuration and CIM/WMI polling alone cannot establish loss-free short-lived descendants, denied direct attempts, DNS/UDP/IPv6, byte and application-request counters. No such complete monitoring combination is ready."
+    }
+  ],
+  "credentialClass": "none-live; no credential access or inheritance",
+  "decision": "NOT ISSUED FOR EXECUTION: monitor prerequisite failed. Prospective parameters do not override BLOCKED.",
+  "evidenceId": "M11-20261019-000099",
+  "exactAllowlist": [],
+  "expectedResult": "Exit 0 <=45 seconds with full observed lifecycle/tree, measured network and live negative probes, zero unexpected egress/orphans, owned side effects and verified integrity/redaction",
+  "fixture": {
+    "alias": "FRESH_ACTUAL_FIXTURE_ALIAS_02",
+    "created": false,
+    "jobAlias": "FRESH_ACTUAL_JOB_ALIAS_02",
+    "jobCreated": false,
+    "monitorArtifactsAlias": "MONITOR_PREFLIGHT_SCOPE_ALIAS_02",
+    "profileAlias": "FRESH_APPCONTAINER_ALIAS_02",
+    "profileIdentityHash": null
+  },
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-rerun-000107.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "293346cdebad185a4c9b7ad4d918ef191d988d8b664e12394c95b3f9f818e519"
+  },
+  "issuedAtUtc": "2026-10-19T14:18:16.164Z",
+  "launch": {
+    "argv": [
+      "--model",
+      "INERT_MODEL_SELECTOR_ALIAS_02",
+      "--config",
+      "OWNED_CONFIG_ALIAS_02",
+      "--session-dir",
+      "OWNED_SESSIONS_ALIAS_02",
+      "--tools",
+      "read",
+      "--no-lsp",
+      "--no-extensions",
+      "--no-skills",
+      "--no-rules",
+      "--no-title",
+      "--approval-mode",
+      "always-ask",
+      "--mode",
+      "acp"
+    ],
+    "bindingStatus": "PLANNED ONLY; exact paths/config/model selector not materialized because monitor gate failed",
+    "cwdAlias": "FRESH_ACTUAL_FIXTURE_ALIAS_02",
+    "environmentPolicy": {
+      "actualEnvironment": null,
+      "ambientAllowlist": [
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC"
+      ],
+      "credentialValuesAllowed": false,
+      "homeTempConfig": "Explicit fresh owned AppContainer storage; no existing provider files",
+      "inheritParentEnvironment": false
+    },
+    "exactLaunchPrepared": false,
+    "executableAlias": "PINNED_OMP_BINARY_ALIAS_02",
+    "modelRequests": 0,
+    "protocolSequence": [
+      "initialize",
+      "session/new with empty MCP servers",
+      "EOF"
+    ]
+  },
+  "limits": {
+    "actualJobActiveProcesses": 1,
+    "actualLaunches": 1,
+    "deadlineSeconds": 45,
+    "externalBytes": 0,
+    "liveCostUsd": 0,
+    "liveRequests": 0,
+    "retries": 0
+  },
+  "monitoringPlan": {
+    "capture": {
+      "ready": false,
+      "start": "Before any probe/actual CreateProcess; await all sources ready",
+      "startedAtUtc": null,
+      "stop": "After own Job teardown and PID+creation-time orphan check",
+      "stoppedAtUtc": null
+    },
+    "configRef": "monitoring-config-rerun-000100.json",
+    "configSha256": "50d8da4ef23660fa6de9de27e51a03249424de9aa2e3b1ae3368c7149a63dd66",
+    "correlation": "runId + PID + creation time; parent PID edges; image alias + SHA-256",
+    "counters": [
+      {
+        "baseline": null,
+        "deduplication": null,
+        "delta": null,
+        "final": null,
+        "layer": "network authorization or transport connection",
+        "name": "attempted",
+        "reason": "Collector not ready; actual run not started",
+        "source": null,
+        "unit": "attempt decisions"
+      },
+      {
+        "baseline": null,
+        "deduplication": null,
+        "delta": null,
+        "final": null,
+        "layer": "network authorization or transport connection",
+        "name": "allowed",
+        "reason": "Collector not ready; actual run not started",
+        "source": null,
+        "unit": "attempt decisions"
+      },
+      {
+        "baseline": null,
+        "deduplication": null,
+        "delta": null,
+        "final": null,
+        "layer": "network authorization or transport connection",
+        "name": "denied",
+        "reason": "Collector not ready; actual run not started",
+        "source": null,
+        "unit": "attempt decisions"
+      },
+      {
+        "baseline": null,
+        "deduplication": null,
+        "delta": null,
+        "final": null,
+        "layer": "network authorization or transport connection",
+        "name": "connections",
+        "reason": "Collector not ready; actual run not started",
+        "source": null,
+        "unit": "established connections"
+      },
+      {
+        "baseline": null,
+        "deduplication": null,
+        "delta": null,
+        "final": null,
+        "layer": "transport data",
+        "name": "sentBytes",
+        "reason": "Collector not ready; actual run not started",
+        "source": null,
+        "unit": "bytes"
+      },
+      {
+        "baseline": null,
+        "deduplication": null,
+        "delta": null,
+        "final": null,
+        "layer": "transport data",
+        "name": "receivedBytes",
+        "reason": "Collector not ready; actual run not started",
+        "source": null,
+        "unit": "bytes"
+      },
+      {
+        "baseline": null,
+        "deduplication": null,
+        "delta": null,
+        "final": null,
+        "layer": "application dispatch",
+        "name": "requests",
+        "reason": "Collector not ready; actual run not started",
+        "source": null,
+        "unit": "application dispatches"
+      }
+    ],
+    "eventSources": [
+      {
+        "enabled": false,
+        "eventIdReason": "Enable failed; event schema/filter and loss-free coverage not validated",
+        "eventIds": null,
+        "observationRef": "PREFLIGHT-ETW-1",
+        "provider": "Microsoft-Windows-Kernel-Process",
+        "requestedKeywords": "0xffffffffffffffff",
+        "requestedLevel": 5
+      },
+      {
+        "enabled": false,
+        "eventIdReason": "Enable failed; event schema/filter and loss-free coverage not validated",
+        "eventIds": null,
+        "observationRef": "PREFLIGHT-ETW-2",
+        "provider": "Microsoft-Windows-TCPIP",
+        "requestedKeywords": "0xffffffffffffffff",
+        "requestedLevel": 5
+      },
+      {
+        "enabled": false,
+        "eventIdReason": "Enable failed; event schema/filter and loss-free coverage not validated",
+        "eventIds": null,
+        "observationRef": "PREFLIGHT-ETW-3",
+        "provider": "Microsoft-Windows-WFP",
+        "requestedKeywords": "0xffffffffffffffff",
+        "requestedLevel": 5
+      }
+    ],
+    "lossDiagnostics": {
+      "bufferSize": null,
+      "buffersLost": null,
+      "detectionSource": null,
+      "eventLoss": null,
+      "reason": "ETW session creation denied"
+    },
+    "negativeProbePlan": {
+      "externalDestinationsAllowed": false,
+      "loopbackException": false,
+      "probes": [
+        {
+          "context": "Separate fresh zero-capability AppContainer inert helper, outside actual Job",
+          "destinationAlias": "DENIED_INERT_LOOPBACK_ALIAS_02",
+          "destinationBinding": null,
+          "eventRef": null,
+          "expected": "Winsock WSAEACCES 10013 mapped to EACCES; API observation with PID+creation time and token/policy linkage",
+          "id": "DIRECT_TCP_PROBE_ALIAS_02",
+          "observedError": null,
+          "processIdentity": null,
+          "reason": "Monitor readiness gate failed before probe or fixture preparation",
+          "status": "NOT RUN"
+        },
+        {
+          "context": "Owned broker helper, outside actual Job",
+          "dispatchBaseline": null,
+          "dispatchDelta": null,
+          "dispatchFinal": null,
+          "expected": "Reject-before-network with correlation ID and measured dispatch delta zero",
+          "id": "UNLISTED_ROUTE_PROBE_ALIAS_02",
+          "reason": "Monitor readiness gate failed before probe or fixture preparation",
+          "rejectEventRef": null,
+          "routeAlias": "DENIED_ROUTE_ALIAS_02",
+          "status": "NOT RUN"
+        }
+      ],
+      "sequence": [
+        "All monitor sources ready",
+        "Direct inert TCP negative helper",
+        "Unlisted broker negative helper",
+        "Preflight decision",
+        "One actual process if every gate passed",
+        "Teardown/orphans",
+        "Monitor stop"
+      ]
+    },
+    "orphanCheck": "After teardown, query own Job membership and PID+creation identities; no broad process termination",
+    "readiness": false,
+    "selectedMonitor": "ETW process lifecycle + network/WFP with correlated controller/API observations; not ready",
+    "tools": [
+      {
+        "name": "logman.exe",
+        "pathAlias": "SYSTEM_LOGMAN_ALIAS",
+        "version": "10.0.26100.9711"
+      },
+      {
+        "name": "wpr.exe",
+        "pathAlias": "SYSTEM_WPR_ALIAS",
+        "version": "10.0.26100.9711"
+      },
+      {
+        "name": "tracerpt.exe",
+        "pathAlias": "SYSTEM_TRACERPT_ALIAS",
+        "version": "10.0.26100.9711"
+      }
+    ]
+  },
+  "observationOwner": "Codex executing assistant and evidence owner",
+  "phase": "A1-rerun",
+  "project": "ProviderDock/omp-integration/M11",
+  "providerRoute": null,
+  "recordedAtUtc": "2026-10-19T14:18:16.164Z",
+  "responsible": "Codex executing assistant and evidence owner",
+  "runId": "M11-A1-RERUN-20261019-000099",
+  "scope": "At most one pinned OMP 18.0.4 ACP initialize/session-new/EOF in a fresh owned no-network AppContainer, only after complete monitor and isolation gates. No model request, credential or provider route.",
+  "sideEffectPolicy": {
+    "actualFixtureChangesAllowedOnlyIfReady": true,
+    "allowed": [
+      "Owned preflight source files under MONITOR_PREFLIGHT_SCOPE_ALIAS_02",
+      "New CurrentUser DPAPI alias metadata outside checkout under LOCAL_DPAPI_ALIAS_REGISTRY_02",
+      "Exactly nine new public evidence files"
+    ],
+    "prohibited": [
+      "System audit/firewall/group membership changes",
+      "Global tool installation",
+      "Existing user configuration changes",
+      "Any actual launch while BLOCKED"
+    ]
+  },
+  "status": "BLOCKED",
+  "stopCriterion": [
+    "Incomplete/unavailable monitoring or unknown counters before launch: BLOCKED without launch",
+    "Unexpected child or actual network attempt outside empty allowlist",
+    "Cap/deadline breach, hash/version mismatch or side effect outside owned fixture",
+    "After launch stop own Job, preserve observations and orphan check; never retry"
+  ],
+  "supersedes": [
+    {
+      "meaning": "Prospective separate rerun only; no extension of historical window or alteration of historical observations",
+      "record": "authorization-explicit-user-000044.json"
+    }
+  ],
+  "teardown": {
+    "mechanism": "Close/terminate only owned Job; release handles, verify own process identities gone, delete fresh profile only after evidence preservation",
+    "owner": "Codex executing assistant and evidence owner",
+    "performed": false
+  },
+  "utcTimeWindow": {
+    "end": "2026-10-19T14:25:16.164Z",
+    "start": "2026-10-19T14:23:16.164Z"
+  },
+  "watchdog": {
+    "deadlineFrom": "actual CreateProcess timestamp",
+    "implementation": null,
+    "independent": true,
+    "maximumSeconds": 45,
+    "owner": "Codex executing assistant and evidence owner",
+    "reason": "Not prepared because collector gate failed",
+    "validated": false
+  },
+  "windowArmed": false,
+  "windowDurationSeconds": 120,
+  "windowReason": "Prospective 120-second slot, five minutes after record creation, reserving startup, <=45-second actual lifecycle, and teardown. BLOCKED; never armed or used."
+}

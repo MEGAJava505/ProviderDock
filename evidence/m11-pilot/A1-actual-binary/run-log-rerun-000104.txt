@@ -1,0 +1,18 @@
+# evidenceId: M11-20261019-000104
+# runId: M11-A1-RERUN-20261019-000099
+# authorizationRef: authorization-rerun-000099.json
+# observationOwner: Codex executing assistant and evidence owner
+# recordedAtUtc: 2026-10-19T14:18:16.164Z
+# monitoringConfig: monitoring-config-rerun-000100.json
+# monitoringConfigSha256: 50d8da4ef23660fa6de9de27e51a03249424de9aa2e3b1ae3368c7149a63dd66
+2026-10-19T14:13:23.3585251Z PREFLIGHT-ETW-1 Microsoft-Windows-Kernel-Process collector start denied; HRESULT=0x80070005; exitCode=-2147024891; ready=false
+2026-10-19T14:13:23.8891256Z PREFLIGHT-ETW-2 Microsoft-Windows-TCPIP collector start denied; HRESULT=0x80070005; exitCode=-2147024891; ready=false
+2026-10-19T14:13:24.0334196Z PREFLIGHT-ETW-3 Microsoft-Windows-WFP collector start denied; HRESULT=0x80070005; exitCode=-2147024891; ready=false
+2026-10-19T14:13:58.1103413Z PREFLIGHT-INVENTORY pinned binary SHA-256=1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba; no actual execution; Procmon not found in checked locations; no own ETW session or ETL observed
+2026-10-19T14:14:42.7459086Z PREFLIGHT-CHANNELS Sysmon log not found; Security metadata unauthorized; WFP Operational metadata eventId=1030 count=8; complete monitor not established
+2026-10-19T14:18:16.164Z PREFLIGHT-DECISION BLOCK; actualLaunches=0; launch budget unconsumed; no monitor-ready event
+2026-10-19T14:18:16.164Z PLANNED-ARGV PINNED_OMP_BINARY_ALIAS_02 --model INERT_MODEL_SELECTOR_ALIAS_02 --config OWNED_CONFIG_ALIAS_02 --session-dir OWNED_SESSIONS_ALIAS_02 --tools read --no-lsp --no-extensions --no-skills --no-rules --no-title --approval-mode always-ask --mode acp; cwd=FRESH_ACTUAL_FIXTURE_ALIAS_02; planned only, exact binding absent; NOT EXECUTED
+2026-10-19T14:18:16.164Z ACTUAL-LIFECYCLE PID=null; runtimeVersion=null; initialize/session-new/EOF=NOT RUN; exitCode=null; duration=null; deadlineCapSeconds=45
+2026-10-19T14:18:16.164Z NEGATIVE-PROBES NOT RUN; counters=null; no invented EACCES or reject event
+2026-10-19T14:18:16.164Z TEARDOWN no actual profile/Job/process created; no own trace session started; actual orphan check=NOT APPLICABLE, count=null
+2026-10-19T14:18:16.164Z MONITOR-STOP not applicable; collector never became ready; no retries; A1=NOT PROVEN; A4=BLOCKED

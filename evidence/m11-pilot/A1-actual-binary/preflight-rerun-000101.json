@@ -1,0 +1,218 @@
+{
+  "actualLaunches": 0,
+  "artifactLocations": [
+    "authorization-rerun-000099.json",
+    "monitoring-config-rerun-000100.json",
+    "preflight-rerun-000101.json",
+    "process-tree-rerun-000102.json",
+    "network-counters-rerun-000103.json",
+    "run-log-rerun-000104.txt",
+    "side-effects-rerun-000105.json",
+    "summary-rerun-000106.json",
+    "integrity-hashes-rerun-000107.txt"
+  ],
+  "authorizationRef": "authorization-rerun-000099.json",
+  "binary": {
+    "bytes": 190118912,
+    "exists": true,
+    "expectedSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "hashMatches": true,
+    "observedSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "packageVersion": "18.0.4",
+    "pathAlias": "PINNED_OMP_BINARY_ALIAS_02",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "verification": "Read existing pinned file and SHA-256; no process execution",
+    "versionSource": "Previously accepted package/runtime evidence 000047; binary not executed"
+  },
+  "blockers": [
+    {
+      "events": [
+        "PREFLIGHT-ETW-1",
+        "PREFLIGHT-ETW-2",
+        "PREFLIGHT-ETW-3"
+      ],
+      "id": "B1",
+      "reason": "All three tested realtime ETW collector starts failed with HRESULT 0x80070005 (access denied); no monitor became ready."
+    },
+    {
+      "events": [
+        "PREFLIGHT-INVENTORY",
+        "PREFLIGHT-CHANNELS"
+      ],
+      "id": "B2",
+      "reason": "No complete alternative observed: Procmon absent in PATH and five common locations; Sysmon channel not found; Kernel-Process Analytic disabled; Security metadata query unauthorized. WFP Operational contains only eight event-ID-1030 records in queried inventory, not a validated complete capture."
+    },
+    {
+      "events": [],
+      "id": "B3",
+      "reason": "Controller/Job configuration and CIM/WMI polling alone cannot establish loss-free short-lived descendants, denied direct attempts, DNS/UDP/IPv6, byte and application-request counters. No such complete monitoring combination is ready."
+    }
+  ],
+  "decision": "BLOCK",
+  "evidenceId": "M11-20261019-000101",
+  "exactAllowlist": [],
+  "fixture": {
+    "created": false,
+    "jobReadback": null,
+    "ownership": null,
+    "profileIdentityHash": null,
+    "reason": "Monitor readiness gate failed first; historical attestation not reused",
+    "snapshot": null,
+    "tokenReadback": null
+  },
+  "independentWatchdog": {
+    "ready": false,
+    "validated": false
+  },
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-rerun-000107.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "a8822c8dcf29d687323a8c7c8cd416f85a015d777db2c995d008958ade475921"
+  },
+  "launchBudget": {
+    "consumed": 0,
+    "maximum": 1,
+    "retries": 0
+  },
+  "limitations": [
+    "No actual process created; runtime process, network, token, Job and orphan measurements are unavailable.",
+    "No retrospective reuse of historical isolation or counters."
+  ],
+  "liveCredentialsReadOrImported": false,
+  "monitor": {
+    "configRef": "monitoring-config-rerun-000100.json",
+    "configSha256": "50d8da4ef23660fa6de9de27e51a03249424de9aa2e3b1ae3368c7149a63dd66",
+    "eventLossBaseline": null,
+    "events": [
+      {
+        "action": "Start own realtime trace session",
+        "commandTemplate": "logman create trace OWNED_SESSION_ALIAS_02 -p Microsoft-Windows-Kernel-Process 0xffffffffffffffff 5 -o OWNED_TRACE_ALIAS_02 -ets",
+        "eventId": "PREFLIGHT-ETW-1",
+        "exitCode": -2147024891,
+        "hresult": "0x80070005",
+        "monitorEventStreamStarted": false,
+        "normalizedError": "Access denied; command requested administrator context",
+        "observedUtcWindow": {
+          "end": "2026-10-19T14:13:23.8851249Z",
+          "start": "2026-10-19T14:13:23.3585251Z"
+        },
+        "ready": false,
+        "source": "Microsoft-Windows-Kernel-Process",
+        "stopExitCode": null
+      },
+      {
+        "action": "Start own realtime trace session",
+        "commandTemplate": "logman create trace OWNED_SESSION_ALIAS_02 -p Microsoft-Windows-TCPIP 0xffffffffffffffff 5 -o OWNED_TRACE_ALIAS_02 -ets",
+        "eventId": "PREFLIGHT-ETW-2",
+        "exitCode": -2147024891,
+        "hresult": "0x80070005",
+        "monitorEventStreamStarted": false,
+        "normalizedError": "Access denied; command requested administrator context",
+        "observedUtcWindow": {
+          "end": "2026-10-19T14:13:24.0334196Z",
+          "start": "2026-10-19T14:13:23.8891256Z"
+        },
+        "ready": false,
+        "source": "Microsoft-Windows-TCPIP",
+        "stopExitCode": null
+      },
+      {
+        "action": "Start own realtime trace session",
+        "commandTemplate": "logman create trace OWNED_SESSION_ALIAS_02 -p Microsoft-Windows-WFP 0xffffffffffffffff 5 -o OWNED_TRACE_ALIAS_02 -ets",
+        "eventId": "PREFLIGHT-ETW-3",
+        "exitCode": -2147024891,
+        "hresult": "0x80070005",
+        "monitorEventStreamStarted": false,
+        "normalizedError": "Access denied; command requested administrator context",
+        "observedUtcWindow": {
+          "end": "2026-10-19T14:13:24.1692991Z",
+          "start": "2026-10-19T14:13:24.0334196Z"
+        },
+        "ready": false,
+        "source": "Microsoft-Windows-WFP",
+        "stopExitCode": null
+      }
+    ],
+    "inventory": {
+      "channels": [
+        {
+          "errorId": "NoMatchingLogsFound,Microsoft.PowerShell.Commands.GetWinEventCommand",
+          "normalizedReason": "No matching log found",
+          "querySucceeded": false,
+          "source": "Microsoft-Windows-Sysmon/Operational"
+        },
+        {
+          "errorId": "LogInfoUnavailable,Microsoft.PowerShell.Commands.GetWinEventCommand",
+          "normalizedReason": "Unauthorized metadata query; existence not inferred",
+          "querySucceeded": false,
+          "source": "Security"
+        }
+      ],
+      "kernelProcessAnalyticEnabled": false,
+      "procmon": {
+        "commonDirectoryCount": 5,
+        "commonLocationMatches": [],
+        "fullDiskSearchPerformed": false,
+        "pathMatches": 0
+      },
+      "wfpOperational": {
+        "enabled": true,
+        "metadataEventCounts": [
+          {
+            "count": 8,
+            "eventId": 1030
+          }
+        ],
+        "networkCaptureCoverageValidated": false
+      }
+    },
+    "ready": false,
+    "sourceCoverage": {
+      "applicationRequests": false,
+      "bytes": false,
+      "deniedPreStack": false,
+      "dnsUdpIpv6": false,
+      "lossDiagnostics": false,
+      "networkAttempts": false,
+      "processLifecycle": false
+    }
+  },
+  "observationOwner": "Codex executing assistant and evidence owner",
+  "observedUtcWindow": {
+    "end": "2026-10-19T14:14:42.7459086Z",
+    "start": "2026-10-19T14:13:23.3206681Z"
+  },
+  "phase": "A1-rerun",
+  "policyRef": "monitoring-config-rerun-000100.json",
+  "policySha256": "5b95749c9a9469795c13c3d4dcf58e23f0278bebb4761c14619946ce1dadc5c7",
+  "project": "ProviderDock/omp-integration/M11",
+  "prospectiveWindowCheck": {
+    "armed": false,
+    "end": "2026-10-19T14:25:16.164Z",
+    "recordedAtUtc": "2026-10-19T14:18:16.164Z",
+    "start": "2026-10-19T14:23:16.164Z",
+    "startWasFutureAtRecording": true
+  },
+  "providerRoute": null,
+  "recordedAtUtc": "2026-10-19T14:18:16.164Z",
+  "runId": "M11-A1-RERUN-20261019-000099",
+  "source": "Current local preflight command observations; not actual OMP telemetry",
+  "status": "BLOCKED",
+  "teardown": {
+    "activeOwnedEtwSessionMentioned": false,
+    "actualOwnedResourcesCreated": false,
+    "etlFiles": 0
+  }
+}

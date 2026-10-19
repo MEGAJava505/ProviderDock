@@ -1,0 +1,395 @@
+{
+  "aggregation": {
+    "attemptedEqualsAllowedPlusDenied": false,
+    "reason": "No common measured layer; no invented equality",
+    "requestCounterFromTcp": false
+  },
+  "allowedHelperInventory": [],
+  "artifactLocations": [
+    "authorization-rerun-000099.json",
+    "monitoring-config-rerun-000100.json",
+    "preflight-rerun-000101.json",
+    "process-tree-rerun-000102.json",
+    "network-counters-rerun-000103.json",
+    "run-log-rerun-000104.txt",
+    "side-effects-rerun-000105.json",
+    "summary-rerun-000106.json",
+    "integrity-hashes-rerun-000107.txt"
+  ],
+  "authorizationRef": "authorization-rerun-000099.json",
+  "blockers": [
+    {
+      "events": [
+        "PREFLIGHT-ETW-1",
+        "PREFLIGHT-ETW-2",
+        "PREFLIGHT-ETW-3"
+      ],
+      "id": "B1",
+      "reason": "All three tested realtime ETW collector starts failed with HRESULT 0x80070005 (access denied); no monitor became ready."
+    },
+    {
+      "events": [
+        "PREFLIGHT-INVENTORY",
+        "PREFLIGHT-CHANNELS"
+      ],
+      "id": "B2",
+      "reason": "No complete alternative observed: Procmon absent in PATH and five common locations; Sysmon channel not found; Kernel-Process Analytic disabled; Security metadata query unauthorized. WFP Operational contains only eight event-ID-1030 records in queried inventory, not a validated complete capture."
+    },
+    {
+      "events": [],
+      "id": "B3",
+      "reason": "Controller/Job configuration and CIM/WMI polling alone cannot establish loss-free short-lived descendants, denied direct attempts, DNS/UDP/IPv6, byte and application-request counters. No such complete monitoring combination is ready."
+    }
+  ],
+  "bufferDiagnostics": {
+    "bufferSize": null,
+    "buffersLost": null,
+    "detectionSource": null,
+    "eventLoss": null,
+    "reason": "ETW session creation denied"
+  },
+  "capture": {
+    "ready": false,
+    "start": "Before any probe/actual CreateProcess; await all sources ready",
+    "startedAtUtc": null,
+    "stop": "After own Job teardown and PID+creation-time orphan check",
+    "stoppedAtUtc": null
+  },
+  "collectorInvokerSha256": "5376695e8ecdeb536b7cede4ba7d10ce6dfe07a51aa7c9651911d2c3cb66840d",
+  "completeness": {
+    "applicationRequests": false,
+    "bytes": false,
+    "deniedPreStack": false,
+    "dnsUdpIpv6": false,
+    "lossDiagnostics": false,
+    "networkAttempts": false,
+    "processLifecycle": false
+  },
+  "controller": {
+    "reason": "New controller not built: required OS collector unavailable; old controller cannot replace OS telemetry",
+    "sha256": null,
+    "version": null
+  },
+  "counters": [
+    {
+      "baseline": null,
+      "deduplication": null,
+      "delta": null,
+      "final": null,
+      "layer": "network authorization or transport connection",
+      "name": "attempted",
+      "reason": "Collector not ready; actual run not started",
+      "source": null,
+      "unit": "attempt decisions"
+    },
+    {
+      "baseline": null,
+      "deduplication": null,
+      "delta": null,
+      "final": null,
+      "layer": "network authorization or transport connection",
+      "name": "allowed",
+      "reason": "Collector not ready; actual run not started",
+      "source": null,
+      "unit": "attempt decisions"
+    },
+    {
+      "baseline": null,
+      "deduplication": null,
+      "delta": null,
+      "final": null,
+      "layer": "network authorization or transport connection",
+      "name": "denied",
+      "reason": "Collector not ready; actual run not started",
+      "source": null,
+      "unit": "attempt decisions"
+    },
+    {
+      "baseline": null,
+      "deduplication": null,
+      "delta": null,
+      "final": null,
+      "layer": "network authorization or transport connection",
+      "name": "connections",
+      "reason": "Collector not ready; actual run not started",
+      "source": null,
+      "unit": "established connections"
+    },
+    {
+      "baseline": null,
+      "deduplication": null,
+      "delta": null,
+      "final": null,
+      "layer": "transport data",
+      "name": "sentBytes",
+      "reason": "Collector not ready; actual run not started",
+      "source": null,
+      "unit": "bytes"
+    },
+    {
+      "baseline": null,
+      "deduplication": null,
+      "delta": null,
+      "final": null,
+      "layer": "transport data",
+      "name": "receivedBytes",
+      "reason": "Collector not ready; actual run not started",
+      "source": null,
+      "unit": "bytes"
+    },
+    {
+      "baseline": null,
+      "deduplication": null,
+      "delta": null,
+      "final": null,
+      "layer": "application dispatch",
+      "name": "requests",
+      "reason": "Collector not ready; actual run not started",
+      "source": null,
+      "unit": "application dispatches"
+    }
+  ],
+  "evidenceId": "M11-20261019-000100",
+  "exportProcedure": "Normalize only authorized scoped event fields, alias paths and destinations, redact before hash; no raw payload/header/frame/environment exports",
+  "filters": {
+    "applied": false,
+    "identity": "runId + PID + creation time; parent PID edges; image alias + SHA-256",
+    "intendedScope": "Controller, actual and every descendant, helpers and negative probes separately"
+  },
+  "helperInventoryReason": "None launched; controller/watchdog/probes deferred until complete monitor available",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-rerun-000107.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "6640830615c6a75aaf489a3e33f59e08d397cc9263045c9acc7907dbe12ad782"
+  },
+  "limitations": [
+    "No actual process created; runtime process, network, token, Job and orphan measurements are unavailable.",
+    "No retrospective reuse of historical isolation or counters."
+  ],
+  "negativeProbePlan": {
+    "externalDestinationsAllowed": false,
+    "loopbackException": false,
+    "probes": [
+      {
+        "context": "Separate fresh zero-capability AppContainer inert helper, outside actual Job",
+        "destinationAlias": "DENIED_INERT_LOOPBACK_ALIAS_02",
+        "destinationBinding": null,
+        "eventRef": null,
+        "expected": "Winsock WSAEACCES 10013 mapped to EACCES; API observation with PID+creation time and token/policy linkage",
+        "id": "DIRECT_TCP_PROBE_ALIAS_02",
+        "observedError": null,
+        "processIdentity": null,
+        "reason": "Monitor readiness gate failed before probe or fixture preparation",
+        "status": "NOT RUN"
+      },
+      {
+        "context": "Owned broker helper, outside actual Job",
+        "dispatchBaseline": null,
+        "dispatchDelta": null,
+        "dispatchFinal": null,
+        "expected": "Reject-before-network with correlation ID and measured dispatch delta zero",
+        "id": "UNLISTED_ROUTE_PROBE_ALIAS_02",
+        "reason": "Monitor readiness gate failed before probe or fixture preparation",
+        "rejectEventRef": null,
+        "routeAlias": "DENIED_ROUTE_ALIAS_02",
+        "status": "NOT RUN"
+      }
+    ],
+    "sequence": [
+      "All monitor sources ready",
+      "Direct inert TCP negative helper",
+      "Unlisted broker negative helper",
+      "Preflight decision",
+      "One actual process if every gate passed",
+      "Teardown/orphans",
+      "Monitor stop"
+    ]
+  },
+  "observationOwner": "Codex executing assistant and evidence owner",
+  "observedUtcWindow": {
+    "end": "2026-10-19T14:14:42.7459086Z",
+    "start": "2026-10-19T14:13:23.3206681Z"
+  },
+  "osSources": [
+    {
+      "enabled": false,
+      "eventIdReason": "Enable failed; event schema/filter and loss-free coverage not validated",
+      "eventIds": null,
+      "observationRef": "PREFLIGHT-ETW-1",
+      "provider": "Microsoft-Windows-Kernel-Process",
+      "requestedKeywords": "0xffffffffffffffff",
+      "requestedLevel": 5
+    },
+    {
+      "enabled": false,
+      "eventIdReason": "Enable failed; event schema/filter and loss-free coverage not validated",
+      "eventIds": null,
+      "observationRef": "PREFLIGHT-ETW-2",
+      "provider": "Microsoft-Windows-TCPIP",
+      "requestedKeywords": "0xffffffffffffffff",
+      "requestedLevel": 5
+    },
+    {
+      "enabled": false,
+      "eventIdReason": "Enable failed; event schema/filter and loss-free coverage not validated",
+      "eventIds": null,
+      "observationRef": "PREFLIGHT-ETW-3",
+      "provider": "Microsoft-Windows-WFP",
+      "requestedKeywords": "0xffffffffffffffff",
+      "requestedLevel": 5
+    }
+  ],
+  "osVersion": "10.0.26300.0",
+  "outputs": {
+    "privateScopeAlias": "MONITOR_PREFLIGHT_SCOPE_ALIAS_02",
+    "public": [
+      "authorization-rerun-000099.json",
+      "monitoring-config-rerun-000100.json",
+      "preflight-rerun-000101.json",
+      "process-tree-rerun-000102.json",
+      "network-counters-rerun-000103.json",
+      "run-log-rerun-000104.txt",
+      "side-effects-rerun-000105.json",
+      "summary-rerun-000106.json",
+      "integrity-hashes-rerun-000107.txt"
+    ],
+    "rawEtwOrPmlPublished": false
+  },
+  "phase": "A1-rerun",
+  "policy": {
+    "actualNetworkAllowlist": [],
+    "job": {
+      "activeProcessLimit": 1,
+      "breakawayAllowed": false,
+      "killOnClose": true
+    },
+    "liveCredentialInheritance": false,
+    "liveCredentialReads": false,
+    "modelRequestsAllowed": false,
+    "networkDefault": "deny",
+    "ownedScopeOnly": true,
+    "providerRoute": null,
+    "retryCount": 0
+  },
+  "policySha256": "5b95749c9a9469795c13c3d4dcf58e23f0278bebb4761c14619946ce1dadc5c7",
+  "polling": {
+    "intervalMilliseconds": null,
+    "reason": "Not accepted as a substitute for complete lifecycle/network capture",
+    "used": false
+  },
+  "powershellVersion": "5.1.26100.9711",
+  "privatePreflightSources": [
+    {
+      "alias": "MONITOR_ETW_OBSERVATION_ALIAS_02",
+      "publicExport": false,
+      "sha256": "04e6cfa9d794e257665e4240a3c31718760cd2070ed77886fff2b5af3ec69b4b"
+    },
+    {
+      "alias": "MONITOR_INVENTORY_ALIAS_02",
+      "publicExport": false,
+      "sha256": "af33332fbb1beafd76056d3162fb583ef2160647c8cee4bc91d2c5f193e399e2"
+    },
+    {
+      "alias": "MONITOR_CHANNEL_DETAIL_ALIAS_02",
+      "publicExport": false,
+      "sha256": "915b3b7cf176ae29e572ec1836fe9c5a5339fc1d9adc08f52fd8b9f026f50248"
+    }
+  ],
+  "project": "ProviderDock/omp-integration/M11",
+  "protectedMapping": {
+    "ciphertextSha256": "fcf1d25e1b39ce3a0df7b2bc940fb230b82cb5cb261b7380ef37b18df43e5694",
+    "credentialValuesRead": false,
+    "directoryAcl": {
+      "allowRules": 2,
+      "ownerMatches": true,
+      "protected": true,
+      "unexpected": 0
+    },
+    "existingVaultEntriesReadOrModified": false,
+    "mechanism": "Windows DPAPI CurrentUser; path metadata only",
+    "outsideCheckout": true,
+    "privateSourceAcl": {
+      "allowRules": 2,
+      "ownerMatches": true,
+      "protected": true,
+      "unexpected": 0
+    },
+    "registryAlias": "LOCAL_DPAPI_ALIAS_REGISTRY_02",
+    "roundtripVerified": true
+  },
+  "recordedAtUtc": "2026-10-19T14:18:16.164Z",
+  "runId": "M11-A1-RERUN-20261019-000099",
+  "selectedMonitor": "ETW process lifecycle + network/WFP with correlated controller/API observations; not ready",
+  "source": "Current local preflight command observations; not actual OMP telemetry",
+  "sourceNativeArtifacts": [],
+  "status": "BLOCKED",
+  "supplementaryInventory": {
+    "channels": [
+      {
+        "errorId": "NoMatchingLogsFound,Microsoft.PowerShell.Commands.GetWinEventCommand",
+        "normalizedReason": "No matching log found",
+        "querySucceeded": false,
+        "source": "Microsoft-Windows-Sysmon/Operational"
+      },
+      {
+        "errorId": "LogInfoUnavailable,Microsoft.PowerShell.Commands.GetWinEventCommand",
+        "normalizedReason": "Unauthorized metadata query; existence not inferred",
+        "querySucceeded": false,
+        "source": "Security"
+      }
+    ],
+    "kernelProcessAnalyticEnabled": false,
+    "procmon": {
+      "commonDirectoryCount": 5,
+      "commonLocationMatches": [],
+      "fullDiskSearchPerformed": false,
+      "pathMatches": 0
+    },
+    "wfpOperational": {
+      "enabled": true,
+      "metadataEventCounts": [
+        {
+          "count": 8,
+          "eventId": 1030
+        }
+      ],
+      "networkCaptureCoverageValidated": false
+    }
+  },
+  "tools": [
+    {
+      "name": "logman.exe",
+      "pathAlias": "SYSTEM_LOGMAN_ALIAS",
+      "version": "10.0.26100.9711"
+    },
+    {
+      "name": "wpr.exe",
+      "pathAlias": "SYSTEM_WPR_ALIAS",
+      "version": "10.0.26100.9711"
+    },
+    {
+      "name": "tracerpt.exe",
+      "pathAlias": "SYSTEM_TRACERPT_ALIAS",
+      "version": "10.0.26100.9711"
+    }
+  ],
+  "utcClock": {
+    "accuracyMeasured": null,
+    "etwClockConversion": null,
+    "printedFractionalSecondDigits": 7,
+    "reason": "No event stream created",
+    "source": "DateTime.UtcNow ISO-8601 in PowerShell preflight"
+  }
+}

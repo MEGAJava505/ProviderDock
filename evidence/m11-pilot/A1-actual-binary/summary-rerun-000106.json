@@ -1,0 +1,141 @@
+{
+  "a1": "NOT PROVEN",
+  "a4": "BLOCKED",
+  "actualLaunches": 0,
+  "actualObservedUtcWindow": null,
+  "artifactLocations": [
+    "authorization-rerun-000099.json",
+    "monitoring-config-rerun-000100.json",
+    "preflight-rerun-000101.json",
+    "process-tree-rerun-000102.json",
+    "network-counters-rerun-000103.json",
+    "run-log-rerun-000104.txt",
+    "side-effects-rerun-000105.json",
+    "summary-rerun-000106.json",
+    "integrity-hashes-rerun-000107.txt"
+  ],
+  "authorizationNotExecutable": true,
+  "authorizationRef": "authorization-rerun-000099.json",
+  "binary": {
+    "fileHashVerified": true,
+    "processLinkage": null,
+    "runtimeVersionObserved": null,
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "version": "18.0.4"
+  },
+  "blockers": [
+    {
+      "events": [
+        "PREFLIGHT-ETW-1",
+        "PREFLIGHT-ETW-2",
+        "PREFLIGHT-ETW-3"
+      ],
+      "id": "B1",
+      "reason": "All three tested realtime ETW collector starts failed with HRESULT 0x80070005 (access denied); no monitor became ready."
+    },
+    {
+      "events": [
+        "PREFLIGHT-INVENTORY",
+        "PREFLIGHT-CHANNELS"
+      ],
+      "id": "B2",
+      "reason": "No complete alternative observed: Procmon absent in PATH and five common locations; Sysmon channel not found; Kernel-Process Analytic disabled; Security metadata query unauthorized. WFP Operational contains only eight event-ID-1030 records in queried inventory, not a validated complete capture."
+    },
+    {
+      "events": [],
+      "id": "B3",
+      "reason": "Controller/Job configuration and CIM/WMI polling alone cannot establish loss-free short-lived descendants, denied direct attempts, DNS/UDP/IPv6, byte and application-request counters. No such complete monitoring combination is ready."
+    }
+  ],
+  "budgetConsumed": false,
+  "durationSeconds": null,
+  "evidenceId": "M11-20261019-000106",
+  "execution": "BLOCKED",
+  "exitCode": null,
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-rerun-000107.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "0c6f194d30ec18a31c3e015e0b46c5f8530b19f488f0b12d11b30c3c7ad14a3a"
+  },
+  "integrityScope": {
+    "immutableHistoricalFiles": 163,
+    "manifestEntries": 8,
+    "newFiles": 9,
+    "unknownActualCountersRemainNull": true
+  },
+  "limitations": [
+    "No actual process created; runtime process, network, token, Job and orphan measurements are unavailable.",
+    "No retrospective reuse of historical isolation or counters."
+  ],
+  "nextRequirement": "Provide a permitted complete OS lifecycle/network collector and validate source coverage/loss diagnostics on inert helpers before considering any actual launch. Do not treat administrator membership alone as proof of complete monitoring. No automatic rerun.",
+  "observationOwner": "Codex executing assistant and evidence owner",
+  "observedUtcWindow": {
+    "end": "2026-10-19T14:14:42.7459086Z",
+    "start": "2026-10-19T14:13:23.3206681Z"
+  },
+  "opensA4Gate": false,
+  "phase": "A1-rerun",
+  "project": "ProviderDock/omp-integration/M11",
+  "prospectiveWindow": {
+    "end": "2026-10-19T14:25:16.164Z",
+    "start": "2026-10-19T14:23:16.164Z"
+  },
+  "protectedMapping": {
+    "ciphertextSha256": "fcf1d25e1b39ce3a0df7b2bc940fb230b82cb5cb261b7380ef37b18df43e5694",
+    "credentialValuesRead": false,
+    "directoryAcl": {
+      "allowRules": 2,
+      "ownerMatches": true,
+      "protected": true,
+      "unexpected": 0
+    },
+    "existingVaultEntriesReadOrModified": false,
+    "mechanism": "Windows DPAPI CurrentUser; path metadata only",
+    "outsideCheckout": true,
+    "privateSourceAcl": {
+      "allowRules": 2,
+      "ownerMatches": true,
+      "protected": true,
+      "unexpected": 0
+    },
+    "registryAlias": "LOCAL_DPAPI_ALIAS_REGISTRY_02",
+    "roundtripVerified": true
+  },
+  "recordedAtUtc": "2026-10-19T14:18:16.164Z",
+  "retries": 0,
+  "reviewAcceptance": "PENDING",
+  "runId": "M11-A1-RERUN-20261019-000099",
+  "source": "Current local preflight command observations; not actual OMP telemetry",
+  "status": "NOT PROVEN",
+  "supersedes": [
+    {
+      "meaning": "New current A1 assessment only; all historical bytes and prior accepted P2 corrections retained",
+      "record": "summary-p2-correction-000091.json"
+    }
+  ],
+  "verdicts": {
+    "binaryFileHash": "PASS",
+    "boundedActualLaunch": "NOT RUN",
+    "freshIsolation": "NOT PREPARED",
+    "integrity": "PASS for new package; manifest excludes itself",
+    "liveNegativeProbes": "NOT RUN",
+    "measuredNetwork": "NOT PROVEN",
+    "observedProcessTree": "NOT PROVEN",
+    "orphanCheck": "NOT APPLICABLE",
+    "preflightSideEffects": "PASS within declared accounting scope",
+    "redaction": "PASS for new package only"
+  },
+  "windowArmed": false
+}
