@@ -1,0 +1,72 @@
+{
+  "actor": "codex-pilot-operator",
+  "approvalBasis": "Explicit user continuation and delegated choices cover corrected bounded pilot execution; no live retry and no fabricated signature",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "A1",
+  "binary": {
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "sourceCommit": "0c6c981ee5838d97700180383077eb0a3790637c",
+    "version": "18.0.4"
+  },
+  "controllerSourceSha256": "6a4a4a91764e2f2c4c40ca54bc9610275f14d57676e6d6112d4febb86aad5861",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "credentialClassAndAllowlistedRoute": {
+    "credentialClass": "none-live; inert marker only",
+    "route": "none"
+  },
+  "evidenceId": "M11-20261019-000041",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000042.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "e0a9f5532b851a1f4081666cc4d62b86178b5ad344cd420ea865b1c37dc55607"
+  },
+  "limits": {
+    "actualLaunches": 1,
+    "deadlineSeconds": 45,
+    "independentKillWatchdog": true,
+    "promptRequests": 0
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase1-authorization-preflight",
+  "previousStopRef": "actual-launch-stop-000040.json",
+  "project": "ProviderDock/omp-integration/M11",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "scope": "One new corrected A1 attempt; native ACP initialize/session-new/EOF; verify source header directly at OMP-created path. No session/list and no inference.",
+  "status": "PASS",
+  "stopCriterion": "Any version/hash mismatch, deadline, unexpected egress/child/side effect, protocol failure or ambiguous exit stops own Job; no next phase until PASS; no automatic retry",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:58:31.131Z",
+    "start": "2026-10-19T08:13:31.131Z"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "acceptedObservationRef": "native-resume-pass-000052.json",
+  "actor": "codex-pilot-operator",
+  "actualResult": "Exactly one native --resume opened same source/session/model, idle exit 0, before/after source hashes equal; zero provider requests/cost",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "preflight-continuation-000051.json",
+    "native-resume-pass-000052.json",
+    "run-log-continuation-20261019.txt"
+  ],
+  "authorizationRef": "authorization-continuation-000050.json",
+  "claim": "Reviewed complete phase evidence; external acceptance remains subject to independent review",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "environmentAttestation": {
+    "isolatedHomeAndTemp": true,
+    "liveCredentialValuesRead": false,
+    "minimalExplicitEnvironment": true,
+    "originalVaultOpened": false,
+    "snapshotHashesVerified": true,
+    "sourceCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035"
+  },
+  "evidenceId": "M11-20261019-000083",
+  "expectedResult": "Same native session/file/model and unchanged source after clean terminal exit",
+  "gate": "A2",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-review-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "bf9ed6d2625e88a5318adb04942dd61c04f2e59b7ff29a033639f1489f9afa60"
+  },
+  "nativeResumeLinkage": {
+    "immutableSourceCopyHashMatches": true,
+    "sessionIdentityHash": "08e63263d35c01db7352ba4b9a537eca08205e7755407a6b4c7203be03db26dd",
+    "sourceHash": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea",
+    "sourceRun": "../A1-actual-binary/actual-launch-pass-000047.json",
+    "sourceStateHashAfter": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea",
+    "sourceStateHashBefore": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea"
+  },
+  "networkEgressObservation": {
+    "applicationDeadline": false,
+    "containedLoopbackAccepted": 0,
+    "hostPositiveControlConnected": true,
+    "networkCapabilities": 0,
+    "osError": "ETIMEDOUT",
+    "status": "PASS"
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "osIsolationAttestation": {
+    "accepted": true,
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "fixtureWrite": true,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "outsideFixtureReadDenied": true,
+    "packageIdentityMatches": true,
+    "profileIdentityHash": "dbc2e5a58686c64a0fada414de11a9978295480769b7e55ab0e6699bb0f37235"
+  },
+  "phase": "phase3-native-resume",
+  "phaseExecution": "EXECUTED",
+  "preflightId": "m11-a2-native-resume",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "Provider/inference HTTP requests within this phase"
+  },
+  "reviewCorrection": "Consolidates previously recorded facts into full schema and explicitly labels counter scope; earlier observations and manifests remain unchanged",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "runId": "m11-a1-native-acp-create-v3/resume-1",
+  "sideEffectAssessment": "Readonly source copy will be retained locally before opening exact original file",
+  "status": "PASS",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:20:23Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:20:21Z"
+  }
+}

@@ -1,0 +1,4 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+9ab7fb37167fb2b662308607257bdf844f8ce9c5557878d1f6fe1b7bf2a6b135  actual-launch-stop-000040.json
+bca963ac5d90528581e83633f9a050f7b3af54f2475c1e898eef530926df6e66  authorization-correction-000041.json
+ba16d546275aa3d1bc95c3ac5e62f4016255295fe90f0db47bb600d7087bd95a  preflight-correction-pass-000042.json

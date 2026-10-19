@@ -1,0 +1,5 @@
+2026-10-19T08:14Z Restored approved readonly Git bundle into separate owned directory after initial A1 stop; fsck exit 0 and restored source tree matched.
+2026-10-19T08:16:27Z Earlier owned profile removed only after preserving first native state; failed-attempt artifacts retained.
+2026-10-19T08:28:42Z Final owned AppContainer deleted after preserving accepted native source. Pilot executable/process and profile mapping counts 0.
+2026-10-19T08:29:58Z PASS final readonly snapshot hashes (bundle/state metadata/actual binary), restored tree, git fsck, clean restored checkout and retained native-source hash.
+2026-10-19T08:33:18Z Subsequent user-requested inactive pilot provider metadata intentionally retained; no earlier user profile overwritten, no production default changed; no running runtime/provider request.

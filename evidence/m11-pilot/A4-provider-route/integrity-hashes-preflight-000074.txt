@@ -1,0 +1,4 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+70d84e6b0421ae11d85f87953ed5e4aaf5ffa032a9dcf6e3cae9d81117524f22  authorization-pending-000073.json
+f639a5148f49036b652f6bb118b15e22fc9ca47ac3c53e1ed632ad735b2d99ea  preflight-blocked-000074.json
+6f95691501c24d4874eeb1d1948ef4711f34397da8b66f03c858271555357681  profile-created-000072.json

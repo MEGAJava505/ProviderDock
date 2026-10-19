@@ -1,0 +1,85 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "Fresh isolated fixture PASS; explicit user repeat approval received; actual repeat not yet executed",
+  "approver": "requesting-user-explicit-repeat-confirmation",
+  "artifactLocations": [
+    "authorization-explicit-user-000044.json",
+    "fresh-isolation-proof-000045.json",
+    "approval-review-stop-000043.json"
+  ],
+  "authorizationRef": "authorization-explicit-user-000044.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "environmentAttestation": {
+    "isolatedHomeAndTemp": true,
+    "liveCredentialValuesRead": false,
+    "minimalExplicitEnvironment": true,
+    "originalVaultOpened": false,
+    "snapshotHashesVerified": true,
+    "sourceCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035"
+  },
+  "evidenceId": "M11-20261019-000046",
+  "expectedResult": "One corrected actual native ACP launch; native source header and clean EOF exit; provider requests zero",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000046.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "91ee4f6a1dd638e9699d25de35fea32a834b1e45e874a61890fef4029f7ab84e"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "networkEgressObservation": {
+    "applicationDeadline": false,
+    "containedLoopbackAccepted": 0,
+    "hostPositiveControlConnected": true,
+    "networkCapabilities": 0,
+    "osError": "ETIMEDOUT",
+    "status": "PASS"
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "osIsolationAttestation": {
+    "accepted": true,
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "fixtureWrite": true,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "outsideFixtureReadDenied": true,
+    "packageIdentityMatches": true,
+    "profileIdentityHash": "dbc2e5a58686c64a0fada414de11a9978295480769b7e55ab0e6699bb0f37235"
+  },
+  "phase": "phase1-authorization-preflight",
+  "preflightId": "m11-a1-explicit-user-repeat",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "runId": "m11-a1-native-acp-create-v3",
+  "sideEffectAssessment": "Owned native profile retained; no live user state touched",
+  "status": "PASS",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:18:37.277Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:17:52Z"
+  }
+}

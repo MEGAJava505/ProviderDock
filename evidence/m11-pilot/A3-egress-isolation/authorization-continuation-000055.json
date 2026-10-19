@@ -1,0 +1,81 @@
+{
+  "actor": "codex-pilot-operator",
+  "approvalBasis": "User requested A3 external isolation and delegated environment/route parameters; no global policy weakened",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "A3",
+  "controllerSourceSha256": "d37b8bfbf789df129d36bb9e0128f0b60a59a92062a60b302bd966d5d71edd56",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "credentialClassAndAllowlistedRoute": {
+    "controlClass": "Public IANA example-domain TLS HEAD root; no application payload",
+    "credentialClass": "none",
+    "route": "m11-iana-control"
+  },
+  "evidenceId": "M11-20261019-000055",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000056.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "3e7310df3424294add3cc20e808819517f95ddae27721ccc27caa048a3bb55c5"
+  },
+  "limits": {
+    "brokerExternalConnections": 1,
+    "containedProcesses": 1,
+    "deadlineSeconds": 25,
+    "deniedBrokerRoutes": 1,
+    "deniedChildSpawnAttempts": 1,
+    "deniedDirectExternalConnects": 1,
+    "dnsResolutions": 1,
+    "payloadBytes": 0,
+    "requestBytes": 256,
+    "responseHeaderBytes": 8192
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase4-egress-isolation",
+  "policy": {
+    "broker": "Inherited stdio only; exact route ID and HEAD; constant destination; pinned DNS IPv4; verified TLS; redirects/proxies/retries forbidden",
+    "childProcess": "deny via Job active-process limit 1",
+    "directNetwork": "deny via zero capabilities"
+  },
+  "policyRevision": "m11-appcontainer-stdio-broker-exact-route-v1",
+  "probeSourceSha256": "6664f63f97e8f27988e5272c3b066fec8c72c5bf78dba9131faabfe378cabc6f",
+  "project": "ProviderDock/omp-integration/M11",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "requestLimit": 1,
+  "responsible": "codex-pilot-operator",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "scope": "One bounded inert process under existing zero-capability AppContainer; prove direct external denial and child denial; exact-route stdio broker permits one public synthetic HEAD control",
+  "securityOsOwner": "requesting-user-delegated-owned-profile-configuration",
+  "status": "PASS",
+  "stopCriterion": "Unexpected destination, allowed direct access, child creation, TLS/address mismatch, invalid response, timeout, byte/request cap, 401/403/429/5xx or side effect -> stop; no automatic retry",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:52:40.386Z",
+    "start": "2026-10-19T08:22:40.386Z"
+  }
+}

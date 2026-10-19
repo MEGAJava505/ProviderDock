@@ -1,0 +1,79 @@
+{
+  "actor": "codex-pilot-operator",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "authorization-continuation-000055.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "evidenceId": "M11-20261019-000057",
+  "hypotheses": [
+    "Synchronous child-spawn negative test stalls under Job process cap",
+    "Node network attempt does not yield to bounded timer",
+    "Helper startup module access failure"
+  ],
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "ba76eacae01d3c8ee6321810d905f49f8e0620900c550d359ac1505ee22f80a2"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "observation": {
+    "costUsd": 0,
+    "deniedBrokerRequests": 0,
+    "destinationIdentitySha256": "2d92752e69614799ea8467c10d252c76f79c85845cf23d54406ef49ab463ff0c",
+    "dnsResolutionCount": 1,
+    "endedAtUtc": "2026-10-19T08:23:10Z",
+    "errorClass": "RuntimeError",
+    "externalRequests": 0,
+    "normalizedCause": "probe-observation-deadline",
+    "payloadBytes": 0,
+    "phase": "phase4-egress-isolation",
+    "policyRevision": "m11-appcontainer-stdio-broker-exact-route-v1",
+    "processAttestation": {
+      "activeProcessLimit": 1,
+      "capabilityCount": 0,
+      "childProcessCreationDenied": false,
+      "inheritedHandlesRestrictedToStdio": true,
+      "integrityRid": 4096,
+      "isAppContainer": true,
+      "jobKillOnClose": true,
+      "packageIdentityMatches": true
+    },
+    "providerRequests": 0,
+    "proxyEnvironmentUsed": false,
+    "rawHeadersPersisted": false,
+    "redirectsFollowed": 0,
+    "resolvedAddressCount": 2,
+    "routeIdRedacted": "m11-iana-control",
+    "startedAtUtc": "2026-10-19T08:22:48Z",
+    "status": "NOT PROVEN"
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase4-egress-isolation",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "rootCause": "Not yet established; local stage diagnostic next",
+  "routeIdRedacted": "none",
+  "status": "NOT PROVEN",
+  "stopOutcome": "Own Job closed at observation deadline; external broker request count zero; A4 not opened"
+}

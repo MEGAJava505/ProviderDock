@@ -1,0 +1,34 @@
+{
+  "actor": "codex-pilot-operator",
+  "checks": {
+    "A3externalControlRequests": 1,
+    "A3providerRequests": 0,
+    "allExistingManifestEntries": true,
+    "canonicalJson": true,
+    "completeCurrentPhaseSummarySchemas": 5,
+    "currentPreflightSchemas": 5,
+    "mandatoryPhaseDirectories": 6,
+    "nativeResumeHashLinkage": true,
+    "previous55PublishedFilesUnchanged": true,
+    "recordHashes": true,
+    "redactionScan": "PASS",
+    "rollbackSourceAndTeardown": true,
+    "uniqueContiguousEvidenceIds": true
+  },
+  "currentStatusIndex": "pilot-status-reviewed-000087.json",
+  "evidenceId": "M11-20261019-000088",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-final-000088.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "06587b411d3065432f5a30f94037f496cb082fad868b947e044b4524a2c66c45"
+  },
+  "observedAtUtc": "2026-10-19T08:40:59.660Z",
+  "phase": "reviewed-final-validation",
+  "scope": "Evidence integrity/structure validation only; A4 stays BLOCKED, external review remains pending",
+  "status": "PASS",
+  "supersedesValidation": "validation-final-000081.json"
+}

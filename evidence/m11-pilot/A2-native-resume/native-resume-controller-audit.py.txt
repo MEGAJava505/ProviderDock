@@ -1,0 +1,83 @@
+import ctypes as C, importlib.util,sys,pathlib,json,hashlib,os,threading,queue,time
+sys.argv=[sys.argv[0],'no-child-policy','native-resume']
+spec=importlib.util.spec_from_file_location('m11_container',pathlib.Path(__file__).with_name('m11-resume-main-path.py'))
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+s=json.loads(m.STATE.read_text(encoding='utf-8'));p=json.loads((m.ROOT/'prepared-acp-private-v3.json').read_text(encoding='utf-8'))
+report=m.ROOT/'native-resume-observation.json'
+if report.exists():raise RuntimeError('No automatic resume retry')
+source=pathlib.Path(s['nativeSessionFile']);before=hashlib.sha256(source.read_bytes()).hexdigest()
+if before!=s['nativeSessionSha256']:raise RuntimeError('Native source hash mismatch')
+snapshot=m.ROOT/('accepted-native-source-'+before+'.jsonl')
+with snapshot.open('xb') as stream:stream.write(source.read_bytes())
+snapshot.chmod(0o444)
+m.WORK=pathlib.Path(p['cwd'])
+m.environment_block=lambda:C.create_unicode_buffer('\0'.join(k+'='+p['environment'][k] for k in sorted(p['environment']))+'\0\0')
+convert=m.signature(m.A,'ConvertStringSidToSidW',m.W.BOOL,[m.W.LPCWSTR,C.POINTER(m.P)])
+sid=m.P();m.check(convert(s['sidText'],C.byref(sid)),'owned-profile-sid')
+o={'status':'NOT PROVEN','phase':'phase3-native-resume','startedAtUtc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'resumeAttempts':1,'sourceStateHashBefore':before,'immutableSourceCopyHashMatches':hashlib.sha256(snapshot.read_bytes()).hexdigest()==before,'providerRequests':0,'providerCostUsd':0,'rawFramesPersisted':False}
+proc=None;timer=None
+try:
+ args=p['args'][:];args[-1]='rpc';args+=['--resume',str(source)]
+ proc=m.ContainedProcess(pathlib.Path(p['executable']),args,sid,45000)
+ timer=threading.Timer(45,lambda:m.terminate_job(proc.job,124));timer.daemon=True;timer.start()
+ o['processAttestation']=proc.attestation
+ q=queue.Queue();errors=[];counts={'stdoutBytes':0,'stderrBytes':0};deadline=time.monotonic()+35
+ def read(fd,kind):
+  try:
+   pending=b''
+   while True:
+    b=os.read(fd,4096)
+    if not b:break
+    counts[kind+'Bytes']+=len(b)
+    if counts[kind+'Bytes']>2097152:errors.append('output-cap');break
+    if kind=='stderr':continue
+    pending+=b
+    while b'\n' in pending:
+     line,pending=pending.split(b'\n',1)
+     if line.strip():
+      try:q.put(json.loads(line))
+      except Exception:errors.append('invalid-json')
+  finally:os.close(fd)
+ threads=[]
+ for attr,kind in [('out_read','stdout'),('err_read','stderr')]:
+  t=threading.Thread(target=read,args=(getattr(proc,attr),kind),daemon=True);setattr(proc,attr,None);t.start();threads.append(t)
+ def wait(predicate):
+  while time.monotonic()<deadline:
+   if errors:raise RuntimeError('invalid-bounded-rpc-output')
+   try:f=q.get(timeout=.1)
+   except queue.Empty:
+    if m.wait_process(proc.info.hProcess,0)==0:raise RuntimeError('native-exited-before-state')
+    continue
+   if predicate(f):return f
+  raise RuntimeError('native-resume-rpc-deadline')
+ ready=wait(lambda f:f.get('type')=='ready')
+ if ready.get('protocolVersion')!=1:raise RuntimeError('rpc-protocol-version-mismatch')
+ os.write(proc.in_write,b'{"id":"m11-native-state","type":"get_state"}\n')
+ f=wait(lambda f:f.get('type')=='response' and f.get('id')=='m11-native-state')
+ if f.get('success') is not True:raise RuntimeError('native-get-state-failed')
+ data=f.get('data',{});model=data.get('model',{})
+ o['sameNativeSessionId']=data.get('sessionId')==s['nativeSessionId']
+ o['sameNativeSourceFile']=data.get('sessionFile')==str(source)
+ o['samePinnedModel']=model.get('id')==p['rpcModel']['modelId'] and model.get('provider')==p['rpcModel']['providerId']
+ o['isStreaming']=data.get('isStreaming');o['messageCount']=data.get('messageCount')
+ o['nativeSessionIdSha256']=hashlib.sha256(s['nativeSessionId'].encode()).hexdigest()
+ if not all(o[k] for k in ['sameNativeSessionId','sameNativeSourceFile','samePinnedModel']) or o['isStreaming'] is not False:raise RuntimeError('native-linkage-or-idle-mismatch')
+ os.write(proc.in_write,b'{"id":"m11-idle-abort","type":"abort"}\n')
+ abort=wait(lambda f:f.get('type')=='response' and f.get('id')=='m11-idle-abort')
+ if abort.get('success') is not True:raise RuntimeError('native-idle-abort-failed')
+ os.close(proc.in_write);proc.in_write=None
+ if m.wait_process(proc.info.hProcess,10000)!=0:raise RuntimeError('native-resume-eof-deadline')
+ code=m.W.DWORD();m.check(m.get_exit(proc.info.hProcess,C.byref(code)),'native-resume-exit');o['exitCode']=code.value
+ for t in threads:t.join(timeout=1)
+ o.update(counts)
+ o['sourceStateHashAfter']=hashlib.sha256(source.read_bytes()).hexdigest();o['sourceUnchanged']=o['sourceStateHashAfter']==before
+ if code.value!=0 or errors or counts['stderrBytes'] or not o['sourceUnchanged']:raise RuntimeError('native-terminal-state-not-proven')
+ o['status']='PASS'
+except Exception as e:
+ o['errorClass']=type(e).__name__;o['normalizedCause']=str(e) if isinstance(e,RuntimeError) else 'controller-error-redacted'
+finally:
+ if timer:timer.cancel()
+ if proc:proc.close()
+ m.local_free(sid);o['endedAtUtc']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+ report.write_text(json.dumps(o,indent=2)+'\n',encoding='utf-8');print(json.dumps(o))
+sys.exit(0 if o['status']=='PASS' else 1)

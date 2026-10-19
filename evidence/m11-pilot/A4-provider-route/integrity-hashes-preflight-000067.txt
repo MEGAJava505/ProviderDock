@@ -1,0 +1,4 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+c13a8c876105621a84ba2069147ea05bbad3f074271a287b17e2f509c7682605  authorization-pending-000066.json
+8c9df7ae2fa748e51eb768d7ed8dc64987bc79176b8bab870343fdc4a8572c13  preflight-blocked-000067.json
+4e548859c89758734ba20f192c70fc383c73439eaecb412d258db15a586e84be  provider-metadata-observation-000065.json

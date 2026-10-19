@@ -1,0 +1,47 @@
+{
+  "actor": "codex-pilot-operator",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "assessment": "none",
+  "authorizationRef": "authorization-pending-000066.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "costUsd": 0,
+  "credentialClass": "none-live",
+  "credentialValuesRead": false,
+  "evidenceId": "M11-20261019-000068",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "be7b15adcf379b0c5ec5300f06c47d47cfc6a2bc0941671851a12fa877d2dbb3"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "originalStateModified": false,
+  "ownerDecision": "Hold A4; request configured pilot route through protected mechanism",
+  "phase": "phase5-provider-route",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "providerRequests": 0,
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "status": "BLOCKED"
+}

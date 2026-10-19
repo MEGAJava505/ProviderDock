@@ -1,0 +1,52 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "No configured provider profile available in normal resolved ProviderDock home",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "A4-pending",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "evidenceId": "M11-20261019-000065",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "9eeb3b88f1600c06ab8ae8f1d2ba165a91518de4f67ab518bed24c72934ae65a"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "observation": {
+    "credentialValuesRead": false,
+    "observedAtUtc": "2026-10-19T08:26:30.831Z",
+    "profileCount": 0,
+    "profiles": [],
+    "providerRequests": 0,
+    "source": "Normal ProviderDock metadata repository; no environment credential scan"
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase5-provider-route",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "requiredInput": "Configured pilot profile ID and actual ProviderDock home if nondefault; scoped/ephemeral credential through protected vault, never conversation",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "scope": "Default ProviderDock metadata only; no unrelated app auth-file or environment token scan",
+  "status": "BLOCKED"
+}

@@ -1,0 +1,139 @@
+import importlib.util
+import sys
+from pathlib import Path
+import json, ctypes as C, os, threading, queue, time, hashlib, re
+
+MODE=sys.argv[1]
+if MODE not in ['create','resume']:
+    raise RuntimeError('Unsupported operation')
+sys.argv=[sys.argv[0],'no-child-policy','acp-'+MODE]
+spec=importlib.util.spec_from_file_location('m11_container',Path(__file__).with_name('m11-resume-main-path.py'))
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+state=json.loads(m.STATE.read_text(encoding='utf-8'))
+prepared=json.loads((m.ROOT/'prepared-acp-private-v3.json').read_text(encoding='utf-8'))
+observation_path=m.ROOT/('actual-acp-'+MODE+'-v2-observation.json')
+if observation_path.exists():
+    raise RuntimeError('Actual operation already has an observation; no retry')
+m.WORK=Path(prepared['cwd'])
+def environment():
+    values=prepared['environment']
+    return C.create_unicode_buffer('\0'.join(k+'='+values[k] for k in sorted(values))+'\0\0')
+m.environment_block=environment
+convert=m.signature(m.A,'ConvertStringSidToSidW',m.W.BOOL,[m.W.LPCWSTR,C.POINTER(m.P)])
+sid=m.P();m.check(convert(state['sidText'],C.byref(sid)),'owned-profile-sid')
+obs={'status':'NOT PROVEN','phase':'phase2' if MODE=='create' else 'phase3','operation':MODE,'actor':'codex-pilot-operator','startedAtUtc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'providerRequests':0,'providerCostUsd':0,'deadlineSeconds':45,'rawFramesPersisted':False}
+process=None
+try:
+    binary_hash=hashlib.sha256(Path(prepared['executable']).read_bytes()).hexdigest()
+    if binary_hash!='1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba':
+        raise RuntimeError('binary-hash-mismatch')
+    obs['binarySha256']=binary_hash
+    if MODE=='resume':
+        source=Path(state['nativeSessionFile'])
+        obs['sourceStateHashBefore']=hashlib.sha256(source.read_bytes()).hexdigest()
+        if obs['sourceStateHashBefore']!=state['nativeSessionSha256']:
+            raise RuntimeError('source-state-hash-mismatch')
+    process=m.ContainedProcess(Path(prepared['executable']),prepared['args'],sid,timeout_ms=45000)
+    watchdog=threading.Timer(45,lambda:m.terminate_job(process.job,124));watchdog.daemon=True;watchdog.start()
+    obs['processAttestation']=process.attestation
+    frames=queue.Queue();errors=[];counts={'stdoutBytes':0,'stderrBytes':0}
+    deadline=time.monotonic()+40
+    def reader(fd,kind):
+        stream=os.fdopen(fd,'rb');pending=b''
+        try:
+            while True:
+                chunk=os.read(stream.fileno(),4096)
+                if not chunk: break
+                counts[kind+'Bytes']+=len(chunk)
+                if counts[kind+'Bytes']>2097152:
+                    errors.append('bounded-output-exceeded');break
+                if kind=='stderr':
+                    # Retain only error identifiers; raw diagnostic text stays memory-only.
+                    text=chunk.decode('utf-8',errors='replace')
+                    for code in re.findall(r'\b(?:EACCES|EPERM|ENOENT|ENOSYS|ERR_[A-Z_]+)\b',text):
+                        errors.append(code)
+                    continue
+                pending+=chunk
+                while b'\n' in pending:
+                    line,pending=pending.split(b'\n',1)
+                    if line.strip():
+                        try: frames.put(json.loads(line))
+                        except Exception: errors.append('invalid-protocol-json')
+        finally: stream.close()
+    threads=[]
+    for attr,kind in [('out_read','stdout'),('err_read','stderr')]:
+        t=threading.Thread(target=reader,args=(getattr(process,attr),kind),daemon=True)
+        setattr(process,attr,None);t.start();threads.append(t)
+    def request(identifier,method,params):
+        os.write(process.in_write,(json.dumps({'jsonrpc':'2.0','id':identifier,'method':method,'params':params})+'\n').encode())
+        while time.monotonic()<deadline:
+            if 'bounded-output-exceeded' in errors or 'invalid-protocol-json' in errors:
+                raise RuntimeError('protocol-output-rejected')
+            try: frame=frames.get(timeout=.1)
+            except queue.Empty:
+                if m.wait_process(process.info.hProcess,0)==0:
+                    result=m.W.DWORD();m.get_exit(process.info.hProcess,C.byref(result))
+                    obs['exitCode']=result.value
+                    raise RuntimeError('process-exited-before-response')
+                continue
+            if frame.get('id')==identifier:
+                if 'error' in frame:
+                    obs['protocolErrorCode']=frame['error'].get('code')
+                    raise RuntimeError('native-protocol-command-failed')
+                return frame.get('result')
+            if 'id' in frame and 'method' in frame:
+                raise RuntimeError('unexpected-agent-request')
+        raise RuntimeError('native-protocol-deadline')
+    initialized=request(1,'initialize',{'protocolVersion':1,'clientCapabilities':{},'clientInfo':{'name':'m11-contained-pilot','version':'1'}})
+    obs['runtimeVersion']=initialized.get('agentInfo',{}).get('version')
+    obs['nativeResumeAdvertised']=initialized.get('agentCapabilities',{}).get('loadSession') is True
+    if obs['runtimeVersion']!='18.0.4':raise RuntimeError('runtime-version-mismatch')
+    if MODE=='create':
+        result=request(2,'session/new',{'cwd':prepared['cwd'],'mcpServers':[]})
+        session_id=result.get('sessionId')
+        if not isinstance(session_id,str) or not re.fullmatch(r'[a-fA-F0-9-]{36}',session_id):
+            raise RuntimeError('invalid-native-session-id')
+        state['nativeSessionId']=session_id
+    else:
+        session_id=state['nativeSessionId']
+        request(2,'session/load',{'sessionId':session_id,'cwd':prepared['cwd'],'mcpServers':[]})
+    if MODE=='create':
+        files=[p for p in Path(prepared['sessionsDirectory']).rglob('*.jsonl') if session_id in p.name]
+        if len(files)!=1:raise RuntimeError('native-source-state-not-found')
+        entries=[json.loads(l) for l in files[0].read_text(encoding='utf-8').splitlines()]
+        if sum(e.get('type')=='session' and e.get('id')==session_id for e in entries)!=1:
+            raise RuntimeError('native-session-header-mismatch')
+    obs['nativeSessionIdSha256']=hashlib.sha256(session_id.encode()).hexdigest()
+    obs['nativeSourceHeaderMatched']=True
+    os.close(process.in_write);process.in_write=None
+    wait=m.wait_process(process.info.hProcess,10000)
+    if wait!=0:raise RuntimeError('native-eof-shutdown-deadline')
+    code=m.W.DWORD();m.check(m.get_exit(process.info.hProcess,C.byref(code)),'native-exit-code')
+    obs['exitCode']=code.value
+    for t in threads:t.join(timeout=2)
+    obs.update(counts);obs['diagnosticCodes']=sorted(set(errors))
+    if code.value!=0 or errors:raise RuntimeError('native-terminal-outcome-rejected')
+    if MODE=='create':
+        files=[p for p in Path(prepared['sessionsDirectory']).rglob('*.jsonl') if session_id in p.name]
+        if len(files)!=1:raise RuntimeError('native-source-state-not-found')
+        source=files[0];state['nativeSessionFile']=str(source)
+        state['nativeSessionSha256']=hashlib.sha256(source.read_bytes()).hexdigest()
+        m.STATE.write_text(json.dumps(state,indent=2)+'\n',encoding='utf-8')
+        obs['nativeStateSha256']=state['nativeSessionSha256']
+    else:
+        obs['sourceStateHashAfter']=hashlib.sha256(source.read_bytes()).hexdigest()
+        obs['sourceStateUnchanged']=obs['sourceStateHashAfter']==obs['sourceStateHashBefore']
+        if not obs['sourceStateUnchanged']:raise RuntimeError('native-source-state-changed')
+    obs['status']='PASS'
+except Exception as error:
+    obs['status']='NOT PROVEN';obs['errorClass']=type(error).__name__
+    obs['normalizedCause']=str(error) if isinstance(error,RuntimeError) else 'local-controller-error-redacted'
+finally:
+    if process:
+        watchdog.cancel()
+        process.close()
+    m.local_free(sid)
+    obs['endedAtUtc']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+    observation_path.write_text(json.dumps(obs,indent=2)+'\n',encoding='utf-8')
+    print(json.dumps(obs))
+sys.exit(0 if obs['status']=='PASS' else 1)

@@ -1,0 +1,5 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+920387d43b1c34d2d83bda7a0f8b4ffb370335564ca1b271efe500cb8baf202b  authorization-acp-000038.json
+5138835faae917b41e6c096a305fa7c6a874227c0e25022a02f86e10ae80d473  authorization-resume-000036.json
+269428ba9888287c03e8e393961a0f82e39b0046d1b93ae2a0acd55f672f58eb  diagnosis-continuation-000037.json
+aa67a478881fc7408e434fd414006935dd66fbd924c2372769d9bb7a4c42ec11  preflight-pass-000039.json

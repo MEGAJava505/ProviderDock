@@ -1,0 +1,20 @@
+import {createConnection} from 'node:net';
+import {createInterface} from 'node:readline';
+const result={directExternalDenied:false};
+const socket=createConnection({host:process.argv[2],port:443});
+await new Promise(resolve=>{
+ const timer=setTimeout(()=>{result.directError='APPLICATION_DEADLINE';socket.destroy();resolve();},2000);
+ socket.once('error',e=>{clearTimeout(timer);result.directError=e.code;result.directExternalDenied=['EACCES','EPERM','ETIMEDOUT'].includes(e.code);resolve();});
+ socket.once('connect',()=>{clearTimeout(timer);result.directError='UNEXPECTED_CONNECT';socket.destroy();resolve();});
+});
+const input=createInterface({input:process.stdin,terminal:false});
+const lines=input[Symbol.asyncIterator]();
+console.log(JSON.stringify({kind:'broker-request',route:'unlisted-control',method:'HEAD'}));
+const rejected=JSON.parse((await lines.next()).value);
+result.unlistedBrokerRouteDenied=rejected.decision==='deny'&&rejected.externalRequests===0;
+console.log(JSON.stringify({kind:'broker-request',route:'m11-iana-control',method:'HEAD'}));
+const allowed=JSON.parse((await lines.next()).value);
+result.allowlistedExternalControlPassed=allowed.decision==='allow'&&allowed.statusClass==='2xx'&&allowed.externalRequests===1;
+input.close();
+console.log(JSON.stringify({kind:'probe-result',...result}));
+process.exitCode=Object.entries(result).filter(([k])=>k.endsWith('Denied')||k.endsWith('Passed')).every(([,v])=>v===true)?0:1;

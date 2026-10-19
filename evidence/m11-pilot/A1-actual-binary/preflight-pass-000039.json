@@ -1,0 +1,85 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "All assertions observed; no actual OMP launch yet",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "authorization-resume-000036.json",
+    "diagnosis-continuation-000037.json",
+    "authorization-acp-000038.json"
+  ],
+  "authorizationRef": "authorization-acp-000038.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "environmentAttestation": {
+    "isolatedHomeAndTemp": true,
+    "liveCredentialValuesRead": false,
+    "minimalExplicitEnvironment": true,
+    "originalVaultOpened": false,
+    "snapshotHashesVerified": true,
+    "sourceCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035"
+  },
+  "evidenceId": "M11-20261019-000039",
+  "expectedResult": "Contained inert helper can write owned work, cannot read outside canary or reach available loopback listener",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000039.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "f8decfd2b42b788d077959751d0ceb8e420efd36a601aa280d9de0021f75eac9"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "networkEgressObservation": {
+    "applicationDeadline": false,
+    "containedLoopbackAccepted": 0,
+    "hostPositiveControlConnected": true,
+    "networkCapabilities": 0,
+    "osError": "ETIMEDOUT",
+    "status": "PASS"
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "osIsolationAttestation": {
+    "accepted": true,
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "fixtureWrite": true,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "outsideFixtureReadDenied": true,
+    "packageIdentityMatches": true,
+    "policyRevision": "m11-appcontainer-joblimit1-native-profile-no-network-v3"
+  },
+  "phase": "phase1-authorization-preflight",
+  "preflightId": "m11-a1-acp-contained-preflight",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "runId": "m11-a1-native-acp-create",
+  "sideEffectAssessment": "Owned native profile retained; no live user state touched",
+  "status": "PASS",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:11:03.613Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:07:43Z"
+  }
+}

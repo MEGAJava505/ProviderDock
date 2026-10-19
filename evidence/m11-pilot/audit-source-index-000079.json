@@ -1,0 +1,58 @@
+{
+  "actor": "codex-pilot-operator",
+  "evidenceId": "M11-20261019-000079",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "dadfda38741bba778ffe13257d67a125672fada1d3c0231655940d1434897d0d"
+  },
+  "phase": "cross-phase-audit-sources",
+  "policy": "Audit text contains no runtime secrets, raw captured headers, transcripts, user paths, or provider endpoints",
+  "sources": [
+    {
+      "artifact": "A1-actual-binary/containment-launcher-audit.py.txt",
+      "executable": false,
+      "executedSourceSha256": "1d8344c7261d22de0621fdeed76f20de7d1feb9088c7a635aaaa86df004aefcb",
+      "publishedSourceSha256": "40a5a9c680559cad6c2aeb8f77f06372fc698e40bc9d08e669fbf9a395bde704",
+      "redaction": "Only literal loopback/control destination replaced with named resolver; no runtime logic or assertions omitted",
+      "scope": "Audit text; operational originals stay local; protected runtime files and raw frames not published"
+    },
+    {
+      "artifact": "A1-actual-binary/actual-acp-controller-audit.py.txt",
+      "executable": false,
+      "executedSourceSha256": "fadb0122304fb903890e4e4308485aa2b67e79591d55ff6e1ab1e6a236c3823c",
+      "publishedSourceSha256": "ed93a417b9ea78aa73a0b45dcd1d4229a41ffbf8947b1082adb2d4073357ae73",
+      "redaction": "Only literal loopback/control destination replaced with named resolver; no runtime logic or assertions omitted",
+      "scope": "Audit text; operational originals stay local; protected runtime files and raw frames not published"
+    },
+    {
+      "artifact": "A2-native-resume/native-resume-controller-audit.py.txt",
+      "executable": false,
+      "executedSourceSha256": "6bae9b114abbd8f26433c64f44094e09823ef7c89f1406d1c00f7fa68415e198",
+      "publishedSourceSha256": "6bae9b114abbd8f26433c64f44094e09823ef7c89f1406d1c00f7fa68415e198",
+      "redaction": "none",
+      "scope": "Audit text; operational originals stay local; protected runtime files and raw frames not published"
+    },
+    {
+      "artifact": "A3-egress-isolation/egress-broker-audit.py.txt",
+      "executable": false,
+      "executedSourceSha256": "752896262b7eaaf6aef4a4d68ed5da943086e928187c8006e5fba528749551da",
+      "publishedSourceSha256": "acf7f7f8a92bfa8e76a71cca9a49e80e74bacb0dd4ee42d0360d5a2fd412105b",
+      "redaction": "Only literal loopback/control destination replaced with named resolver; no runtime logic or assertions omitted",
+      "scope": "Audit text; operational originals stay local; protected runtime files and raw frames not published"
+    },
+    {
+      "artifact": "A3-egress-isolation/egress-probe-audit.mjs.txt",
+      "executable": false,
+      "executedSourceSha256": "1422040c6696d06b58058cc5fcd64ff5ffbd34dc54b1d98f305f7f3483e3ba1e",
+      "publishedSourceSha256": "278809ca4845163dbec17ab4fd7b946004402921bdd0636015e57432489b0d28",
+      "redaction": "Only literal loopback/control destination replaced with named resolver; no runtime logic or assertions omitted",
+      "scope": "Audit text; operational originals stay local; protected runtime files and raw frames not published"
+    }
+  ],
+  "status": "PASS"
+}

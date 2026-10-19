@@ -1,0 +1,69 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualOmpLaunchesInContinuation": 1,
+  "actualRepeatExecuted": false,
+  "actualResult": "Automatic approval review rejected repeat; pending user reply",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "actual-launch-stop-000040.json",
+    "authorization-correction-000041.json",
+    "preflight-correction-pass-000042.json"
+  ],
+  "authorizationRef": "authorization-correction-000041.json",
+  "automaticApprovalReview": {
+    "action": "One corrected actual OMP A1 repeat",
+    "decision": "REJECTED",
+    "reason": "The first actual A1 launch was already used and stopped. A new authorization created by the agent is not additional explicit user approval for this high-risk repeat."
+  },
+  "correction": "The operator-generated continuation authorization is not accepted as approval for a repeat after an actual A1 stop. These records do not authorize execution and cannot open the next phase.",
+  "correctionOf": [
+    "authorization-correction-000041.json",
+    "preflight-correction-pass-000042.json"
+  ],
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "dependentPhasesStarted": false,
+  "evidenceId": "M11-20261019-000043",
+  "expectedResult": "User approval required before another actual process",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "6c82f3ed72acc8e58f266949591251c087a40f6378a9f1d7bd8256503ef5170d"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase1-authorization-preflight",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "requiredAction": "Separate explicit user approval for exactly one corrected A1 repeat, deadline 45 seconds, zero provider requests/cost, zero-capability AppContainer, native initialize/session-new/EOF only",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "sideEffectAssessment": "No process created by rejected command",
+  "status": "BLOCKED",
+  "stopOutcome": "Rejected command was not executed; no workaround attempted; only independent rollback verification continues",
+  "userApprovalRequested": true,
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:14:49.202Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:14:49.201Z"
+  }
+}

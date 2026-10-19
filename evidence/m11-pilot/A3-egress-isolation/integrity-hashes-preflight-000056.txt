@@ -1,0 +1,3 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+2b5221bbe80f725c5b5f912f0316c3f5f75e6f8e4ad1a200d3be062337b609dd  authorization-continuation-000055.json
+f348f90084cc00d383259c7af5601cce2b325a6871e651e6340fd79df1689643  preflight-continuation-000056.json

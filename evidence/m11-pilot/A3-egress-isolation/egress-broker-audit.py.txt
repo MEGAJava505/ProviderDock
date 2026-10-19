@@ -1,0 +1,89 @@
+import sys,pathlib,importlib.util,json,ctypes as C,os,socket,ssl,time,threading,queue,hashlib
+sys.argv=[sys.argv[0],'no-child-policy','egress-broker']
+spec=importlib.util.spec_from_file_location('m11_container',pathlib.Path(__file__).with_name('m11-resume-main-path.py'));m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+s=json.loads(m.STATE.read_text(encoding='utf-8'));report=m.ROOT/'egress-broker-v2-observation.json'
+if report.exists():raise RuntimeError('No automatic A3 retry')
+host=resolve_authorized_control_host();route='m11-iana-control';proc=None;timer=None;sid=m.P()
+o={'status':'NOT PROVEN','phase':'phase4-egress-isolation','startedAtUtc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'policyRevision':'m11-appcontainer-stdio-broker-exact-route-v1','routeIdRedacted':route,'externalRequests':0,'deniedBrokerRequests':0,'providerRequests':0,'costUsd':0,'proxyEnvironmentUsed':False,'redirectsFollowed':0,'payloadBytes':0,'rawHeadersPersisted':False}
+try:
+ addresses=sorted({i[4][0] for i in socket.getaddrinfo(host,443,socket.AF_INET,socket.SOCK_STREAM)})
+ if not addresses:raise RuntimeError('No allowlisted route address')
+ target=addresses[0];o['dnsResolutionCount']=1;o['resolvedAddressCount']=len(addresses)
+ o['destinationIdentitySha256']=hashlib.sha256((host+':443').encode()).hexdigest()
+ convert=m.signature(m.A,'ConvertStringSidToSidW',m.W.BOOL,[m.W.LPCWSTR,C.POINTER(m.P)])
+ m.check(convert(s['sidText'],C.byref(sid)),'owned-profile-sid');m.WORK=pathlib.Path(s['workDirectory'])
+ proc=m.ContainedProcess(m.PROGRAM/'node-probe.exe',['--preserve-symlinks-main',str(m.PROGRAM/'egress-probe-v2.mjs'),target],sid,25000)
+ timer=threading.Timer(25,lambda:m.terminate_job(proc.job,124));timer.daemon=True;timer.start();o['processAttestation']=proc.attestation
+ q=queue.Queue();errors=[];counts={'stdoutBytes':0,'stderrBytes':0}
+ def reader(fd,kind):
+  try:
+   buf=b''
+   while True:
+    b=os.read(fd,4096)
+    if not b:break
+    counts[kind+'Bytes']+=len(b)
+    if counts[kind+'Bytes']>65536:errors.append('output-cap');break
+    if kind=='stderr':continue
+    buf+=b
+    while b'\n' in buf:
+     line,buf=buf.split(b'\n',1)
+     if line:
+      try:q.put(json.loads(line))
+      except Exception:errors.append('protocol-json')
+  finally:os.close(fd)
+ threads=[]
+ for attr,kind in [('out_read','stdout'),('err_read','stderr')]:
+  t=threading.Thread(target=reader,args=(getattr(proc,attr),kind),daemon=True);setattr(proc,attr,None);t.start();threads.append(t)
+ deadline=time.monotonic()+22;result=None
+ while time.monotonic()<deadline:
+  if errors:raise RuntimeError('bounded-probe-output-rejected')
+  try:f=q.get(timeout=.1)
+  except queue.Empty:
+   if m.wait_process(proc.info.hProcess,0)==0:raise RuntimeError('probe-exited-before-observation')
+   continue
+  if f.get('kind')=='probe-result':result=f;break
+  if f.get('kind')!='broker-request' or f.get('method')!='HEAD':raise RuntimeError('unexpected-probe-command')
+  if f.get('route')!=route:
+   o['deniedBrokerRequests']+=1
+   if o['deniedBrokerRequests']>1:raise RuntimeError('denied-request-cap')
+   reply={'decision':'deny','externalRequests':0}
+  else:
+   if o['externalRequests']!=0:raise RuntimeError('external-request-cap')
+   o['externalRequests']=1
+   context=ssl.create_default_context()
+   request=('HEAD / HTTP/1.1\r\nHost: '+host+'\r\nConnection: close\r\n\r\n').encode('ascii')
+   if len(request)>256:raise RuntimeError('request-byte-cap')
+   with socket.create_connection((target,443),timeout=8) as raw:
+    if raw.getpeername()[0]!=target:raise RuntimeError('destination-drift')
+    with context.wrap_socket(raw,server_hostname=host) as secure:
+     secure.settimeout(5);o['tlsVerified']=True;o['tlsVersion']=secure.version();secure.sendall(request);response=b''
+     while b'\r\n\r\n' not in response:
+      chunk=secure.recv(min(2048,8193-len(response)))
+      if not chunk:raise RuntimeError('incomplete-http-control-response')
+      response+=chunk
+      if len(response)>8192:raise RuntimeError('response-header-cap')
+   status=int(response.split(b' ',2)[1]);o['httpStatus']=status;o['requestBytes']=len(request);o['responseHeaderBytes']=response.index(b'\r\n\r\n')+4;o['observedPlaintextBytes']=len(response)
+   o['peerAddressMatchesPinnedResolution']=True;o['externalConnections']=1
+   if not 200<=status<300:raise RuntimeError('control-http-status-stop-'+str(status))
+   reply={'decision':'allow','statusClass':'2xx','externalRequests':1}
+  os.write(proc.in_write,(json.dumps(reply)+'\n').encode())
+ if result is None:raise RuntimeError('probe-observation-deadline')
+ o['probe']=result
+ for key in ['directExternalDenied','unlistedBrokerRouteDenied','allowlistedExternalControlPassed']:
+  if result.get(key) is not True:raise RuntimeError('required-isolation-assertion-failed-'+key)
+ os.close(proc.in_write);proc.in_write=None
+ if m.wait_process(proc.info.hProcess,3000)!=0:raise RuntimeError('probe-shutdown-deadline')
+ code=m.W.DWORD();m.check(m.get_exit(proc.info.hProcess,C.byref(code)),'probe-exit');o['exitCode']=code.value
+ for t in threads:t.join(timeout=1)
+ o.update(counts)
+ if code.value or counts['stderrBytes'] or errors:raise RuntimeError('probe-terminal-result-rejected')
+ o['status']='PASS'
+except Exception as e:
+ o['errorClass']=type(e).__name__;o['normalizedCause']=str(e) if isinstance(e,RuntimeError) else 'network-or-controller-error-redacted'
+finally:
+ if 'counts' in locals():o.update(counts)
+ if timer:timer.cancel()
+ if proc:proc.close()
+ if sid:m.local_free(sid)
+ o['endedAtUtc']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime());report.write_text(json.dumps(o,indent=2)+'\n',encoding='utf-8');print(json.dumps(o))
+sys.exit(0 if o['status']=='PASS' else 1)

@@ -1,0 +1,107 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "All checks passed; subsequent user-authorized inactive profile metadata retained",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "preflight-continuation-000071.json",
+    "../phase0-preparation/snapshot-observation.json",
+    "../A4-provider-route/profile-created-000072.json"
+  ],
+  "authorizationRef": "authorization-continuation-000070.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "evidenceId": "M11-20261019-000076",
+  "expectedResult": "Restore from readonly snapshot matches; own processes/profiles gone; retained native state hash verified",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "c197f7e6b984de016f09f8df4f640689db3baa6539de040153dd68a14cf276d6"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "observation": {
+    "expectedTree": "bd21b64dccdc9b60515383fd40de8a183e21287c",
+    "gitFsckExitCode": 0,
+    "networkScope": "Own contained processes absent, brokers/sockets closed; no host-wide network claim",
+    "observedAtUtc": "2026-10-19T08:29:58Z",
+    "originalUserStateModified": false,
+    "ownProfileCleanup": {
+      "acceptedNativeSourceSha256": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea",
+      "globalFirewallChanged": false,
+      "nativeSourceStatePreservedBeforeCleanup": true,
+      "observedAtUtc": "2026-10-19T08:28:42Z",
+      "ownedProfileIdentitySha256": "dbc2e5a58686c64a0fada414de11a9978295480769b7e55ab0e6699bb0f37235",
+      "profileCleanupComplete": true,
+      "profileDeleteHresult": 0,
+      "scope": "Only uniquely named owned M11 AppContainer profile",
+      "userHomesOrArchivesDeleted": false
+    },
+    "preservedNativeSourceHashMatches": true,
+    "preservedNativeSourceReadOnly": true,
+    "residualPostcheck": {
+      "matchingOwnedProfileMappings": 0,
+      "matchingPilotExecutableNames": 0,
+      "observedAtUtc": "2026-10-19T08:28:42.8521095Z",
+      "scope": "M11 own executable/profile identities; no global host egress claim"
+    },
+    "restoredCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035",
+    "restoredTree": "bd21b64dccdc9b60515383fd40de8a183e21287c",
+    "restoredTreeMatches": true,
+    "restoredWorktreeClean": true,
+    "restoreFrom": "readonly snapshot bundle",
+    "snapshotChecks": [
+      {
+        "artifact": "omp-integration.bundle",
+        "hashMatches": true,
+        "readOnly": true,
+        "sha256": "4906284a756839becb6fbf5a5210376e1d3d6eb6cde6e4c4f6f1c1178f396742"
+      },
+      {
+        "artifact": "provider-dock-state-hashes.txt",
+        "hashMatches": true,
+        "readOnly": true,
+        "sha256": "0ff1a75c0c43488e5745e9a6449e7b7f3c1ca9483dc36004851656ee68726716"
+      },
+      {
+        "artifact": "actual-omp.exe",
+        "hashMatches": true,
+        "readOnly": true,
+        "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba"
+      }
+    ],
+    "status": "PASS",
+    "userHomesOrArchivesDeleted": false
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase6-rollback-observation",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "completed",
+    "scope": "Owned pilot execution and approved isolated checkout; retain newly requested inactive pilot profile"
+  },
+  "routeIdRedacted": "none",
+  "status": "PASS",
+  "subsequentAuthorizedChange": {
+    "existingProfileOverwritten": false,
+    "productionDefaultChanged": false,
+    "profileRetained": true,
+    "ref": "../A4-provider-route/profile-created-000072.json"
+  }
+}

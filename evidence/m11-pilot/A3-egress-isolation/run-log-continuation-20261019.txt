@@ -1,0 +1,3 @@
+2026-10-19T08:22:48Z..08:23:10Z STOP initial inert probe observation deadline; optional synchronous child-spawn test stalled; external HTTP requests 0; own Job closed.
+2026-10-19T08:24:31Z..08:24:37Z LOCAL DIAGNOSIS stages prove main and direct network step finished; synchronous child-spawn did not return. No external HTTP request; own Job closed.
+2026-10-19T08:25:26Z..08:25:27Z PASS corrected required network probe with unchanged AppContainer/Job policy: direct external EACCES, unlisted broker denied, one pinned TLS1.3 control HEAD 200, request 57 bytes/response headers 315 bytes/payload 0; exit 0. Negative-child behavior not claimed.

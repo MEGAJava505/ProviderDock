@@ -1,0 +1,2 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+d49008613f73c5c0da5e029b52d24b19f9e04ad636b45d1bd89b9ea2575deff7  audit-source-index-000079.json

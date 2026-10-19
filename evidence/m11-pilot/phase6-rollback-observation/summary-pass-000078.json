@@ -1,0 +1,54 @@
+{
+  "actor": "codex-pilot-operator",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "rollback-pass-000076.json",
+    "side-effects-continuation-000077.json",
+    "../A4-provider-route/profile-created-000072.json"
+  ],
+  "authorizationRef": "authorization-continuation-000070.json",
+  "claim": "Readonly-snapshot restoration and owned execution teardown observed",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "evidenceId": "M11-20261019-000078",
+  "gitFsckExitCode": 0,
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "df98f159d53de7833474d950473179db0a77c8a771e7c7d03fd647cf323f3bf9"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "nativeSourcePreserved": true,
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "ownedProcessCount": 0,
+  "ownedProfileCount": 0,
+  "phase": "phase6-rollback-observation",
+  "pilotProviderProfileRetainedInactive": true,
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "restoredCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035",
+  "restoredTree": "bd21b64dccdc9b60515383fd40de8a183e21287c",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "completed"
+  },
+  "routeIdRedacted": "none",
+  "snapshotHashesMatched": true,
+  "status": "PASS"
+}

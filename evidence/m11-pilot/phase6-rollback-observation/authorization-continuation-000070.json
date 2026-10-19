@@ -1,0 +1,61 @@
+{
+  "actor": "codex-pilot-operator",
+  "approvalBasis": "User requested Phase 6 rollback observation; decision applies to owned pilot artifacts only",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "none-new-A-gate-required",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "credentialClassAndAllowlistedRoute": {
+    "credentialClass": "none",
+    "route": "none"
+  },
+  "evidenceId": "M11-20261019-000070",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000071.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "2e40eb68fbb3beb9ce0cbcb7072944e93314a0a150c75f695ee9d6bd44f298f2"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase6-rollback-observation",
+  "priorIndependentRestore": "Separate checkout was restored after first A1 stop under existing user task authority; this record does not claim it was written before that earlier restoration",
+  "project": "ProviderDock/omp-integration/M11",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "initiated",
+    "reason": "A4 preflight blocked; own AppContainer cleaned; verify snapshot restoration and native source retention"
+  },
+  "routeIdRedacted": "none",
+  "scope": "Verify approved checkout restored from readonly bundle in separate owned directory; verify retained native-source copy and own process/profile/socket teardown",
+  "status": "PASS",
+  "stopCriterion": "Snapshot/tree/hash mismatch, residual own process/profile/egress or damaged user data -> preserve state and NOT PROVEN",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:59:52.398Z",
+    "start": "2026-10-19T08:29:52.396Z"
+  }
+}

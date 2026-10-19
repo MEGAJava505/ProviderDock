@@ -1,0 +1,65 @@
+{
+  "actor": "codex-pilot-operator",
+  "approvalBasis": "Original explicit request to complete A3 plus delegated environment/parameter choices; this is a contained inert diagnostic, not another actual OMP launch",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "A3",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "credentialClassAndAllowlistedRoute": {
+    "credentialClass": "none",
+    "route": "none-for-broker"
+  },
+  "evidenceId": "M11-20261019-000058",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-diagnosis-000058.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "20113cff4bea0714907e5037639b37401fa1bc7b5b73a7cfe1a4f9941ff7aa0e"
+  },
+  "limits": {
+    "deadlineSeconds": 8,
+    "deniedDirectExternalAttempts": 1,
+    "inertProcesses": 1,
+    "payloadBytes": 0
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase4-egress-isolation",
+  "project": "ProviderDock/omp-integration/M11",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "scope": "One bounded local inert stage diagnostic only; zero broker external requests; stage names only",
+  "status": "PASS",
+  "stopCriterion": "Stage timeout records own Job teardown, no external broker call, no A4 progression",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:39:26.257Z",
+    "start": "2026-10-19T08:24:26.257Z"
+  }
+}

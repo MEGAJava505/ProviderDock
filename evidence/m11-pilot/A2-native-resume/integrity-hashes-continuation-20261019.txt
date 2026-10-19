@@ -1,0 +1,7 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+b581bf2496ccf44199aeb169431fce0d9243e37bfdc9667d05eeedb3f54d5d17  authorization-continuation-000050.json
+745e32b25952962e134f600bf6e2af089f0840d53ab7633d994cf311e541977f  integrity-hashes-preflight-000051.txt
+f9122404d26373d2b05ca0dd40011d63cc8f811c522330f48e40d3ab1f99b4fc  native-resume-pass-000052.json
+fcaf4ba7997b6d1a82f9a648b7a94853667264ef9654c10fda0f3ac1f35be174  preflight-continuation-000051.json
+38d6586f7c487bea877d9f874d8bc5767edce31fd091b7ed1e70d35899cfcde6  side-effects-continuation-000053.json
+cd35b8b0a2fccaee4c7b63fa51bd778c2f9c828760180779ddb7d222813244e4  summary-pass-000054.json

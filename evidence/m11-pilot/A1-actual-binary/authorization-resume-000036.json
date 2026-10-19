@@ -1,0 +1,51 @@
+{
+  "approvalBasis": "User explicitly resumed the incomplete M11 workflow and previously delegated environment and parameter selection; no forged per-record signature",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "authorizationRef": "A1",
+  "binary": {
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "sourceCommit": "0c6c981ee5838d97700180383077eb0a3790637c",
+    "version": "18.0.4"
+  },
+  "controllerSourceSha256": "38f04b115016497eecd856f7aa243b36cc1ac0f69f8c7b54e7948b54bfead253",
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClassAndAllowlistedRoute": {
+    "credentialClass": "none-live",
+    "liveCredentialsAllowed": false,
+    "route": "none-for-provider"
+  },
+  "diagnosticPolicy": "AppContainer identity, low integrity and zero network capabilities remain mandatory. Change one launcher parameter at a time. Never change global desktop/firewall/ACL policy. Own temporary objects only. No actual OMP launch until positive filesystem and network assertions.",
+  "evidenceId": "M11-20261019-000036",
+  "executionPreconditionsSatisfied": false,
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "50531daeb0e483ab5a2db495e29d7898dda41c89a1687037e29dd61d963a073c"
+  },
+  "limits": {
+    "actualOmpDeadlineSeconds": 45,
+    "actualOmpLaunches": 1,
+    "localInertProbes": 8,
+    "payloadBytes": 0,
+    "probeDeadlineSeconds": 12
+  },
+  "phase": "phase1-authorization-preflight",
+  "previousStopRef": "isolation-observation-stop-000015.json",
+  "project": "ProviderDock/omp-integration/M11",
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "scope": "Diagnose and correct contained inert-helper startup, then one actual OMP launch only after a new complete Phase 1 PASS",
+  "status": "PASS",
+  "stopCriterion": "Each failed diagnostic gets an append-only observation and teardown before changing the one tested variable; never continue external phases on failed proof. Unexpected egress, outside-fixture access, unowned side effect, credentials, timeout, or actual OMP failure stops execution. No external retry on 5xx/503.",
+  "utcTimeWindow": {
+    "end": "2026-10-19T10:00:33.050Z",
+    "start": "2026-10-19T08:00:33.050Z"
+  }
+}

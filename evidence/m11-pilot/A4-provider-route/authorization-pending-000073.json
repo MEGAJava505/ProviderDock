@@ -1,0 +1,74 @@
+{
+  "actor": "codex-pilot-operator",
+  "approvalBasis": "User requested A4 and explicitly authorized new profile creation; no nonexistent credential or model authorization invented",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "A4-pending",
+  "costApprover": "requesting-user-delegated-bounded-pilot-choices",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "costLimit": {
+    "amount": 0.01,
+    "currency": "USD",
+    "status": "PROPOSED; no current execution permission"
+  },
+  "credentialClass": "none-live",
+  "credentialClassAndAllowlistedRoute": {
+    "credentialClass": "unavailable; scoped/ephemeral required",
+    "profileConfigured": true,
+    "profileEnabled": false,
+    "protectedCredentialPresent": false,
+    "route": "m11-pilot-route"
+  },
+  "evidenceId": "M11-20261019-000073",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000074.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "7419f1f8b86ee4421b705ecfe970ff2dd8b0876af0f9a50df457780ce51cc254"
+  },
+  "limits": {
+    "actualRequestsAuthorizedNow": 0,
+    "retries": 0
+  },
+  "missingFields": [
+    "protected scoped/ephemeral credential",
+    "concrete model and cost enforcement",
+    "open UTC window"
+  ],
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase5-provider-route",
+  "project": "ProviderDock/omp-integration/M11",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "requestLimit": 1,
+  "responsible": "codex-pilot-operator",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "scope": "One live pilot request only after protected scoped/ephemeral credential, concrete model/cost enforcement and UTC window exist",
+  "status": "BLOCKED",
+  "stopCriterion": "Do not execute without protected credential/model/cost enforcement; stop 401/403/429/5xx/503/timeout/side effect/egress/cap; no retry",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:35:02.256Z",
+    "executionWindowOpen": false,
+    "start": "2026-10-19T08:35:02.256Z"
+  }
+}

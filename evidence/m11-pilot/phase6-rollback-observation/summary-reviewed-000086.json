@@ -1,0 +1,79 @@
+{
+  "acceptedObservationRef": "rollback-pass-000076.json",
+  "actor": "codex-pilot-operator",
+  "actualResult": "Readonly snapshot hashes and restored Git tree matched; fsck 0; accepted native source retained readonly; owned processes/profiles 0. Subsequent user-requested inactive pilot provider profile retained",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "preflight-continuation-000071.json",
+    "rollback-pass-000076.json",
+    "run-log-continuation-20261019.txt"
+  ],
+  "authorizationRef": "authorization-continuation-000070.json",
+  "claim": "Reviewed complete phase evidence; external acceptance remains subject to independent review",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "environmentAttestation": {
+    "isolatedPilot": true,
+    "originalUserStateMutated": false,
+    "snapshotMechanism": "Readonly file attributes plus pinned SHA-256; not WORM"
+  },
+  "evidenceId": "M11-20261019-000086",
+  "expectedResult": "Restore from readonly snapshot matches; own processes/profiles gone; retained native state hash verified",
+  "gate": "none-new-A-gate",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-review-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "d885e79e512d7e1829de7b6eee616545fd2c60a626aa1817bd2454881b40b0b2"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "networkEgressObservation": {
+    "hostWideEgressClaim": false,
+    "ownedAppContainers": 0,
+    "ownedBrokersExited": true,
+    "ownedPilotProcesses": 0,
+    "ownedSocketsClosed": true,
+    "providerRequests": 0
+  },
+  "ompBinarySha256": "not-applicable",
+  "ompBinaryVersion": "not-applicable",
+  "osIsolationAttestation": {
+    "globalPolicyChanged": false,
+    "ownedAppContainerDeletionObserved": true
+  },
+  "phase": "phase6-rollback-observation",
+  "phaseExecution": "EXECUTED",
+  "preflightId": "m11-rollback-final-observation",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "Provider/inference HTTP requests within this phase"
+  },
+  "reviewCorrection": "Consolidates previously recorded facts into full schema and explicitly labels counter scope; earlier observations and manifests remain unchanged",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "completed",
+    "scope": "Owned pilot runtime and isolated approved checkout; retain requested inactive provider metadata"
+  },
+  "routeIdRedacted": "none",
+  "runId": "m11-rollback-from-readonly-bundle",
+  "sideEffectAssessment": "Own restore/audit/native-state artifacts and user-requested inactive profile retained; no user homes/archives deleted; no existing user data overwritten",
+  "status": "PASS",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:29:52.396Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:29:52.396Z"
+  }
+}

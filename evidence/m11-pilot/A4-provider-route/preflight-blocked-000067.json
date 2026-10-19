@@ -1,0 +1,80 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "A1/A2/A3 PASS, but standard ProviderDock profile repository returns zero profiles; A4 execution not started",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "authorization-pending-000066.json",
+    "provider-metadata-observation-000065.json",
+    "../A3-egress-isolation/summary-pass-000064.json"
+  ],
+  "authorizationRef": "authorization-pending-000066.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "unavailable; no value read",
+  "environmentAttestation": {
+    "credentialValuesRead": false,
+    "profileCount": 0,
+    "source": "Normal resolveProviderDockPaths metadata repository",
+    "userStateModified": false
+  },
+  "evidenceId": "M11-20261019-000067",
+  "expectedResult": "One named configured protected pilot route with caps before one request",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000067.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "49d3cd4b0adccaa46880527c801666319af82c2d9eff97dce2e94f9708b063e5"
+  },
+  "nativeResumeLinkage": "../A2-native-resume/native-resume-pass-000052.json",
+  "networkEgressObservation": {
+    "credentialAccesses": 0,
+    "liveProviderRequests": 0
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "osIsolationAttestation": {
+    "accepted": true,
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "fixtureWrite": true,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "outsideFixtureReadDenied": true,
+    "packageIdentityMatches": true,
+    "profileIdentityHash": "dbc2e5a58686c64a0fada414de11a9978295480769b7e55ab0e6699bb0f37235"
+  },
+  "phase": "phase5-provider-route",
+  "preflightId": "m11-a4-no-configured-route",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "runId": "not-started",
+  "sideEffectAssessment": "none; metadata query only",
+  "status": "BLOCKED",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:28:37.151Z",
+    "externalExecutionWindowOpen": false,
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:28:37.151Z"
+  }
+}

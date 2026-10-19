@@ -1,0 +1,56 @@
+{
+  "actor": "codex-pilot-operator",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "assessment": "observed",
+  "authorizationRef": "authorization-continuation-000070.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "evidenceId": "M11-20261019-000077",
+  "expectedOwnedArtifacts": [
+    "Separate restored checkout",
+    "Readonly native state copy",
+    "Redacted evidence"
+  ],
+  "globalFirewallChanged": false,
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "36039ff226da8507894d763300c337798b0455d4139fab9ba0b2d0e8adbe26fc"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "newPilotProfileRetainedInactive": true,
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "originalUserDataOverwritten": false,
+  "ownerDecision": "Retain audit artifacts and requested pilot profile; all pilot execution resources stopped",
+  "phase": "phase6-rollback-observation",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "providerRequests": 0,
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "residualOwnedAppContainers": 0,
+  "residualPilotProcesses": 0,
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "status": "PASS",
+  "userAuthorizedProfileMetadataCreated": true,
+  "userHomesOrArchivesDeleted": false
+}

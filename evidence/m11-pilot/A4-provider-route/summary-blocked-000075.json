@@ -1,0 +1,54 @@
+{
+  "actor": "codex-pilot-operator",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "authorization-pending-000073.json",
+    "preflight-blocked-000074.json",
+    "profile-created-000072.json"
+  ],
+  "authorizationRef": "authorization-pending-000073.json",
+  "claim": "Live provider route NOT PROVEN",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "costUsd": 0,
+  "credentialClass": "none-live",
+  "credentialValuesRead": false,
+  "evidenceId": "M11-20261019-000075",
+  "execution": "NOT STARTED",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "5e22fb3316fcbea7e9d7acf04003cbb7b3d89d40bd6dc5fa7ab162f002575719"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase5-provider-route",
+  "profileCreated": true,
+  "profileEnabled": false,
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "providerRequests": 0,
+  "reason": "Pilot profile now exists, but no protected scoped/ephemeral credential, concrete model or verified cost enforcement is available",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "m11-pilot-route",
+  "status": "BLOCKED",
+  "userInputNeeded": "Provision one pilot scoped/ephemeral provider key through normal protected vault and identify the model; never send secret in conversation"
+}

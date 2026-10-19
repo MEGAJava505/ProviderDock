@@ -1,0 +1,6 @@
+2026-10-19T08:00:38Z..08:07:44Z Local bounded isolation diagnosis; all failed observations retained in diagnosis-continuation-000037.json. Zero actual OMP/provider requests during diagnosis.
+2026-10-19T08:07:43Z..08:07:44Z PASS host positive loopback control, contained write allowed/outside read denied, contained network denied; capabilities 0, low integrity, Job cap 1.
+2026-10-19T08:11:12Z..08:12:01Z STOP first actual ACP attempt: runtime 18.0.4 and native source created; incorrect default-directory session/list linkage check failed. Own Job closed. Overall 45-second budget not proven.
+2026-10-19T08:13Z..08:17Z Automatic approval rejected agent-authored repeat record; rejected command did not execute. Stop/correction retained. User subsequently explicitly approved exactly one corrected A1 repeat.
+2026-10-19T08:17:52Z..08:17:53Z PASS fresh inert isolation preflight. Earlier profile cleanup preserved native source.
+2026-10-19T08:18:47Z..08:18:54Z PASS approved corrected actual ACP initialize/session-new/EOF; version 18.0.4, native header matched, exit 0, stderr 0, provider requests/cost 0.

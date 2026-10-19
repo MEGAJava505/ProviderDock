@@ -1,0 +1,69 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "Source snapshot and restored checkout available; only final hash/postchecks remain",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "authorization-continuation-000070.json",
+    "../phase0-preparation/snapshot-observation.json",
+    "../A4-provider-route/summary-blocked-000069.json"
+  ],
+  "authorizationRef": "authorization-continuation-000070.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "environmentAttestation": {
+    "isolatedPilot": true,
+    "originalUserStateMutated": false,
+    "snapshotMechanism": "Readonly file attributes plus pinned SHA-256; not WORM"
+  },
+  "evidenceId": "M11-20261019-000071",
+  "expectedResult": "Bundle hash, restored Git tree and native preserved source hashes match; no residual own processes/profiles; user data retained",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000071.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "174e6a9d6eee18119f74c321910c68d6f4e36e71014a4b532e201f9c6bc2a5e3"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "networkEgressObservation": {
+    "finalResidualChecksPending": true,
+    "ownedBrokersExited": true,
+    "providerRequests": 0
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "osIsolationAttestation": {
+    "globalPolicyChanged": false,
+    "ownedAppContainerDeletionObserved": true
+  },
+  "phase": "phase6-rollback-observation",
+  "preflightId": "m11-rollback-final-observation",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "initiated"
+  },
+  "routeIdRedacted": "none",
+  "runId": "m11-rollback-from-readonly-bundle",
+  "sideEffectAssessment": "Own profile removed after preserving native source; no user homes or archives removed",
+  "status": "PASS",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:29:52.396Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:29:52.396Z"
+  }
+}

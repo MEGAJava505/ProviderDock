@@ -1,0 +1,80 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "All linkage true; source hash unchanged; exit 0; 0 provider requests",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [],
+  "authorizationRef": "authorization-continuation-000050.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "evidenceId": "M11-20261019-000052",
+  "expectedResult": "Same native session/file/model and unchanged source after clean terminal exit",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "216e39480cdabc405a320ab2e915400f04eb82aa423c393c74ddf181539cdd2d"
+  },
+  "nativeResumeLinkage": {
+    "sessionIdentityHash": "08e63263d35c01db7352ba4b9a537eca08205e7755407a6b4c7203be03db26dd",
+    "sourceHash": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea",
+    "sourceRun": "../A1-actual-binary/actual-launch-pass-000047.json"
+  },
+  "observation": {
+    "endedAtUtc": "2026-10-19T08:20:23Z",
+    "exitCode": 0,
+    "immutableSourceCopyHashMatches": true,
+    "isStreaming": false,
+    "messageCount": 0,
+    "nativeSessionIdSha256": "08e63263d35c01db7352ba4b9a537eca08205e7755407a6b4c7203be03db26dd",
+    "phase": "phase3-native-resume",
+    "processAttestation": {
+      "activeProcessLimit": 1,
+      "capabilityCount": 0,
+      "childProcessCreationDenied": false,
+      "inheritedHandlesRestrictedToStdio": true,
+      "integrityRid": 4096,
+      "isAppContainer": true,
+      "jobKillOnClose": true,
+      "packageIdentityMatches": true
+    },
+    "providerCostUsd": 0,
+    "providerRequests": 0,
+    "rawFramesPersisted": false,
+    "resumeAttempts": 1,
+    "sameNativeSessionId": true,
+    "sameNativeSourceFile": true,
+    "samePinnedModel": true,
+    "sourceStateHashAfter": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea",
+    "sourceStateHashBefore": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea",
+    "sourceUnchanged": true,
+    "startedAtUtc": "2026-10-19T08:20:21Z",
+    "status": "PASS",
+    "stderrBytes": 0,
+    "stdoutBytes": 27523
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "phase": "phase3-native-resume",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "none",
+  "status": "PASS"
+}

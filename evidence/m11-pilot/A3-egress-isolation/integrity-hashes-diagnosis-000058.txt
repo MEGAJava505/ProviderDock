@@ -1,0 +1,3 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+44a1c59206dafd17488d6ae8598f77766a7a53ed14b4d13a76c225fd62932a31  authorization-local-diagnosis-000058.json
+04b9ef302b2580f7b6654aa476969aa1f8b94e1bda8958c55391df0896088620  egress-stop-000057.json

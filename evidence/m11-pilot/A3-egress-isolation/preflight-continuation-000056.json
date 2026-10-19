@@ -1,0 +1,84 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "A1/A2 accepted; existing AppContainer and Job retained; exact-route broker configured without changing global policy",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "authorization-continuation-000055.json",
+    "../A2-native-resume/summary-pass-000054.json"
+  ],
+  "authorizationRef": "authorization-continuation-000055.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none",
+  "environmentAttestation": {
+    "isolatedHomeAndTemp": true,
+    "liveCredentialValuesRead": false,
+    "minimalExplicitEnvironment": true,
+    "originalVaultOpened": false,
+    "snapshotHashesVerified": true,
+    "sourceCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035"
+  },
+  "evidenceId": "M11-20261019-000056",
+  "expectedResult": "OS-attested direct external denial, denied child and broker route, one permitted external TLS HEAD via explicit broker; complete teardown",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-preflight-000056.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "96fad2b8c821af0c08ec284124d8ab9f8c481f94a23845c0c370cea4b8a5d8a6"
+  },
+  "nativeResumeLinkage": {
+    "acceptedRunRef": "../A2-native-resume/native-resume-pass-000052.json",
+    "sourceStateSha256": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea"
+  },
+  "networkEgressObservation": {
+    "monitor": "Controlled AppContainer socket errors plus broker TLS peer/request/byte counters; no packet payload or host-wide claim",
+    "policyRevision": "m11-appcontainer-stdio-broker-exact-route-v1",
+    "status": "PASS-for-readiness"
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "osIsolationAttestation": {
+    "accepted": true,
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "fixtureWrite": true,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "outsideFixtureReadDenied": true,
+    "packageIdentityMatches": true,
+    "profileIdentityHash": "dbc2e5a58686c64a0fada414de11a9978295480769b7e55ab0e6699bb0f37235"
+  },
+  "phase": "phase4-egress-isolation",
+  "preflightId": "m11-a3-exact-route-broker",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 1
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "m11-iana-control",
+  "runId": "m11-a3-bounded-control-1",
+  "sideEffectAssessment": "Expected public control access log possible; no account, credential or provider mutation",
+  "status": "PASS",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:22:40.391Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:22:40.386Z"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualOmpLaunches": {
+    "A1": 2,
+    "A2NativeResume": 1,
+    "acceptedA1Attempts": 1,
+    "correctedA1ExplicitlyApprovedByUser": true,
+    "firstA1StopPreserved": true,
+    "total": 3
+  },
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "auditSourceIndex": "audit-source-index-000079.json",
+  "claims": {
+    "actualOmpExe": "PASS-observed-pending-external-review",
+    "externalEgressIsolation": "PASS-for-attested-AppContainer-plus-fixed-stdio-broker-pending-external-review",
+    "liveProviderRoute": "NOT PROVEN",
+    "nativeResume": "PASS-observed-pending-external-review"
+  },
+  "cleanup": {
+    "newInactivePilotProfileRetained": true,
+    "ownedAppContainers": 0,
+    "ownedPilotProcesses": 0,
+    "userHomesOrArchivesDeleted": false
+  },
+  "currentArtifacts": {
+    "A1": "A1-actual-binary/summary-pass-000049.json",
+    "A2": "A2-native-resume/summary-pass-000054.json",
+    "A3": "A3-egress-isolation/summary-pass-000064.json",
+    "A4": "A4-provider-route/summary-blocked-000075.json",
+    "phase0": "phase0-preparation/summary.json",
+    "rollback": "phase6-rollback-observation/summary-pass-000078.json"
+  },
+  "evidenceId": "M11-20261019-000080",
+  "executionScope": "Sequential M11 actual pilot; preserve all historical stops; A4 held on missing protected credential, not claimed complete",
+  "externalControlRequests": 1,
+  "externalPilotAccepted": false,
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-continuation-000080.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "0ce4a1129ae9d6f788689e4ab63fca17e78d5e2d5c4d6b663d66620eddbf4044"
+  },
+  "integrityPolicy": {
+    "currentCoverage": "integrity-hashes-continuation-000080.txt covers complete evidence tree except itself",
+    "diagnosticStatus": "local-diagnosis-000059 uses diagnostic-only status; it does not authorize or accept external phase; phase acceptance is summary-pass-000064",
+    "historicalFiles": "Unchanged from prior published commit; original manifests cover original file sets",
+    "phaseCoverage": "Each integrity-hashes-final-20261019.txt covers complete phase directory except itself",
+    "unpublishedLegacyManifestReferenceCorrection": {
+      "A1-actual-binary/authorization-resume-000036.json": "A1-actual-binary/integrity-hashes-preflight-000039.txt"
+    }
+  },
+  "liveCredentialValuesRead": false,
+  "liveProviderRequests": 0,
+  "phase": "pilot-final-continuation",
+  "phaseStatus": {
+    "phase0": "PASS",
+    "phase1": "PASS",
+    "phase2": "PASS",
+    "phase3": "PASS",
+    "phase4": "PASS",
+    "phase5": "BLOCKED; live request NOT STARTED",
+    "phase6": "PASS"
+  },
+  "pilotProfile": {
+    "automaticHealthProbes": false,
+    "createdByExplicitUserRequest": true,
+    "enabled": false,
+    "productionDefaultChanged": false,
+    "profileId": "m11-pilot",
+    "protectedCredentialPresent": false,
+    "routeIdRedacted": "m11-pilot-route"
+  },
+  "providerCostUsd": 0,
+  "remainingRequiredInput": "Protected scoped/ephemeral credential and concrete allowlisted model with enforceable cost cap for m11-pilot; no token in chat",
+  "status": "BLOCKED"
+}

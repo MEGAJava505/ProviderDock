@@ -1,0 +1,87 @@
+{
+  "acceptedObservationRef": "summary-blocked-000075.json",
+  "actor": "codex-pilot-operator",
+  "actualResult": "Inactive m11-pilot profile created by explicit user instruction and verified. Protected scoped/ephemeral credential absent, concrete model/cost enforcement missing; no live request executed",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "preflight-blocked-000074.json",
+    "summary-blocked-000075.json",
+    "run-log-continuation-20261019.txt"
+  ],
+  "authorizationRef": "authorization-pending-000073.json",
+  "claim": "Reviewed complete phase evidence; external acceptance remains subject to independent review",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "unavailable; scoped/ephemeral required",
+  "environmentAttestation": {
+    "automaticHealthProbes": false,
+    "configuredProfileCount": 1,
+    "credentialValuesRead": false,
+    "pilotProfileEnabled": false,
+    "userAuthorizedProfileMetadataCreated": true
+  },
+  "evidenceId": "M11-20261019-000085",
+  "expectedResult": "One named configured protected pilot route with caps before one request",
+  "gate": "A4",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-review-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "9aac6380e9b015a1be13c94c0a3e52ff3e5cc8ba771f89bcd4fb8c83debde280"
+  },
+  "nativeResumeLinkage": "../A2-native-resume/native-resume-pass-000052.json",
+  "networkEgressObservation": {
+    "credentialAccesses": 0,
+    "liveProviderRequests": 0
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "osIsolationAttestation": {
+    "accepted": true,
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "fixtureWrite": true,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "outsideFixtureReadDenied": true,
+    "packageIdentityMatches": true,
+    "profileIdentityHash": "dbc2e5a58686c64a0fada414de11a9978295480769b7e55ab0e6699bb0f37235"
+  },
+  "phase": "phase5-provider-route",
+  "phaseExecution": "NOT STARTED",
+  "preflightId": "m11-a4-profile-created-no-credential",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1; no secrets/raw headers/transcripts/payloads/endpoints/absolute paths",
+  "remainingInput": "Provision one pilot scoped/ephemeral provider key through normal protected vault and identify the model; never send secret in conversation",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "Provider/inference HTTP requests within this phase"
+  },
+  "reviewCorrection": "Consolidates previously recorded facts into full schema and explicitly labels counter scope; earlier observations and manifests remain unchanged",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "m11-pilot-route",
+  "runId": "not-started",
+  "sideEffectAssessment": "Expected user-authorized inactive profile metadata creation; no credential value read, no previous profile overwritten, no production default change",
+  "status": "BLOCKED",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:35:02.256Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:33:18.936Z"
+  }
+}

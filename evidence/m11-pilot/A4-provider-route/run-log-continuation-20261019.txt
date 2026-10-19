@@ -1,0 +1,4 @@
+2026-10-19T08:26:30Z Metadata-only inventory: standard ProviderDock repository had 0 profiles; no key read and no provider request.
+2026-10-19T08:28Z BLOCKED live-route preflight; user asked to identify/configure protected pilot profile; no execution.
+2026-10-19T08:33:18Z User instructed creating a new profile if previous profile absent. Created m11-pilot via built-in factory; persisted readback verified, disabled, autohealth off, no protected key present.
+FINAL BLOCKED: inactive profile exists; scoped/ephemeral protected credential, concrete model/cost enforcement and execution UTC window missing. Live provider requests/cost 0. No retry.

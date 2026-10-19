@@ -1,0 +1,38 @@
+{
+  "acceptanceLimit": "A4 remains BLOCKED and external review pending; validation does not claim live provider acceptance",
+  "actor": "codex-pilot-operator",
+  "checks": {
+    "actualA1ElapsedWithinCap": true,
+    "all55PreviouslyPublishedFilesUnchanged": true,
+    "allManifestEntries": true,
+    "canonicalJson": true,
+    "currentPreflightSchemas": 5,
+    "mandatoryPhaseDirectories": 6,
+    "nativeResumeHashAndIdentityLinked": true,
+    "positiveAndNegativeExternalNetworkProof": true,
+    "recordHashes": true,
+    "redactionScan": "PASS",
+    "rollbackSourceAndPostchecks": true,
+    "uniqueContiguousEvidenceIds": true
+  },
+  "evidenceId": "M11-20261019-000081",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes-final-000081.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "e348776e1ffce79f670f38445b8343eeae9bda213bdd4a1cbe03e186e0c564c4"
+  },
+  "legacyRecordManifestReferenceCorrection": {
+    "effectiveManifest": "A1-actual-binary/integrity-hashes-preflight-000039.txt",
+    "reason": "Unpublished continuation authorization was initially written with the original writer default; original historical manifests remain unchanged; actual byte hash is covered by later append-only manifests",
+    "record": "A1-actual-binary/authorization-resume-000036.json"
+  },
+  "manifestCoverageCorrection": "integrity-hashes-final-000081.txt is the final complete root manifest and supersedes the earlier 000080 root coverage snapshot. The added root integrity-hashes-continuation-20261019.txt supplies the audit index record manifest reference.",
+  "observedAtUtc": "2026-10-19T08:37:02.543Z",
+  "phase": "final-evidence-validation",
+  "status": "PASS",
+  "statusIndex": "pilot-status-continuation-000080.json"
+}

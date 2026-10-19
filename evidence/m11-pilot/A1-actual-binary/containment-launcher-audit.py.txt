@@ -1,0 +1,333 @@
+import ctypes as C
+from ctypes import wintypes as W
+import hashlib
+import json
+import os
+from pathlib import Path
+import socket
+import subprocess
+import sys
+import time
+import uuid
+import msvcrt
+import re
+
+ROOT = Path(__file__).resolve().parent / 'm11-appcontainer-owned-20261019'
+WORK = ROOT / 'work'
+PROGRAM = ROOT / 'program'
+VARIANT = sys.argv[1] if len(sys.argv) > 1 else 'base'
+if VARIANT not in ['base', 'no-active-limit', 'no-child-policy', 'new-console', 'system-env']:
+    raise RuntimeError('Unknown diagnostic variant')
+REPORT_TAG = sys.argv[2] if len(sys.argv) > 2 else VARIANT
+if not re.fullmatch(r'[a-z0-9-]+', REPORT_TAG):
+    raise RuntimeError('Invalid diagnostic report tag')
+OBSERVATION = ROOT / ('resume-observation-' + REPORT_TAG + '.json')
+STATE = ROOT / 'controller-state.json'
+K = C.WinDLL('kernel32', use_last_error=True)
+A = C.WinDLL('advapi32', use_last_error=True)
+U = C.WinDLL('userenv', use_last_error=True)
+O = C.WinDLL('ole32', use_last_error=True)
+P = C.c_void_p
+SIZE = C.c_size_t
+
+class SECURITY_ATTRIBUTES(C.Structure):
+    _fields_ = [('nLength', W.DWORD), ('lpSecurityDescriptor', P), ('bInheritHandle', W.BOOL)]
+
+class STARTUPINFO(C.Structure):
+    _fields_ = [('cb', W.DWORD), ('lpReserved', W.LPWSTR), ('lpDesktop', W.LPWSTR), ('lpTitle', W.LPWSTR),
+                ('dwX', W.DWORD), ('dwY', W.DWORD), ('dwXSize', W.DWORD), ('dwYSize', W.DWORD),
+                ('dwXCountChars', W.DWORD), ('dwYCountChars', W.DWORD), ('dwFillAttribute', W.DWORD),
+                ('dwFlags', W.DWORD), ('wShowWindow', W.WORD), ('cbReserved2', W.WORD),
+                ('lpReserved2', P), ('hStdInput', W.HANDLE), ('hStdOutput', W.HANDLE), ('hStdError', W.HANDLE)]
+
+class STARTUPINFOEX(C.Structure):
+    _fields_ = [('StartupInfo', STARTUPINFO), ('lpAttributeList', P)]
+
+class PROCESS_INFORMATION(C.Structure):
+    _fields_ = [('hProcess', W.HANDLE), ('hThread', W.HANDLE), ('dwProcessId', W.DWORD), ('dwThreadId', W.DWORD)]
+
+class SECURITY_CAPABILITIES(C.Structure):
+    _fields_ = [('AppContainerSid', P), ('Capabilities', P), ('CapabilityCount', W.DWORD), ('Reserved', W.DWORD)]
+
+class BASIC_LIMITS(C.Structure):
+    _fields_ = [('ProcessTime', C.c_longlong), ('JobTime', C.c_longlong), ('LimitFlags', W.DWORD),
+                ('MinimumWorkingSetSize', SIZE), ('MaximumWorkingSetSize', SIZE), ('ActiveProcessLimit', W.DWORD),
+                ('Affinity', SIZE), ('PriorityClass', W.DWORD), ('SchedulingClass', W.DWORD)]
+
+class EXTENDED_LIMITS(C.Structure):
+    _fields_ = [('BasicLimitInformation', BASIC_LIMITS), ('IoInfo', C.c_ulonglong * 6),
+                ('ProcessMemoryLimit', SIZE), ('JobMemoryLimit', SIZE), ('PeakProcessMemoryUsed', SIZE), ('PeakJobMemoryUsed', SIZE)]
+
+def signature(dll, name, result, arguments):
+    function = getattr(dll, name)
+    function.restype = result
+    function.argtypes = arguments
+    return function
+
+create_profile = signature(U, 'CreateAppContainerProfile', C.c_long, [W.LPCWSTR, W.LPCWSTR, W.LPCWSTR, P, W.DWORD, C.POINTER(P)])
+delete_profile = signature(U, 'DeleteAppContainerProfile', C.c_long, [W.LPCWSTR])
+get_profile_folder = signature(U, 'GetAppContainerFolderPath', C.c_long, [W.LPCWSTR, C.POINTER(W.LPWSTR)])
+task_free = signature(O, 'CoTaskMemFree', None, [P])
+free_sid = signature(A, 'FreeSid', P, [P])
+convert_sid = signature(A, 'ConvertSidToStringSidW', W.BOOL, [P, C.POINTER(W.LPWSTR)])
+equal_sid = signature(A, 'EqualSid', W.BOOL, [P, P])
+local_free = signature(K, 'LocalFree', P, [P])
+initialize_attributes = signature(K, 'InitializeProcThreadAttributeList', W.BOOL, [P, W.DWORD, W.DWORD, C.POINTER(SIZE)])
+update_attribute = signature(K, 'UpdateProcThreadAttribute', W.BOOL, [P, W.DWORD, SIZE, P, SIZE, P, P])
+delete_attributes = signature(K, 'DeleteProcThreadAttributeList', None, [P])
+create_process = signature(K, 'CreateProcessW', W.BOOL, [W.LPCWSTR, W.LPWSTR, P, P, W.BOOL, W.DWORD, P, W.LPCWSTR, P, C.POINTER(PROCESS_INFORMATION)])
+close_handle = signature(K, 'CloseHandle', W.BOOL, [W.HANDLE])
+create_job = signature(K, 'CreateJobObjectW', W.HANDLE, [P, W.LPCWSTR])
+set_job = signature(K, 'SetInformationJobObject', W.BOOL, [W.HANDLE, C.c_int, P, W.DWORD])
+assign_job = signature(K, 'AssignProcessToJobObject', W.BOOL, [W.HANDLE, W.HANDLE])
+terminate_job = signature(K, 'TerminateJobObject', W.BOOL, [W.HANDLE, W.UINT])
+terminate_process = signature(K, 'TerminateProcess', W.BOOL, [W.HANDLE, W.UINT])
+resume_thread = signature(K, 'ResumeThread', W.DWORD, [W.HANDLE])
+wait_process = signature(K, 'WaitForSingleObject', W.DWORD, [W.HANDLE, W.DWORD])
+get_exit = signature(K, 'GetExitCodeProcess', W.BOOL, [W.HANDLE, C.POINTER(W.DWORD)])
+open_token = signature(A, 'OpenProcessToken', W.BOOL, [W.HANDLE, W.DWORD, C.POINTER(W.HANDLE)])
+token_information = signature(A, 'GetTokenInformation', W.BOOL, [W.HANDLE, C.c_int, P, W.DWORD, C.POINTER(W.DWORD)])
+sid_count = signature(A, 'GetSidSubAuthorityCount', C.POINTER(C.c_ubyte), [P])
+sid_authority = signature(A, 'GetSidSubAuthority', C.POINTER(W.DWORD), [P, W.DWORD])
+
+def check(result, operation):
+    if not result:
+        raise RuntimeError(operation + ':win32=' + str(C.get_last_error()))
+    return result
+
+def token_value(handle, kind):
+    size = W.DWORD()
+    token_information(handle, kind, None, 0, C.byref(size))
+    buffer = C.create_string_buffer(size.value)
+    check(token_information(handle, kind, buffer, size.value, C.byref(size)), 'token-info')
+    return buffer
+
+def environment_block():
+    values = {key: os.environ[key] for key in ['SYSTEMROOT', 'WINDIR', 'COMSPEC'] if key in os.environ}
+    if VARIANT == 'system-env':
+        for key in ['SYSTEMDRIVE', 'PATH', 'PATHEXT', 'OS', 'PROCESSOR_ARCHITECTURE', 'NUMBER_OF_PROCESSORS']:
+            if key in os.environ:
+                values[key] = os.environ[key]
+    for key in ['TEMP', 'TMP', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA']:
+        values[key] = str(WORK)
+    return C.create_unicode_buffer('\0'.join(key + '=' + values[key] for key in sorted(values)) + '\0\0')
+
+class ContainedProcess:
+    def __init__(self, executable, arguments, sid, timeout_ms=10000):
+        self.in_read, self.in_write = os.pipe()
+        self.out_read, self.out_write = os.pipe()
+        self.err_read, self.err_write = os.pipe()
+        self.child_fds = [self.in_read, self.out_write, self.err_write]
+        child_handles = [msvcrt.get_osfhandle(fd) for fd in self.child_fds]
+        for handle in child_handles:
+            os.set_handle_inheritable(handle, True)
+        self.info = PROCESS_INFORMATION()
+        self.job = None
+        self.attributes = None
+        self.started = False
+        size = SIZE()
+        initialize_attributes(None, 3, 0, C.byref(size))
+        self.attributes = C.create_string_buffer(size.value)
+        check(initialize_attributes(self.attributes, 3, 0, C.byref(size)), 'attributes-init')
+        capabilities = SECURITY_CAPABILITIES(sid, None, 0, 0)
+        child_policy = W.DWORD(0 if VARIANT == 'no-child-policy' else 1)
+        inherited = (W.HANDLE * 3)(*child_handles)
+        check(update_attribute(self.attributes, 0, 0x20009, C.byref(capabilities), C.sizeof(capabilities), None, None), 'attributes-security')
+        check(update_attribute(self.attributes, 0, 0x2000E, C.byref(child_policy), C.sizeof(child_policy), None, None), 'attributes-child-policy')
+        check(update_attribute(self.attributes, 0, 0x20002, inherited, C.sizeof(inherited), None, None), 'attributes-handles')
+        startup = STARTUPINFOEX()
+        startup.StartupInfo.cb = C.sizeof(startup)
+        startup.StartupInfo.dwFlags = 0x100
+        startup.StartupInfo.dwFlags |= 1
+        startup.StartupInfo.wShowWindow = 0
+        startup.StartupInfo.hStdInput, startup.StartupInfo.hStdOutput, startup.StartupInfo.hStdError = child_handles
+        startup.lpAttributeList = C.cast(self.attributes, P)
+        environment = environment_block()
+        command = C.create_unicode_buffer(subprocess.list2cmdline([str(executable)] + arguments))
+        console_flag = 0x10 if VARIANT == 'new-console' else 0x8000000
+        check(create_process(str(executable), command, None, None, True, 0x80000 | 0x400 | 0x4 | console_flag, environment, str(WORK), C.byref(startup), C.byref(self.info)), 'create-process')
+        try:
+            self.job = check(create_job(None, None), 'job-create')
+            limits = EXTENDED_LIMITS()
+            limits.BasicLimitInformation.LimitFlags = 0x2000 | (0 if VARIANT == 'no-active-limit' else 0x8)
+            limits.BasicLimitInformation.ActiveProcessLimit = 0 if VARIANT == 'no-active-limit' else 1
+            check(set_job(self.job, 9, C.byref(limits), C.sizeof(limits)), 'job-limits')
+            check(assign_job(self.job, self.info.hProcess), 'job-assign')
+            token = W.HANDLE()
+            check(open_token(self.info.hProcess, 8, C.byref(token)), 'process-token')
+            try:
+                is_container = W.DWORD.from_buffer(token_value(token, 29)).value == 1
+                capabilities_count = W.DWORD.from_buffer(token_value(token, 30)).value
+                # Keep the buffer alive while comparing its SID pointer.
+                package_buffer = token_value(token, 31)
+                package_sid = C.cast(package_buffer, C.POINTER(P))[0]
+                same_sid = bool(equal_sid(package_sid, sid))
+                integrity_buffer = token_value(token, 25)
+                integrity_sid = C.cast(integrity_buffer, C.POINTER(P))[0]
+                count = sid_count(integrity_sid)[0]
+                integrity = sid_authority(integrity_sid, count - 1)[0]
+                self.attestation = {'isAppContainer': is_container, 'capabilityCount': capabilities_count, 'packageIdentityMatches': same_sid, 'integrityRid': integrity, 'jobKillOnClose': True, 'activeProcessLimit': limits.BasicLimitInformation.ActiveProcessLimit, 'childProcessCreationDenied': child_policy.value == 1, 'inheritedHandlesRestrictedToStdio': True}
+                if not is_container or capabilities_count != 0 or not same_sid or integrity != 4096:
+                    raise RuntimeError('process-attestation-rejected')
+            finally:
+                close_handle(token)
+            if resume_thread(self.info.hThread) == 0xFFFFFFFF:
+                raise RuntimeError('resume-thread-failed')
+            self.started = True
+        except Exception:
+            terminate_process(self.info.hProcess, 1)
+            wait_process(self.info.hProcess, 3000)
+            self.close()
+            raise
+        for fd in self.child_fds:
+            os.close(fd)
+        self.child_fds = []
+        self.timeout_ms = timeout_ms
+
+    def finish(self):
+        os.close(self.in_write)
+        self.in_write = None
+        outcome = wait_process(self.info.hProcess, self.timeout_ms)
+        if outcome == 258:
+            terminate_job(self.job, 124)
+            wait_process(self.info.hProcess, 3000)
+            raise RuntimeError('contained-process-deadline')
+        check(outcome == 0, 'wait-process')
+        result = W.DWORD()
+        check(get_exit(self.info.hProcess, C.byref(result)), 'exit-code')
+        with os.fdopen(self.out_read, 'rb') as stream:
+            output = stream.read(65537)
+        self.out_read = None
+        with os.fdopen(self.err_read, 'rb') as stream:
+            error_output = stream.read(65537)
+        self.err_read = None
+        if len(output) > 65536 or len(error_output) > 65536:
+            raise RuntimeError('probe-output-bound-exceeded')
+        return result.value, output, error_output
+
+    def close(self):
+        if self.job:
+            close_handle(self.job)
+            self.job = None
+        for name in ['hThread', 'hProcess']:
+            handle = getattr(self.info, name)
+            if handle:
+                close_handle(handle)
+                setattr(self.info, name, None)
+        if self.attributes:
+            delete_attributes(self.attributes)
+            self.attributes = None
+        for key in ['in_write', 'out_read', 'err_read']:
+            fd = getattr(self, key, None)
+            if fd is not None:
+                os.close(fd)
+                setattr(self, key, None)
+        for fd in self.child_fds:
+            os.close(fd)
+        self.child_fds = []
+
+def grant(path, sid_text, rights):
+    process = subprocess.run(['icacls.exe', str(path), '/grant', '*' + sid_text + ':' + rights], capture_output=True, timeout=5, creationflags=0x8000000)
+    if process.returncode != 0:
+        raise RuntimeError('owned-fixture-acl-rejected:exit=' + str(process.returncode))
+
+def preflight():
+    global WORK
+    canary = ROOT / 'outside-fixture-canary.txt'
+    canary.write_text('inert-outside-fixture-canary', encoding='utf8')
+    sid = P()
+    name = 'ProviderDock.M11.' + uuid.uuid4().hex
+    process = None
+    created = False
+    keep = False
+    observed = {'status': 'NOT PROVEN', 'variant': VARIANT, 'actualOmpExecuted': False, 'policyRevision': 'm11-appcontainer-native-profile-no-network-v2', 'actor': 'codex-pilot-operator', 'startedAtUtc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+    listener = socket.socket()
+    try:
+        result = create_profile(name, 'ProviderDock M11 bounded isolation', 'Owned pilot profile; no network capabilities', None, 0, C.byref(sid))
+        observed['profileCreateHresult'] = result
+        if result != 0:
+            raise RuntimeError('profile-create-failed:hresult=' + str(result))
+        created = True
+        text = W.LPWSTR()
+        check(convert_sid(sid, C.byref(text)), 'sid-format')
+        try:
+            sid_text = text.value
+        finally:
+            local_free(C.cast(text, P))
+        profile_folder = W.LPWSTR()
+        folder_result = get_profile_folder(sid_text, C.byref(profile_folder))
+        if folder_result != 0:
+            raise RuntimeError('profile-folder-failed:hresult=' + str(folder_result))
+        try:
+            WORK = Path(profile_folder.value) / 'Temp' / 'm11-inert-fixture'
+        finally:
+            task_free(C.cast(profile_folder, P))
+        WORK.mkdir(parents=True, exist_ok=True)
+        observed['workDirectoryPolicy'] = 'Native owned AppContainer profile Temp; no filesystem integrity-label change requested'
+        grant(ROOT, sid_text, '(RX)')
+        grant(PROGRAM, sid_text, '(OI)(CI)(RX)')
+        listener.bind((APPROVED_LOOPBACK_HOST, 0))
+        listener.listen(1)
+        host_control = socket.create_connection(listener.getsockname(), timeout=2)
+        accepted_control, _ = listener.accept()
+        accepted_control.close()
+        host_control.close()
+        observed['hostPositiveControlConnected'] = True
+        process = ContainedProcess(PROGRAM / 'node-probe.exe', ['--preserve-symlinks-main', str(PROGRAM / 'isolation-probe.mjs'), str(WORK), str(canary), str(listener.getsockname()[1])], sid)
+        observed['processAttestation'] = process.attestation
+        code, output, error_output = process.finish()
+        observed['inertProbeExitCode'] = code
+        observed['stderrBytes'] = len(error_output)
+        stderr_text = error_output.decode('utf8', errors='replace')
+        observed['stderrCodes'] = sorted(set(re.findall(r"(?:code:\s*['\"]|Error:\s*)([A-Z][A-Z0-9_]+)", stderr_text)))
+        observed['stderrSyscalls'] = sorted(set(re.findall(r"syscall:\s*['\"]([a-z_]+)", stderr_text)))
+        observed['stderrKnownFileMentions'] = [name for name in ['package.json', 'isolation-probe.mjs', 'node-probe.exe'] if name in stderr_text]
+        observed['stderrErrorClasses'] = sorted(set(re.findall(r'\b([A-Za-z]+Error)\b', stderr_text)))
+        failed_paths = re.findall(r"(?:path:\s*|lstat\s*)['\"]([^'\"\r\n]+)", stderr_text)
+        observed['stderrPathClasses'] = []
+        for failed_path in failed_paths:
+            candidate = failed_path.lower().replace('\\', '/')
+            owned = str(ROOT).lower().replace('\\', '/')
+            profile_work = str(WORK).lower().replace('\\', '/')
+            kind = 'owned-program-root' if candidate.startswith(owned) else 'project-ancestor' if owned.startswith(candidate.rstrip('/') + '/') else 'native-profile-storage' if candidate.startswith(profile_work) else 'other-redacted-location'
+            observed['stderrPathClasses'].append(kind)
+        if code != 0xc0000142 and code != 0:
+            observed['stderrClassification'] = 'nonempty' if error_output else 'empty'
+        if not output:
+            raise RuntimeError('inert-startup-no-observation:exit=' + hex(code))
+        observed['probe'] = json.loads(output.decode('utf-8-sig').strip())
+        listener.settimeout(0.1)
+        try:
+            connection, _ = listener.accept()
+            connection.close()
+            accepted = 1
+        except socket.timeout:
+            accepted = 0
+        observed['loopbackConnectionsAccepted'] = accepted
+        if code != 0 or error_output or accepted != 0 or not all(observed['probe'][key] for key in ['fixtureWrite', 'outsideFixtureReadDenied', 'networkDenied']):
+            raise RuntimeError('inert-isolation-probe-rejected')
+        STATE.write_text(json.dumps({'profileName': name, 'sidText': sid_text, 'workDirectory': str(WORK), 'identityHash': hashlib.sha256(name.encode()).hexdigest()}, indent=2) + '\n', encoding='utf8')
+        keep = True
+        observed['profileIdentityHash'] = hashlib.sha256(name.encode()).hexdigest()
+        observed['profileRetainedForBoundedPilot'] = True
+        observed['status'] = 'PASS'
+    except Exception as error:
+        observed['errorClass'] = type(error).__name__
+        observed['normalizedCause'] = str(error) if isinstance(error, RuntimeError) else 'local-controller-error-no-raw-details-published'
+        observed['status'] = 'BLOCKED'
+    finally:
+        if process:
+            process.close()
+        listener.close()
+        if created and not keep:
+            observed['profileDeleteHresult'] = delete_profile(name)
+            observed['profileCleanupComplete'] = observed['profileDeleteHresult'] == 0
+        if sid:
+            free_sid(sid)
+        observed['endedAtUtc'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        OBSERVATION.write_text(json.dumps(observed, indent=2) + '\n', encoding='utf8')
+        print(json.dumps(observed))
+    return 0 if observed['status'] == 'PASS' else 1
+
+if __name__ == '__main__':
+    sys.exit(preflight())

@@ -1,0 +1,4 @@
+# SHA-256 UTF-8 LF; append-only continuation manifest
+7eb7cef54b3771fb6ecbf01c09a399025070a2f845669143d4ada587863809b5  authorization-explicit-user-000044.json
+3719c6b86a23db54ee3508c8310aa3e330b6b87b51024d93e186249806acde97  fresh-isolation-proof-000045.json
+113ace645f9fe63a3cc6bcdfa894167a7bc034b705cf149bf485a3b1db4345ed  preflight-explicit-user-pass-000046.json
