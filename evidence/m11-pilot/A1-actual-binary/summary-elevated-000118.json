@@ -1,0 +1,52 @@
+{
+    "phase":  "A1-rerun-elevated",
+    "evidenceId":  "M11-20261019-000118",
+    "runId":  "M11-A1-RERUN-ELEVATED-20261019-000108",
+    "handoffCommit":  "df5391199daf944f59d871e45db27018c85859a0",
+    "status":  "BLOCKED",
+    "a1":  "NOT PROVEN",
+    "a4":  "BLOCKED",
+    "opensA4Gate":  false,
+    "stoppedAtStep":  1,
+    "reason":  "Actual executing PowerShell token is not elevated: IsAdmin=false; integrity Medium (S-1-16-8192); SeSystemProfilePrivilege absent. Handoff requires STOP.",
+    "observationRef":  "token-readback-000109.json",
+    "runLogRef":  "run-log-elevated-000116.txt",
+    "actualLaunches":  0,
+    "retries":  0,
+    "launchBudgetConsumed":  false,
+    "liveInferenceRequests":  0,
+    "inferenceCost":  0,
+    "futureExecutionAuthorizationIssued":  false,
+    "providerMetadata":  "NOT PERFORMED",
+    "ownedEtwSessionsCreated":  0,
+    "selfTest":  "NOT PERFORMED",
+    "binaryPreflight":  "NOT PERFORMED",
+    "exitCode":  null,
+    "durationSeconds":  null,
+    "processTree":  null,
+    "networkCounters":  null,
+    "orphanCount":  null,
+    "runtimeSideEffects":  null,
+    "measurementsNotClaimed":  [
+                                   "EventsLost",
+                                   "decoder coverage",
+                                   "network egress",
+                                   "full process tree",
+                                   "runtime orphan count",
+                                   "fixture side effects"
+                               ],
+    "previousEvidenceFiles":  172,
+    "previousEvidencePolicy":  "Unchanged; only new files appended.",
+    "newArtifacts":  [
+                         "token-readback-000109.json",
+                         "run-log-elevated-000116.txt",
+                         "summary-elevated-000118.json",
+                         "integrity-hashes-elevated-000119.txt"
+                     ],
+    "omittedArtifactsReason":  "Authorization, provider metadata, monitoring config, preflight, process tree, network counters and side-effect attestation were not fabricated after the step-1 STOP.",
+    "nextRequirement":  "Start a new executing context with owner-confirmed UAC elevation; repeat elevation proof in the same context that creates and reads ETW. Required privileges must be Enabled before continuing. No automatic retry or actual launch was performed.",
+    "observedUtcWindow":  {
+                              "start":  "2026-10-19T15:42:13.5653945Z",
+                              "end":  "2026-10-19T15:42:13.7519255Z"
+                          }
+}

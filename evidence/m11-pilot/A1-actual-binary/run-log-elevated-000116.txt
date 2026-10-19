@@ -1,0 +1,11 @@
+runId: M11-A1-RERUN-ELEVATED-20261019-000108
+handoffCommit: df5391199daf944f59d871e45db27018c85859a0
+2026-10-19T15:42:13.5653945Z BEGIN elevation proof only
+2026-10-19T15:42:13.7519255Z whoami /groups /fo csv /nh exit=0 (public selected SID readback in token-readback-000109.json)
+2026-10-19T15:42:13.7519255Z whoami /priv /fo csv /nh exit=0 (public selected privilege readback in token-readback-000109.json)
+2026-10-19T15:42:13.7519255Z WindowsPrincipal.IsInRole(Administrator)=False; integrity=Medium
+2026-10-19T15:42:13.7519255Z STOP per handoff step 1: process is not elevated
+Provider metadata, ETW sessions, self-test, executable preflight and actual launch: NOT PERFORMED
+actualLaunches=0; retries=0; A1=NOT PROVEN; A4=BLOCKED
+No collector, helper, broker or omp process was started by this run; no runtime orphan or network measurement claimed.
+Post-stop operations limited to read-only handoff inspection and publication of append-only evidence.

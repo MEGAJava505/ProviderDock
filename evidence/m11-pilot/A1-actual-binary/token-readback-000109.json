@@ -1,0 +1,69 @@
+{
+    "phase":  "A1-rerun-elevated",
+    "evidenceId":  "M11-20261019-000109",
+    "runId":  "M11-A1-RERUN-ELEVATED-20261019-000108",
+    "handoffCommit":  "df5391199daf944f59d871e45db27018c85859a0",
+    "observedUtcWindow":  {
+                              "start":  "2026-10-19T15:42:13.5653945Z",
+                              "end":  "2026-10-19T15:42:13.7519255Z"
+                          },
+    "process":  {
+                    "role":  "PowerShell evidence command invoked by executing assistant",
+                    "pid":  28680,
+                    "creationTimeUtc":  "2026-10-19T15:42:13.2742012Z",
+                    "isFutureEtwCollector":  false
+                },
+    "commands":  [
+                     {
+                         "command":  "whoami /groups /fo csv /nh",
+                         "exitCode":  0
+                     },
+                     {
+                         "command":  "whoami /priv /fo csv /nh",
+                         "exitCode":  0
+                     },
+                     {
+                         "command":  "WindowsPrincipal.IsInRole(Administrator)",
+                         "result":  false
+                     }
+                 ],
+    "isAdmin":  false,
+    "integrity":  {
+                      "sid":  [
+                                  "S-1-16-8192"
+                              ],
+                      "level":  "Medium"
+                  },
+    "selectedGroups":  [
+                           {
+                               "sid":  "S-1-16-8192",
+                               "attributes":  ""
+                           },
+                           {
+                               "sid":  "S-1-5-32-544",
+                               "attributes":  "Group used for deny only"
+                           }
+                       ],
+    "requiredPrivilegeReadback":  [
+                                      {
+                                          "name":  "SeSystemProfilePrivilege",
+                                          "present":  false,
+                                          "state":  "Absent"
+                                      },
+                                      {
+                                          "name":  "SeDebugPrivilege",
+                                          "present":  false,
+                                          "state":  "Absent"
+                                      },
+                                      {
+                                          "name":  "SeProfileSingleProcessPrivilege",
+                                          "present":  false,
+                                          "state":  "Absent"
+                                      }
+                                  ],
+    "rawOutputPublished":  false,
+    "redaction":  "Publish relevant group SIDs/attributes and privilege names/states only; omit account names, email, machine names and paths.",
+    "elevationGate":  "FAIL",
+    "status":  "BLOCKED",
+    "actualLaunches":  0
+}

@@ -1,0 +1,7 @@
+# evidenceId: M11-20261019-000119
+# runId: M11-A1-RERUN-ELEVATED-20261019-000108
+# status: BLOCKED at elevation gate; actualLaunches=0
+# algorithm: SHA-256 of final public file bytes; manifest excludes itself
+bf431caf78bd7be7628eff9c64acb33531217f8a5d98b96bb8f333c8d0745d00  token-readback-000109.json
+bc60a1d70d9211f45aae93b3c404bfafd9187a0834dc82cf72b554812317a6b3  run-log-elevated-000116.txt
+70b1a180ec777ad187d46da02fc48db6a4424d2eb52d9ae1d2472a2c212c5a8f  summary-elevated-000118.json
