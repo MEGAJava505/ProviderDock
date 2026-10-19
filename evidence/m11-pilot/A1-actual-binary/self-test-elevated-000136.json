@@ -1,0 +1,298 @@
+{
+  "actualLaunches": 0,
+  "assessmentBy": "Codex executing assistant; evidence assessment, not independent acceptance",
+  "assessmentCorrection": "Controller compared a transient PowerShell Process.ExitCode readback with 0 and reported STOP. The negative helper and its controller both have independently decoded ETW ProcessStop ExitCode=0; no failed OS-level criterion is waived. No full self-test replay was performed for this correction.",
+  "controllerReportedReason": "Negative direct TCP self-test failed",
+  "controllerReportedStatus": "BLOCKED",
+  "denialTransportEvents": [
+    {
+      "eventId": 1044,
+      "pid": 29776,
+      "status": "0xC0000022",
+      "version": 1
+    },
+    {
+      "eventId": 1034,
+      "pid": 29776,
+      "status": "0xC0000022",
+      "version": 1
+    }
+  ],
+  "evidenceId": "M11-20261019-000136",
+  "exitReadbackRegression": "A separate inert cmd /c exit 7 returned 7 after caching Process.Handle before timed WaitForExit.",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "loopback": {
+    "client": {
+      "pid": 29648,
+      "receivedBytes": 64,
+      "requests": 1,
+      "sentBytes": 64,
+      "status": "PASS"
+    },
+    "clientPid": 29648,
+    "durationMs": 444.50980000000004,
+    "port": 64950,
+    "requests": 1,
+    "serverPid": 12688,
+    "serverReceivedBytes": 64,
+    "serverSentBytes": 64,
+    "status": "PASS"
+  },
+  "loss": [
+    {
+      "BuffersWritten": 6,
+      "EventsLost": 0,
+      "LogBuffersLost": 0,
+      "LogFileMode": 4194306,
+      "NumberOfBuffers": 25,
+      "RealTimeBuffersLost": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "kind": "Process"
+    },
+    {
+      "BuffersWritten": 5,
+      "EventsLost": 0,
+      "LogBuffersLost": 0,
+      "LogFileMode": 4194306,
+      "NumberOfBuffers": 25,
+      "RealTimeBuffersLost": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "kind": "Transport"
+    },
+    {
+      "BuffersWritten": 1,
+      "EventsLost": 0,
+      "LogBuffersLost": 0,
+      "LogFileMode": 4194306,
+      "NumberOfBuffers": 24,
+      "RealTimeBuffersLost": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "kind": "WFP"
+    },
+    {
+      "BuffersWritten": 1,
+      "EventsLost": 0,
+      "LogBuffersLost": 0,
+      "LogFileMode": 4194306,
+      "NumberOfBuffers": 24,
+      "RealTimeBuffersLost": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "kind": "DNS"
+    },
+    {
+      "BuffersWritten": 1,
+      "EventsLost": 0,
+      "LogBuffersLost": 0,
+      "LogFileMode": 4194306,
+      "NumberOfBuffers": 24,
+      "RealTimeBuffersLost": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "kind": "KernelNetwork"
+    }
+  ],
+  "negative": {
+    "actualLaunches": 0,
+    "attestation": {
+      "activeProcessLimit": 1,
+      "capabilityCount": 0,
+      "childProcessCreationDenied": false,
+      "inheritedHandlesRestrictedToStdio": true,
+      "integrityRid": 4096,
+      "isAppContainer": true,
+      "jobKillOnClose": true,
+      "packageIdentityMatches": true
+    },
+    "exitCode": 0,
+    "pid": 29776,
+    "policy": "Fresh AppContainer, zero network capabilities; active process limit 1; no actual OMP",
+    "probe": {
+      "code": "EACCES",
+      "errno": -4092,
+      "status": "PASS",
+      "syscall": "connect"
+    },
+    "profileDeleteHresult": 0,
+    "status": "PASS",
+    "stderrBytes": 0,
+    "stdoutBytes": 68,
+    "target": "192.0.2.1:443 (TEST-NET-1)"
+  },
+  "osByteEvents": [
+    {
+      "bytes": 64,
+      "eventId": 10,
+      "pid": 29648,
+      "version": 0
+    },
+    {
+      "bytes": 64,
+      "eventId": 11,
+      "pid": 29648,
+      "version": 0
+    }
+  ],
+  "phase": "A1-rerun-elevated",
+  "privateRawSources": [
+    {
+      "alias": "Process.xml",
+      "sha256": "2f676910d4a8e60dd24e35564abda988c790bb349b4a6e5aa333836d6b3aa804"
+    },
+    {
+      "alias": "Transport.xml",
+      "sha256": "388b4d1ec8117610797f0c1dfc56ca4f4b8ef84da8e6d719df93ca4f6b9bd541"
+    },
+    {
+      "alias": "WFP.xml",
+      "sha256": "6587393f3f5270bc268af92527589b729a6aa0f4947f13f2f9675072b6ef46df"
+    },
+    {
+      "alias": "DNS.xml",
+      "sha256": "b2565b46cc85c153231dcc5e108493d7bccacb27a387609f8eed5cc1fb18e4a6"
+    },
+    {
+      "alias": "KernelNetwork.xml",
+      "sha256": "49ef4b26fa116def109083e88c749195eea3fdc2d7541abfd9d6b8108cb61578"
+    }
+  ],
+  "processLifecycle": [
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:40.199783600Z",
+        "ParentProcessID": "12688",
+        "ParentProcessSequenceNumber": "14736",
+        "ProcessID": "28224",
+        "ProcessSequenceNumber": "14766"
+      },
+      "eventId": 1,
+      "version": 4
+    },
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:40.199783600Z",
+        "ExitCode": "7",
+        "ExitTime": "2026-10-19T16:58:40.293959500Z",
+        "ProcessID": "28224",
+        "ProcessSequenceNumber": "14766"
+      },
+      "eventId": 2,
+      "version": 2
+    },
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:40.325611800Z",
+        "ParentProcessID": "12688",
+        "ParentProcessSequenceNumber": "14736",
+        "ProcessID": "29648",
+        "ProcessSequenceNumber": "14768"
+      },
+      "eventId": 1,
+      "version": 4
+    },
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:40.325611800Z",
+        "ExitCode": "0",
+        "ExitTime": "2026-10-19T16:58:40.741731000Z",
+        "ProcessID": "29648",
+        "ProcessSequenceNumber": "14768"
+      },
+      "eventId": 2,
+      "version": 2
+    },
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:40.767541900Z",
+        "ParentProcessID": "12688",
+        "ParentProcessSequenceNumber": "14736",
+        "ProcessID": "29772",
+        "ProcessSequenceNumber": "14770"
+      },
+      "eventId": 1,
+      "version": 4
+    },
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:46.171021200Z",
+        "ParentProcessID": "29772",
+        "ParentProcessSequenceNumber": "14770",
+        "ProcessID": "29776",
+        "ProcessSequenceNumber": "14778"
+      },
+      "eventId": 1,
+      "version": 4
+    },
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:46.171021200Z",
+        "ExitCode": "0",
+        "ExitTime": "2026-10-19T16:58:46.270167700Z",
+        "ProcessID": "29776",
+        "ProcessSequenceNumber": "14778"
+      },
+      "eventId": 2,
+      "version": 2
+    },
+    {
+      "data": {
+        "CreateTime": "2026-10-19T16:58:40.767541900Z",
+        "ExitCode": "0",
+        "ExitTime": "2026-10-19T16:58:46.303018900Z",
+        "ProcessID": "29772",
+        "ProcessSequenceNumber": "14770"
+      },
+      "eventId": 2,
+      "version": 2
+    }
+  ],
+  "runId": "M11-A1-ELEVATED-20261019-000132",
+  "sameCriteria": true,
+  "status": "PASS",
+  "token": {
+    "endUtc": "2026-10-19T16:58:37.0690137Z",
+    "highOrSystem": true,
+    "isAdmin": true,
+    "pid": 12688,
+    "privilegeVerification": "GetTokenInformation(TokenPrivileges), SE_PRIVILEGE_ENABLED bit",
+    "privileges": [
+      {
+        "Name": "SeSystemProfilePrivilege",
+        "State": "\u0432\u043a\u043b\u044e\u0447\u0435\u043d"
+      },
+      {
+        "Name": "SeProfileSingleProcessPrivilege",
+        "State": "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d"
+      },
+      {
+        "Name": "SeDebugPrivilege",
+        "State": "\u0432\u043a\u043b\u044e\u0447\u0435\u043d"
+      }
+    ],
+    "selectedGroups": [
+      {
+        "Attributes": "",
+        "Sid": "S-1-16-12288"
+      },
+      {
+        "Attributes": "\u041e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u0430\u044f \u0433\u0440\u0443\u043f\u043f\u0430, \u0412\u043a\u043b\u044e\u0447\u0435\u043d\u044b \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e, \u0412\u043a\u043b\u044e\u0447\u0435\u043d\u043d\u0430\u044f \u0433\u0440\u0443\u043f\u043f\u0430, \u0412\u043b\u0430\u0434\u0435\u043b\u0435\u0446 \u0433\u0440\u0443\u043f\u043f\u044b",
+        "Sid": "S-1-5-32-544"
+      }
+    ],
+    "startUtc": "2026-10-19T16:58:36.6960536Z",
+    "systemProfileEnabled": true
+  },
+  "wfpDropEvents": [
+    {
+      "eventId": 1001,
+      "filterId": "0x148DA",
+      "layerId": "0x30",
+      "meaning": "WFP Packet Dropped (local provider metadata)",
+      "pid": 29776,
+      "version": 2
+    }
+  ]
+}

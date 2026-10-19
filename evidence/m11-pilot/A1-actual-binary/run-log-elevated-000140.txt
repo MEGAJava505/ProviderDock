@@ -1,0 +1,16 @@
+runId: M11-A1-ELEVATED-20261019-000132
+self-test: independently assessed PASS; original controller false STOP is retained and explained in self-test-elevated-000136.json
+diagnosis: reproduced negative helper EPERM/lstat, fixed with --preserve-symlinks-main; EACCES plus TCPIP STATUS_ACCESS_DENIED and WFP Packet Dropped then observed
+authorization/preflight: six records written before actual launch and rehashed by elevated collector
+approved UTC window: 2026-10-19T17:09:55.411500+00:00 -> 2026-10-19T17:11:55.411500+00:00
+actual collector PID 26160, High/Admin/SeSystemProfilePrivilege Enabled; token record 000144 written before sessions
+five uniquely named owned ETW sessions verified Running before Python controller CreateProcess
+2026-10-19T17:09:55.503821500Z Python controller PID 32164 spawned by collector
+2026-10-19T17:10:01.817702600Z actual OMP PID 32708 created suspended, token/Job checked, then resumed; hash matched pin
+ACP method sent: initialize; no initialize response received; no session/new and no inference
+2026-10-19T17:10:08.741964800Z actual OMP ProcessStop ExitCode=1; observed lifetime 6.924262 seconds
+STOP: process exited before initialize response. Single actual launch budget consumed; no retries.
+2026-10-19T17:10:09.7285832Z known controller/OMP processes absent; profile deletion HRESULT=0
+Observed Windows conhost child exited 0, is absent at the extended postcheck, and is included in process/network scope. It was not predeclared as an allowed helper.
+all five sessions stopped, decoded; all EventsLost/LogBuffersLost/RealTimeBuffersLost=0; actual scoped network events/bytes=0
+publish exact run failure; A1 NOT PROVEN; A4 BLOCKED

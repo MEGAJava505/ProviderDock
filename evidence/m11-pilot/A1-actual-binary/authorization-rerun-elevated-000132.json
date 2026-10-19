@@ -1,0 +1,79 @@
+{
+  "approver": "gateway-owner MEGAJava505",
+  "authorizationRef": {
+    "additionalDiagnosticApprovalQuote": "\u0414\u0430, \u0438\u0441\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c self-test",
+    "conversationApprovalTime": "Unknown; not invented",
+    "owner": "MEGAJava505",
+    "scopeQuote": "\u041e\u0434\u0438\u043d actual launch \u2014 pinned omp.exe 18.0.4; WaitForExit(45000); live requests/cost=0; \u0431\u0435\u0437 provider route, \u0431\u0435\u0437 credentials, \u0431\u0435\u0437 inference \u0438 \u043f\u043b\u0430\u0442\u043d\u044b\u0445 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432.",
+    "source": "Owner request in current conversation plus AGENT_HANDOFF.md at df53911"
+  },
+  "binary": {
+    "pathAlias": "FRESH_PINNED_OMP_BINARY",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "version": "18.0.4"
+  },
+  "evidenceId": "M11-20261019-000132",
+  "expectedResult": "Exit 0 within 45 seconds; complete observed tree, zero unexpected egress, no orphan processes, fixture-only side effects. PASS requires final evidence validation.",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "sorted-keys-pretty-json-ensure-ascii-utf8-lf",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "bd2688728db60a6b165797cfa9c06ce1b95a8f7c70e1fd2faf4a1a9cc05bb9b3"
+  },
+  "issuedAtUtc": "2026-10-19T17:09:15.411500+00:00",
+  "launchRef": "preflight-elevated-000137.json",
+  "limits": {
+    "actualJobActiveProcesses": 1,
+    "actualLaunches": 1,
+    "credentials": 0,
+    "deadlineSeconds": 45,
+    "externalBytes": 0,
+    "liveCostUsd": 0,
+    "liveInferenceRequests": 0,
+    "providerRoutes": 0,
+    "retries": 0
+  },
+  "monitoringPlan": {
+    "configRef": "monitoring-config-elevated-000135.json",
+    "configSha256": "9e38c68df435b7bd78d8cee5eae11189e53fe69c9bb0b33cb8c530c6ec658163",
+    "selfTestRef": "self-test-elevated-000136.json",
+    "selfTestSha256": "b3c176b3dc73f9444a2ecd4202c5ea2d8a28152da6bb1338d0e4c360c38d3549",
+    "sessions": [
+      "PD-A1-000132-Actual-dd77bbec6e-Process",
+      "PD-A1-000132-Actual-dd77bbec6e-Transport",
+      "PD-A1-000132-Actual-dd77bbec6e-WFP",
+      "PD-A1-000132-Actual-dd77bbec6e-DNS",
+      "PD-A1-000132-Actual-dd77bbec6e-KernelNetwork"
+    ],
+    "startBeforeActual": true,
+    "stopAfterJobAndOrphanCheck": true,
+    "tokenRef": "token-readback-actual-elevated-000144.json"
+  },
+  "observationOwner": "Codex executing assistant",
+  "phase": "A1-rerun-elevated",
+  "project": "ProviderDock/omp-integration/M11",
+  "responsible": "Codex executing assistant on owner Windows machine",
+  "runId": "M11-A1-ELEVATED-20261019-000132",
+  "scope": "Exactly one bounded inert ACP initialize -> session/new -> EOF launch under OS process/network capture; no A4",
+  "sideEffectPolicy": "Only newly owned AppContainer profile/runtime and owned private monitor artifacts; preserve prior public evidence unchanged.",
+  "status": "AUTHORIZED FOR SPECIFIED FUTURE WINDOW; execution remains gated",
+  "stopCriterion": [
+    "Incomplete preflight/self-test",
+    "Hash mismatch or changed prelaunch record",
+    "ETW session/query/decoder failure or lost event/buffer",
+    "Unexpected actual child/egress/side effect",
+    "Deadline, output cap, protocol error or nonzero exit",
+    "No retries after actual launch attempt"
+  ],
+  "supersedes": [
+    "authorization-rerun-000099.json"
+  ],
+  "utcTimeWindow": {
+    "end": "2026-10-19T17:11:55.411500+00:00",
+    "reason": "Future 120-second window; launch requires at least 55 seconds remaining for bounded launch/teardown.",
+    "start": "2026-10-19T17:09:55.411500+00:00"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "actualDescendantCount": 1,
+  "actualLaunches": 1,
+  "binaryRuntimeVersion": null,
+  "collector": {
+    "creationTimeUtc": "2026-10-19T17:09:17.0838479Z",
+    "imageAlias": "WINDOWS_POWERSHELL",
+    "imageSha256": "60c9b29843624dd8af6b6a7b26147753be6aeef65098b9a503cc50850afe410f",
+    "pid": 26160,
+    "tokenRef": "token-readback-actual-elevated-000144.json"
+  },
+  "completeActualSubtreeObserved": true,
+  "consoleHelperObservation": "Windows conhost.exe was observed as a child of OMP, exit 0. It was not declared in the prelaunch helper allowlist; do not claim zero unexpected descendants.",
+  "durationSecondsFromEtw": 6.924262,
+  "evidenceId": "M11-20261019-000138",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "jobAttestation": {
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "packageIdentityMatches": true
+  },
+  "jobPeak": null,
+  "jobPeakLimitation": "Job accounting readback was after successful protocol branch and was not reached. Active process limit=1 was enforced before resume, but the OS-created console host was observed separately. Job containment must not be treated as the complete observed process tree.",
+  "knownPidPostcheck": {
+    "atUtc": "2026-10-19T17:16:11.1815338Z",
+    "pids": [
+      32164,
+      32708,
+      15428
+    ],
+    "remaining": [],
+    "scope": "Actual Python controller, OMP and observed conhost descendant; ETW creation identities also recorded"
+  },
+  "orphanCount": 0,
+  "phase": "A1-rerun-elevated",
+  "processes": [
+    {
+      "creationTimeUtc": "2026-10-19T17:09:55.503821500Z",
+      "exitCode": 1,
+      "exitUtc": "2026-10-19T17:10:09.517349100Z",
+      "imageAlias": "ACTUAL_PYTHON_CONTROLLER",
+      "imagePathLinkage": "Exact ETW device image path matched to known DOS path using QueryDosDeviceW; raw absolute image retained privately.",
+      "imageSha256": "85b71d8c6ec1905935f74be0c9869aae198d00e98f39df699ec66f9c5a84cecd",
+      "observedImagePathSha256": "e92c9cad5adc4093fb2acab69a56b36187b0e7d25a2cc999afd443e1d0846e2e",
+      "parentPid": 26160,
+      "parentProcessSequenceNumber": "14999",
+      "pid": 32164,
+      "processSequenceNumber": "15058",
+      "spawnUtc": "2026-10-19T17:09:55.503821500Z"
+    },
+    {
+      "creationTimeUtc": "2026-10-19T17:10:01.817702600Z",
+      "exitCode": 1,
+      "exitUtc": "2026-10-19T17:10:08.741964800Z",
+      "imageAlias": "FRESH_PINNED_OMP_BINARY",
+      "imagePathLinkage": "Exact ETW device image path matched to known DOS path using QueryDosDeviceW; raw absolute image retained privately.",
+      "imageSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+      "observedImagePathSha256": "7075433358ce5f397de6d250d1a999c422f9ac9b58e128c3594dfb5f4efc5c93",
+      "parentPid": 32164,
+      "parentProcessSequenceNumber": "15058",
+      "pid": 32708,
+      "processSequenceNumber": "15061",
+      "spawnUtc": "2026-10-19T17:10:01.817702600Z"
+    },
+    {
+      "creationTimeUtc": "2026-10-19T17:10:01.828918800Z",
+      "exitCode": 0,
+      "exitUtc": "2026-10-19T17:10:08.744191400Z",
+      "imageAlias": "WINDOWS_CONSOLE_HOST",
+      "imagePathLinkage": "Exact ETW device image path matched to known DOS path using QueryDosDeviceW; raw absolute image retained privately.",
+      "imageSha256": "c86146188b78e484f32cc29e2331689659943b47689a85570342044f499938ac",
+      "observedImagePathSha256": "67ffa2ce71cf0a1daa57536d21dd5a0e29b55d2701c989c88d45c3d5df877431",
+      "parentPid": 32708,
+      "parentProcessSequenceNumber": "15061",
+      "pid": 15428,
+      "processSequenceNumber": "15062",
+      "spawnUtc": "2026-10-19T17:10:01.828918800Z"
+    }
+  ],
+  "runId": "M11-A1-ELEVATED-20261019-000132",
+  "runtimeVersionLimitation": "The initialize response was not received; pin/version from preflight is not a runtime header.",
+  "status": "OBSERVED",
+  "withinApprovedWindow": true
+}

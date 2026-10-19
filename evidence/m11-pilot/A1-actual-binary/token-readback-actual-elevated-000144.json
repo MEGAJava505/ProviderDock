@@ -1,0 +1,42 @@
+{
+    "evidenceId":  "M11-20261019-000144",
+    "phase":  "A1-rerun-elevated",
+    "runId":  "M11-A1-ELEVATED-20261019-000132",
+    "role":  "Actual ETW collector token, not OMP token",
+    "proof":  {
+                  "startUtc":  "2026-10-19T17:09:17.4129513Z",
+                  "endUtc":  "2026-10-19T17:09:17.9448072Z",
+                  "pid":  26160,
+                  "isAdmin":  true,
+                  "highOrSystem":  true,
+                  "selectedGroups":  [
+                                         {
+                                             "Sid":  "S-1-16-12288",
+                                             "Attributes":  ""
+                                         },
+                                         {
+                                             "Sid":  "S-1-5-32-544",
+                                             "Attributes":  "Обязательная группа, Включены по умолчанию, Включенная группа, Владелец группы"
+                                         }
+                                     ],
+                  "privileges":  [
+                                     {
+                                         "Name":  "SeSystemProfilePrivilege",
+                                         "State":  "включен"
+                                     },
+                                     {
+                                         "Name":  "SeProfileSingleProcessPrivilege",
+                                         "State":  "Отключен"
+                                     },
+                                     {
+                                         "Name":  "SeDebugPrivilege",
+                                         "State":  "включен"
+                                     }
+                                 ],
+                  "systemProfileEnabled":  true,
+                  "privilegeVerification":  "GetTokenInformation(TokenPrivileges), SE_PRIVILEGE_ENABLED bit"
+              },
+    "processCreationUtc":  "2026-10-19T17:09:17.0838479Z",
+    "imageAlias":  "WINDOWS_POWERSHELL",
+    "imageSha256":  "60c9b29843624dd8af6b6a7b26147753be6aeef65098b9a503cc50850afe410f"
+}

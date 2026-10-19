@@ -1,0 +1,144 @@
+{
+  "actualLaunches": 1,
+  "actualToken": {
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "packageIdentityMatches": true
+  },
+  "collectorSessionsStopped": true,
+  "createdFiles": [
+    {
+      "bytes": 163840,
+      "relativePath": "Temp/m11-actual-fixture/agent/agent.db",
+      "sha256": "d4ff7596a8adb62a7da7749ab5e710bd195b5a32d1b570a72e6d9d88228cccab"
+    },
+    {
+      "bytes": 32768,
+      "relativePath": "Temp/m11-actual-fixture/agent/agent.db-shm",
+      "sha256": "95d52aacd1e67bb5adc55fe404742ce5b9ecbf47f770b816a6071a0fab5dd239"
+    },
+    {
+      "bytes": 0,
+      "relativePath": "Temp/m11-actual-fixture/agent/agent.db-wal",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 159689728,
+      "relativePath": "Temp/m11-actual-fixture/home/.omp/natives/18.0.4/pi_natives.win32-x64-baseline.node",
+      "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90"
+    },
+    {
+      "bytes": 159689728,
+      "relativePath": "Temp/m11-actual-fixture/home/.omp/natives/18.0.4/pi_natives.win32-x64-modern.node",
+      "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90"
+    }
+  ],
+  "deletedFiles": [],
+  "evidenceId": "M11-20261019-000141",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "knownPidPostcheck": {
+    "atUtc": "2026-10-19T17:16:11.1815338Z",
+    "pids": [
+      32164,
+      32708,
+      15428
+    ],
+    "remaining": [],
+    "scope": "Actual Python controller, OMP and observed conhost descendant; ETW creation identities also recorded"
+  },
+  "limitation": "No whole-host filesystem diff is claimed. Fresh zero-capability AppContainer and explicit environment provide containment; profile snapshots cover the owned native profile only.",
+  "modifiedFiles": [],
+  "phase": "A1-rerun-elevated",
+  "previousEvidenceFilesUnchanged": 184,
+  "privateTraceInventory": [
+    {
+      "alias": "OWNED_ACTUAL_ETW/Process.etl",
+      "bytes": 17563648,
+      "sha256": "b774b04c01cb9df194b248c69df1d343fed7b81dfaa033836226a58f33c771ec"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/Process.xml",
+      "bytes": 219321728,
+      "sha256": "2a9799a34184a319d362f42abb777daeabace6e1aa4808b6cdae2f5a66757ea3"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/Process-summary.txt",
+      "bytes": 4832,
+      "sha256": "197c37767edc69e3fccf3e18e593d4796ef692a69a41e4e1785fd136946ec552"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/Transport.etl",
+      "bytes": 11534336,
+      "sha256": "8f33d3ffd081b169217284a7f313953591693bc425dc5a1f337cd83d0e48d722"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/Transport.xml",
+      "bytes": 117774022,
+      "sha256": "c1b89be1adc12e8096182d7e663b97bf1d4badc91ba2fa1e12232599208a76f9"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/Transport-summary.txt",
+      "bytes": 29630,
+      "sha256": "b1a8d7ba23559da24538022920aa27fde72546881efe110e0488cc41fffca85f"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/WFP.etl",
+      "bytes": 262144,
+      "sha256": "552c5679be1f6239a62a0329369069d9704c915efe284c1c00d83e0d46dfae1a"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/WFP.xml",
+      "bytes": 3438,
+      "sha256": "f26b6fc99eac25c0904feb353b3d97199845481b0dbdf4ec93e0f8f0b0b48a40"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/WFP-summary.txt",
+      "bytes": 1010,
+      "sha256": "7d25998fe31907627b2979b142656f625a304c160439bba53f0b905f8282dc69"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/DNS.etl",
+      "bytes": 3407872,
+      "sha256": "1ab404dc770e956f59139cca744dc8a1ea0137ca3adaa3295d53bde69ac11cd6"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/DNS.xml",
+      "bytes": 1261032,
+      "sha256": "fca5f0ad7d078cd1b82d507b3af3e0460f600eb9de3b01c2fa47cdae8faf3354"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/DNS-summary.txt",
+      "bytes": 3622,
+      "sha256": "a084dede5db712c8d3c431c8abff56a068c8f884539db94db1a34c789745c695"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/KernelNetwork.etl",
+      "bytes": 4194304,
+      "sha256": "83e8b8b659e0c5c2e294adf1a40c1783b39f362067994674534dc1bca43d7721"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/KernelNetwork.xml",
+      "bytes": 22305688,
+      "sha256": "4f0ef70b2ef4d2664d3fef6018e73112380d808f9ea91f13ae1e3aaeecb4e163"
+    },
+    {
+      "alias": "OWNED_ACTUAL_ETW/KernelNetwork-summary.txt",
+      "bytes": 4090,
+      "sha256": "25c9681bf57ab0c61638bb6212dfec20ed522f11bf2adc609cce98ddc67d134e"
+    }
+  ],
+  "profileCleanup": {
+    "actualLaunchesNotRetried": true,
+    "profileDeleteHresult": 0,
+    "profileDirectoryStillExists": false
+  },
+  "runId": "M11-A1-ELEVATED-20261019-000132",
+  "scope": "Fresh AppContainer native profile; explicit HOME/config/cache/temp/cwd all inside it; owned binary and ETW files outside the checkout.",
+  "status": "OWNED FIXTURE OBSERVED",
+  "wholeHostFilesystemSnapshotTaken": false
+}

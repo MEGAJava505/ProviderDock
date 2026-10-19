@@ -1,0 +1,122 @@
+{
+  "actualTokenRef": "token-readback-actual-elevated-000144.json",
+  "consumer": "tracerpt XML -lr -gmt; exact process, TCPIP/WFP and Kernel-Network selectors validated in self-test; actual ETL decoded after teardown",
+  "containment": "Fresh AppContainer zero capabilities, Job active process limit 1 and kill-on-close; all network denied. No global audit or firewall changes.",
+  "evidenceId": "M11-20261019-000135",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "liveGuard": "ControlTraceW QUERY polls EventsLost, LogBuffersLost, RealTimeBuffersLost while actual controller is running; any loss kills the controller and its kill-on-close Job.",
+  "lossPolicy": "Native baseline/final counters plus final ETL header all zero",
+  "networkCounters": {
+    "applicationRequests": "ACP method allowlist initialize/session-new only; no prompt or inference method is permitted; separately observed OS network counters",
+    "attempts": "PID-correlated TCPIP/WFP authorization/connection events, deduplicated per layer; no equality invented across layers",
+    "bytes": "Kernel-Network event IDs 10/11/26/27 and UDP send/receive, payload PID and size; per-layer counts, no retransmission/UDP aggregation double counting"
+  },
+  "phase": "A1-rerun-elevated",
+  "processCorrelation": "PID + payload CreateTime/ProcessSequenceNumber, parent PID, image path alias + SHA-256",
+  "providerMetadataRef": "provider-metadata-elevated-000134.json",
+  "runId": "M11-A1-ELEVATED-20261019-000132",
+  "runtimeTools": {
+    "logman": "10.0.26100.8875",
+    "tracerpt": "10.0.26100.8875",
+    "wevtutil": "10.0.26100.8875"
+  },
+  "scripts": [
+    {
+      "alias": "actual-controller.py",
+      "sha256": "a54b84f1173ca13e8960c43b40e304c083569cd340a37322dad42517ede9677e"
+    },
+    {
+      "alias": "run-actual.ps1",
+      "sha256": "4dd8c4d60ef0878ecf55c9141497ed979c89ad955b8c5bbeb24b92ae37fca524"
+    },
+    {
+      "alias": "query-etw-loss.ps1",
+      "sha256": "4613a3d38a375219833bf3358d15c0de6bc593e48f24c2be7f9a9f2b94eb6b09"
+    },
+    {
+      "alias": "inspect-elevated.ps1",
+      "sha256": "26643a06b7f595c2c517850d9532eada67baf83d3363f3a65e9a08d7b3e43914"
+    },
+    {
+      "alias": "cleanup-profile.py",
+      "sha256": "d1ac9243566f3ddd153a04889f1e1971a5ebb1fb5134a4a4ab7e92b355889543"
+    },
+    {
+      "alias": "prepare-actual.py",
+      "sha256": "e58d9045533e5d66bd22a201476d1f0ca5a4c460a0c01b5bebcaae6dc7bdb748"
+    }
+  ],
+  "selfTestRef": "self-test-elevated-000136.json",
+  "sessions": [
+    {
+      "bufferSizeKb": 256,
+      "etlAlias": "OWNED_ACTUAL_ETW/Process.etl",
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "Process",
+      "level": 255,
+      "maximumBuffers": 64,
+      "maximumFileMb": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000132-Actual-dd77bbec6e-Process",
+      "provider": "Microsoft-Windows-Kernel-Process"
+    },
+    {
+      "bufferSizeKb": 256,
+      "etlAlias": "OWNED_ACTUAL_ETW/Transport.etl",
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "Transport",
+      "level": 255,
+      "maximumBuffers": 64,
+      "maximumFileMb": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000132-Actual-dd77bbec6e-Transport",
+      "provider": "Microsoft-Windows-TCPIP"
+    },
+    {
+      "bufferSizeKb": 256,
+      "etlAlias": "OWNED_ACTUAL_ETW/WFP.etl",
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "WFP",
+      "level": 255,
+      "maximumBuffers": 64,
+      "maximumFileMb": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000132-Actual-dd77bbec6e-WFP",
+      "provider": "Microsoft-Windows-WFP"
+    },
+    {
+      "bufferSizeKb": 256,
+      "etlAlias": "OWNED_ACTUAL_ETW/DNS.etl",
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "DNS",
+      "level": 255,
+      "maximumBuffers": 64,
+      "maximumFileMb": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000132-Actual-dd77bbec6e-DNS",
+      "provider": "Microsoft-Windows-DNS-Client"
+    },
+    {
+      "bufferSizeKb": 256,
+      "etlAlias": "OWNED_ACTUAL_ETW/KernelNetwork.etl",
+      "keywordsAny": "0xffffffffffffffff",
+      "kind": "KernelNetwork",
+      "level": 255,
+      "maximumBuffers": 64,
+      "maximumFileMb": 64,
+      "minimumBuffers": 8,
+      "mode": "bincirc file",
+      "name": "PD-A1-000132-Actual-dd77bbec6e-KernelNetwork",
+      "provider": "Microsoft-Windows-Kernel-Network"
+    }
+  ],
+  "watchdogs": {
+    "actualJobSeconds": 40,
+    "authorizationCapSeconds": 45,
+    "independentParentSeconds": 43
+  }
+}

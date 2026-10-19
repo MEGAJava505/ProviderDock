@@ -1,0 +1,164 @@
+{
+  "applicationRequestCountFromTransport": null,
+  "baselineJustification": "Capture was running before CreateProcess; PID+creation-time scope did not exist at baseline. Zeros are observed absent scoped events in complete loss-free source files, not inherited constants.",
+  "counters": {
+    "connections": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "units": "Kernel-Network connect/accept events"
+    },
+    "dnsQueryEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "units": "PID-correlated DNS events"
+    },
+    "receivedBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "units": "Kernel-Network payload bytes"
+    },
+    "sentBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "units": "Kernel-Network payload bytes"
+    },
+    "transportAttemptEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "units": "PID-correlated TCPIP connection/authorization events"
+    },
+    "wfpDeniedEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "units": "PID-correlated WFP packet-drop events"
+    }
+  },
+  "deduplication": "Do not sum TCPIP and WFP into one attempt total; per-layer counters. Kernel-Network payload bytes count only directional send/receive events, not TCP copy/retransmit diagnostics.",
+  "evidenceId": "M11-20261019-000139",
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "limitations": [
+    "TCPIP events with only execution context PID are not attributed to OMP; kernel/DPC work can run in an unrelated process context.",
+    "No inference/application request count is inferred from TCP packets."
+  ],
+  "liveInferenceRequests": 0,
+  "liveInferenceRequestsSource": "Only initialize was sent; no prompt/inference dispatch method allowed or sent. No credential or provider route exists.",
+  "loss": [
+    {
+      "decodeExit": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "finalNative": {
+        "BuffersWritten": 55,
+        "EventsLost": 0,
+        "LogBuffersLost": 0,
+        "LogFileMode": 4194306,
+        "NumberOfBuffers": 25,
+        "RealTimeBuffersLost": 0
+      },
+      "kind": "Process",
+      "stopExit": 0
+    },
+    {
+      "decodeExit": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "finalNative": {
+        "BuffersWritten": 32,
+        "EventsLost": 0,
+        "LogBuffersLost": 0,
+        "LogFileMode": 4194306,
+        "NumberOfBuffers": 25,
+        "RealTimeBuffersLost": 0
+      },
+      "kind": "Transport",
+      "stopExit": 0
+    },
+    {
+      "decodeExit": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "finalNative": {
+        "BuffersWritten": 1,
+        "EventsLost": 0,
+        "LogBuffersLost": 0,
+        "LogFileMode": 4194306,
+        "NumberOfBuffers": 24,
+        "RealTimeBuffersLost": 0
+      },
+      "kind": "WFP",
+      "stopExit": 0
+    },
+    {
+      "decodeExit": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "finalNative": {
+        "BuffersWritten": 1,
+        "EventsLost": 0,
+        "LogBuffersLost": 0,
+        "LogFileMode": 4194306,
+        "NumberOfBuffers": 24,
+        "RealTimeBuffersLost": 0
+      },
+      "kind": "DNS",
+      "stopExit": 0
+    },
+    {
+      "decodeExit": 0,
+      "etlBuffersLost": 0,
+      "etlEventsLost": 0,
+      "finalNative": {
+        "BuffersWritten": 4,
+        "EventsLost": 0,
+        "LogBuffersLost": 0,
+        "LogFileMode": 4194306,
+        "NumberOfBuffers": 25,
+        "RealTimeBuffersLost": 0
+      },
+      "kind": "KernelNetwork",
+      "stopExit": 0
+    }
+  ],
+  "phase": "A1-rerun-elevated",
+  "runId": "M11-A1-ELEVATED-20261019-000132",
+  "scope": {
+    "controllerAndHelpersExcluded": true,
+    "correlationRef": "process-tree-elevated-000138.json",
+    "includesActualDescendants": true,
+    "pids": [
+      15428,
+      32708
+    ],
+    "selfTestMeasurementsNotReused": true
+  },
+  "sources": {
+    "DNS": {
+      "actualEvents": [],
+      "excludedExecutionContextOnlyEvents": 0
+    },
+    "KernelNetwork": {
+      "actualEvents": [],
+      "excludedExecutionContextOnlyEvents": 0
+    },
+    "Process": {
+      "actualEvents": [],
+      "excludedExecutionContextOnlyEvents": 0
+    },
+    "Transport": {
+      "actualEvents": [],
+      "excludedExecutionContextOnlyEvents": 21
+    },
+    "WFP": {
+      "actualEvents": [],
+      "excludedExecutionContextOnlyEvents": 0
+    }
+  },
+  "status": "OBSERVED",
+  "unexpectedObservedEgress": 0
+}

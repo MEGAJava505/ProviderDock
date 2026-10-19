@@ -1,0 +1,118 @@
+{
+  "binary": {
+    "bytes": 190118912,
+    "executedForPreflight": false,
+    "expectedSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "pathAlias": "FRESH_PINNED_OMP_BINARY",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "version": "18.0.4",
+    "versionSource": "Historical accepted pin, to verify runtime header in the one actual launch"
+  },
+  "configSha256": "6f38907af4a1920a6dc9411b767b0e7026071f91d469b50425f123110962574f",
+  "controllerHashes": [
+    {
+      "alias": "actual-controller.py",
+      "sha256": "a54b84f1173ca13e8960c43b40e304c083569cd340a37322dad42517ede9677e"
+    },
+    {
+      "alias": "run-actual.ps1",
+      "sha256": "4dd8c4d60ef0878ecf55c9141497ed979c89ad955b8c5bbeb24b92ae37fca524"
+    },
+    {
+      "alias": "query-etw-loss.ps1",
+      "sha256": "4613a3d38a375219833bf3358d15c0de6bc593e48f24c2be7f9a9f2b94eb6b09"
+    },
+    {
+      "alias": "inspect-elevated.ps1",
+      "sha256": "26643a06b7f595c2c517850d9532eada67baf83d3363f3a65e9a08d7b3e43914"
+    },
+    {
+      "alias": "cleanup-profile.py",
+      "sha256": "d1ac9243566f3ddd153a04889f1e1971a5ebb1fb5134a4a4ab7e92b355889543"
+    },
+    {
+      "alias": "prepare-actual.py",
+      "sha256": "e58d9045533e5d66bd22a201476d1f0ca5a4c460a0c01b5bebcaae6dc7bdb748"
+    }
+  ],
+  "evidenceId": "M11-20261019-000137",
+  "freshProfile": {
+    "created": true,
+    "cwdAlias": "FRESH_ACTUAL_PROFILE/Temp/m11-actual-fixture/project",
+    "identitySha256": "ded5905e6716fb037c404e9776bebbdb58a5cf1ea34c137118301e8295d6bed9",
+    "networkCapabilities": 0,
+    "noPriorCredentialsOrProviderRoutes": true,
+    "runtimeAttestation": "AppContainer SID equality, capabilityCount=0, Low integrity, Job kill-on-close and process limit=1 verified inside suspended CreateProcess before ResumeThread",
+    "snapshotBefore": {
+      "Temp/m11-actual-fixture/agent/models.yml": {
+        "bytes": 19,
+        "sha256": "30f2ed5e1b485b5e116435f3dcff1915353ae55cd65ddb0b7f48bfe952caf83c"
+      },
+      "Temp/m11-actual-fixture/config.yml": {
+        "bytes": 869,
+        "sha256": "6f38907af4a1920a6dc9411b767b0e7026071f91d469b50425f123110962574f"
+      },
+      "Temp/m11-actual-fixture/project/fixture.txt": {
+        "bytes": 46,
+        "sha256": "da50c2ddf18b4e76aad707c7297660ee43a8b852157bea5eafe4495986b472af"
+      }
+    }
+  },
+  "handoffCommit": "df5391199daf944f59d871e45db27018c85859a0",
+  "independentWatchdog": "PowerShell parent: 43 seconds; killing Python closes its Job handle, terminating OMP. Inner Job watchdog: 40 seconds.",
+  "launch": {
+    "ambientAllowlist": [
+      "SYSTEMROOT",
+      "WINDIR",
+      "COMSPEC"
+    ],
+    "argv": [
+      "--config",
+      "FRESH_ACTUAL_CONFIG",
+      "--session-dir",
+      "FRESH_ACTUAL_SESSIONS",
+      "--tools",
+      "read",
+      "--no-lsp",
+      "--no-extensions",
+      "--no-skills",
+      "--no-rules",
+      "--no-title",
+      "--approval-mode",
+      "always-ask",
+      "--mode",
+      "acp"
+    ],
+    "credentialCount": 0,
+    "environmentNames": [
+      "APPDATA",
+      "COMSPEC",
+      "HOME",
+      "LOCALAPPDATA",
+      "PI_CODING_AGENT_DIR",
+      "PI_CONFIG_DIR",
+      "PI_NATIVE_VARIANT",
+      "SYSTEMROOT",
+      "TEMP",
+      "TMP",
+      "TMPDIR",
+      "USERPROFILE",
+      "WINDIR",
+      "XDG_CACHE_HOME",
+      "XDG_CONFIG_HOME",
+      "XDG_DATA_HOME",
+      "XDG_STATE_HOME"
+    ],
+    "inertValues": {
+      "PI_NATIVE_VARIANT": "baseline"
+    },
+    "inheritParentEnvironment": false,
+    "providerRouteCount": 0
+  },
+  "networkAllowlist": [],
+  "phase": "A1-rerun-elevated",
+  "ports": "No listening port/broker is used by the actual fixture; all network is denied.",
+  "runId": "M11-A1-ELEVATED-20261019-000132",
+  "selfTestRef": "self-test-elevated-000136.json",
+  "status": "STATIC PREFLIGHT PASS; runtime token/Job enforced before ResumeThread"
+}

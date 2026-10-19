@@ -1,0 +1,16 @@
+# evidenceId: M11-20261019-000143
+# runId: M11-A1-ELEVATED-20261019-000132
+# status: BLOCKED after one actual launch, exit 1; self-test PASS
+# SHA-256 of final public artifact bytes, excludes this manifest only
+6202de3ae5f196ec7dfdf202cfd7e4b1a751b8a7a0a677764a5758bb47030c5d  authorization-rerun-elevated-000132.json
+e86fe0984e8537565de8bb9ac7273472dd32243711e7eaa8500e9f90739dbd1e  token-readback-elevated-000133.json
+58955b0d1ee58daacbef9a21fe5c4a5cef0242814d758eef5f386d4978cd0d72  provider-metadata-elevated-000134.json
+9e38c68df435b7bd78d8cee5eae11189e53fe69c9bb0b33cb8c530c6ec658163  monitoring-config-elevated-000135.json
+b3c176b3dc73f9444a2ecd4202c5ea2d8a28152da6bb1338d0e4c360c38d3549  self-test-elevated-000136.json
+ddb0fe00e50b5949591f451b80c66d878abbe489572a0e7f773b37c04424835e  preflight-elevated-000137.json
+1d4150d0904f7a862451b9a26ce67875e4572d248228784c71d0f17f473020f6  process-tree-elevated-000138.json
+f80a72869932fa10c61b9993daeacdeb0f4481e0526fd9914451ae497e0e2190  network-counters-elevated-000139.json
+3d764bf13c14c1f3707740aee4995fd103df25a896a4d26347e331f42b283e66  run-log-elevated-000140.txt
+61e85288f630c092613eabf98ee5dae95b72ed5906fa90e95d9013e4f6868ecd  side-effects-elevated-000141.json
+be240398a51bcfb56c0d6a1b394a3d1fc829744d4e1a5d2225c993b6de213d5b  summary-elevated-000142.json
+e8d5c4606337d8f47afc51839cf8f93b96f5c352cd43b391e5fa17ebac4d43e4  token-readback-actual-elevated-000144.json
