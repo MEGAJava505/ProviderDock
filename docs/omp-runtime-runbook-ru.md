@@ -1,6 +1,6 @@
 # Управляемый OMP: сборка и проверка на Windows
 
-**M10-R, 17 октября 2026 — локальный пакет выполнен, отчёт исполнителя ожидает независимого review:** normal и negative browser smoke проверены на Brave; evidence и ограничения записаны в [PEER_REVIEW.md](omp-migration/PEER_REVIEW.md). Это synthetic loopback/fake-child acceptance; cutover и внешние gates не открыты.
+**Текущий статус, 18 октября 2026:** M10-R2 локально принят по критериям главы 5, включая browser acceptance на Chrome for Testing 155 (normal 12/12, negative 4 фазы). Глава 5 ожидает внешнего M11 evidence для actual `omp.exe`, native resume, external egress/isolation и живой provider route. **M11-P — doc-only preparation завершена:** [план внешнего пилота и evidence schema](omp-migration/M11_EXTERNAL_PILOT_PLAN.md). Пилот не выполнен; главы 6–7 и cutover не начаты. Подготовка не даёт разрешения на live credentials, сеть, OS isolation, paid requests или изменение production default; детали и ограничения — в [PEER_REVIEW.md](omp-migration/PEER_REVIEW.md).
 
 **Повторная проверка M10 по ответу из чата, 16 октября 2026:** 10 assertions browser fixture выполнены, preflight и сообщение отмены просмотрены. Независимый повтор вне sandbox дал **exit 1** из-за cleanup `EPERM` за 58.9 s; stdout `ok:true` печатается раньше cleanup. Полный browser gate не принят, исправления CDP/network/evidence и недостающие критерии остаются в M10-R. Логи и границы проверки — в конце [PEER_REVIEW.md](omp-migration/PEER_REVIEW.md).
 

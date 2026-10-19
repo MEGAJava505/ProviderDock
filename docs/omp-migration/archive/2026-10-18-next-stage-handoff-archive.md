@@ -1,0 +1,158 @@
+# АКТИВНОЕ ЗАДАНИЕ M10-R — ЗАВЕРШИТЬ ЛОКАЛЬНУЮ ЧАСТЬ ГЛАВЫ 5 / STEP 6
+
+> **Передано 16 октября 2026.** Источник: [REMAINING_PLAN.md](REMAINING_PLAN.md), глава 5, пункты 1–4. M10 принят частично; замечания и результаты проверки координатора находятся ниже, в разделе «Результат последней проверки». Предыдущее [задание M10](archive/2026-10-16-m10-handoff.md) и [архивный срез](archive/2026-10-16-m10-peer-review.md) сохранены. Это самостоятельное задание следующему агенту: выполни весь локальный пакет и запиши итог в PEER_REVIEW до финального ответа.
+
+**Разделение ролей по указанию пользователя:** исполнитель записывает свой итог в [PEER_REVIEW.md](PEER_REVIEW.md) и дословно повторяет его в чате. Координатор читает этот отчёт и записывает результаты проверки, замечания и следующие задания только в `AGENT_HANDOFF.md`.
+
+## Цель и границы
+
+Довести уже начатую локальную приёмку пользовательского OMP-контура до воспроизводимого результата: браузер выбирает проект/маршрут/права, делает preflight, запускает настоящий локальный service/runtime/supervisor с fake child, показывает сохранённый run; отмена, restart и ошибки имеют проверенный результат. Отдельно завершить матрицу прав с точными источниками и честными ограничениями.
+
+Разрешены изменения локального кода, существующих тестов, smoke и перечисленных ниже документов. Данные синтетические; запросы только loopback; процесс OMP заменяется контролируемым `tests/support/omp-fake-child.mjs`; закреплённый upstream читается с диска.
+
+Сохраняй явный выбор provider/account/model/project, fail-closed gate, подтверждение прав и отсутствие автоматического retry/fallback. Платный VSLLM/Doctor, публикация live v2, настоящий `omp.exe`, Bun/importer, живые homes/transcripts/ключи, изменение OS isolation/ACL, cutover, удаление legacy и commit/push/PR остаются вне разрешённого пакета. Эти внешние gates не мешают выполнять независимые локальные пункты. Общую миграционную цель по fake-child результату закрывать нельзя.
+
+## Что уже есть
+
+- Передача: `omp-integration`, HEAD `5025cb31ae9dfa8c8e64bbc29e8a39513f6a5872`, накопительный dirty worktree. Прежние tracked/untracked изменения принадлежат предыдущим пакетам. Зафиксируй собственный стартовый снимок до правок.
+- Reviewer 16 октября повторил целевые 7 файлов / **190 тестов PASS**, typecheck и build (**130 JS**); оба browser-скрипта проходят `node --check`, diff-check чист. Полный **83/1189** — исторический результат исполнителя M10, reviewer его не повторял.
+- M10 добавил `fetch.enabled=false`, отказ для пяти project-файлов `.env`, `.env.local`, `.env.development`, `.env.production`, `.env.test` и сброс UI acknowledgement/preflight при смене выбора. Runtime regression пока включает только `.env`; UI smoke с новыми assertions не принят.
+- `tests/omp-integration-harness.test.ts` уже использует настоящий launch stack, FileOmpRunRepository, fake child и строгий loopback; есть failure matrix, restart и unconfirmed cancellation. Переиспользуй эти проверки, дополняй конкретные пробелы.
+- `scripts/dashboard-ui-smoke.mjs` запускает настоящий браузер, но подставляет `ompLauncher`. Новый `scripts/omp-browser-stack-smoke.mjs` использует настоящий локальный launch stack, однако завершённого browser gate нет: исполнитель сообщил Edge profile `EPERM` и CDP navigation timeout. Их причина не установлена.
+
+## Результат последней проверки координатора — 16 октября 2026
+
+**M10 принят частично; активное задание — M10-R.** Переданный пользователем ответ «M10 завершён» сопоставлен с текущими файлами. Приведённого нового отчёта исполнителя и раздела M10-R в PEER_REVIEW на момент сверки не было. Ранее добавленные координатором два раздела review M10 перенесены из журнала исполнителя в этот handoff; остальные существовавшие отчёты и исторические разделы сохранены.
+
+**Подтверждено:** целевые 7 файлов / 190 тестов, typecheck и build 130 JS прошли в первой проверке. Во второй проверке build снова прошёл; два browser-прогона достигли 10 именованных assertions настоящего dashboard/launch stack с fake child. Просмотрены [preflight](../../.scratch/m10-report-review-NPIEt2/reviewer-screenshots/ready-preflight.png) и [сообщение отмены](../../.scratch/m10-report-review-NPIEt2/reviewer-screenshots/cancelled.png). Изменение ожидаемого состояния TUI на `TERMINAL_OPEN` соответствует supervisor. Полный suite 83/1189 остаётся результатом исполнителя, координатор его не повторял.
+
+**Полный browser gate не принят:** обычный sandbox-прогон получил cleanup `EPERM` и потребовал остановки своего процесса; повтор вне sandbox завершился самостоятельно **exit 1**, `timedOut:false`, за **58.9 s**, также с cleanup `EPERM`. В обоих stdout заранее содержал `ok:true`. [Результат повтора](../../.scratch/m10-report-review-NPIEt2/result.json), [stdout](../../.scratch/m10-report-review-NPIEt2/stdout.log), [stderr](../../.scratch/m10-report-review-NPIEt2/stderr.log); [первый прогон](../../.scratch/m10-report-review-hfLkNd/result.json). Проверенный SHA-256 smoke: `72d2df73af8e342cb1caa6fa29fb57d8a74f6714e92de2f35ddceae08489ccdc`.
+
+Открытые замечания:
+
+1. **P2, CDP:** `cdp.call()` не имеет deadline/отказа pending при закрытии socket; `waitFor()` и error-диагностика могут ждать бесконечно. Извлечённая текущая `cdpClient()` оставила запрос pending после закрытия fixture socket — [воспроизведение](../../.scratch/reviewer-m10-2026-10-16/cdp-reproduction.json). Это отдельное доказательство; причину зависания полного первого прогона оно само по себе не устанавливает.
+2. **P2, cleanup/evidence:** успех печатается до обязательного cleanup; screenshots находятся внутри удаляемого root. Добавленное ожидание exit и поиск Chromium по профилю пока не обеспечили exit 0. Исправить установленную причину `EPERM`, сохранять evidence отдельно, публиковать успех после cleanup. При ошибке должны сохраняться исходная причина и ненулевой exit.
+3. **P2, сеть:** собранные `Network.loadingFailed` не проверяются перед PASS; нужны проверки неожиданных сетевых/HTTP ошибок и отказный сценарий.
+4. **Недостающий объём доказательства:** browser restart переиспользует старый repository-объект и проверяет terminal records; native resume не доказан. В permission matrix для ряда строк нет точных upstream файлов/символов; `.env*` шире списка пяти guard-имён, regression добавлен только для `.env`. Завершить критерии R.3–R.5, не объявляя все четыре пункта главы принятыми по этим 10 assertions.
+
+После неудачного cleanup внутри двух указанных `.scratch/m10-report-review-*` остались собственные temp-данные. Точечное удаление temp первого прогона вне sandbox также получило отказ на Chromium cache `journal.baj`. Логи и копии screenshots сохранены отдельно; чужие процессы/профили, ACL и OS настройки не менялись. Старые ссылки плана/runbook на review в PEER_REVIEW являются историческими; текущий результат проверки координатора находится здесь.
+
+## M10-R.1 — исходное состояние и проверка до изменений
+
+1. Прочитай ближайшие инструкции, результат проверки координатора выше, последний отчёт исполнителя в PEER_REVIEW, четыре пункта главы 5 и `STEP6_PERMISSION_BOUNDARY.md`. Затем читай только нужный код рядом.
+2. Зафиксируй дату, branch/HEAD/status и снимок изменяемых файлов, включая исходные untracked. Храни временные логи и baseline отдельно: не затирай inventory логом запуска. Для отделения своего diff не используй `git reset`, очистку worktree или откат предыдущих изменений.
+3. В разделе главы 5 плана обновляй одну матрицу: требование → существующее доказательство → конкретный пробел → проверка → статус. Статусы: `LOCAL PASS`, `STATIC UPSTREAM`, `NOT PROVEN`, `BLOCKED` с причиной. Исторические counts не превращай в свежие результаты.
+4. До правки каждого дефекта выбери наблюдаемую проверку. Воспроизведи отказ по ожидаемой причине, затем сделай минимальное исправление и повтори проверку. Для инфраструктуры smoke используй контролируемые fault-сценарии; они дополняют полный browser gate.
+
+**Критерий:** собственный diff отделим, у каждого замечания есть RED-проверка, у каждого пункта главы — существующая проверка или открытый пробел.
+
+## M10-R.2 — исправить browser smoke и его cleanup
+
+Основной файл: `scripts/omp-browser-stack-smoke.mjs`; используй удачные решения существующего `dashboard-ui-smoke.mjs`, избегая отдельного фреймворка ради одного smoke.
+
+1. **Зависание CDP.** Ограничь время каждой CDP-команды, подключения, readiness и HTTP-discovery; закрытие/error socket должно завершать pending-запросы. Убери соответствующие timers/pending после ответа. Диагностика при ошибке тоже должна иметь предел и доходить до cleanup. Покажи fault с потерянным ответом/закрытием CDP: процесс заканчивается ненулевым exit за заданный предел, причина различима, собственные ресурсы освобождены. Одного увеличения timeout недостаточно.
+2. **Порядок завершения.** Ожидай завершения созданных данным прогоном browser/child процессов до удаления профиля; учитывай частичную инициализацию и ранний отказ spawn. Cleanup проверяет принадлежность и resolved path своих каталогов, не затрагивает чужие процессы/профили и сохраняет исходную причину ошибки. Ошибка обязательного cleanup даёт ненулевой exit; успешный итог печатается после cleanup. Проверь штатный и отказный пути, включая ошибку cleanup без ложного `ok:true`.
+3. **Сохранить evidence.** Вынеси скриншоты/структурный отчёт из удаляемого temp-root в отдельный каталог текущего прогона внутри принятой локальной рабочей области. Проверяй, что после завершения процесса указанные файлы существуют. Профиль браузера, секреты и transcript не являются evidence для сохранения. Просмотри фактические скриншоты и назови проверенные состояния.
+4. **Проверить сеть.** Непредвиденные `Network.loadingFailed`, ошибки dashboard HTTP и JS exceptions должны проваливать проверку. Ожидаемые отказы конкретных fixture-запросов учитывай узко и явно; blanket ignore ошибок недопустим. Fault-сценарий должен доказать, что неожиданная ошибка сети меняет exit на ненулевой.
+5. Выбирай установленный browser через существующий `PROVIDERDOCK_TEST_BROWSER`; запиши путь/версию использованного браузера без пользовательских данных. TEMP/TMP задавай только дочерним процессам в собственном каталоге на E: при нехватке места. Исправляй локальный сбой запуска/блокировку профиля по установленной причине, сохраняя OS настройки. Недоступный браузер — конкретный `BLOCKED`, а не PASS и не основание бросить остальные пункты.
+
+**Критерий:** штатный smoke имеет exit 0 после cleanup, evidence остаётся доступным; проверенные fault-пути завершаются ненулевым exit без зависания, ложного успеха и чужих побочных изменений.
+
+## M10-R.3 — сквозной выбор, preflight и запуск
+
+Пройди через настоящий browser → `ProviderDashboardServer` → `OmpLaunchService` → `OmpRuntime` → `OmpProcessSupervisor` → fake child/loopback → `FileOmpRunRepository` → UI. Fixture route/health/evidence допускаются как синтетические входные данные; результат launch-service или run-store вычисляется реальной реализацией.
+
+- Через UI выбери конкретные provider/account/model/project, подтверди права и сделай preflight. Зафиксируй ответ HTTP launch и сопоставь **тот же runId** с записью на диске и UI terminal state.
+- Докажи cwd с пробелами/кириллицей и фактическое чтение fixture-файла: ожидаемый hash его байтов совпадает с marker в принятом loopback tool-turn. Отдельно обозначь, что это argv/cwd harness, а не проверка shell quoting установленного CLI.
+- Для provider/account/model/project проверь сброс обоих evidence после успешного preflight. Добавляй независимые fixture-варианты только там, где их недостаёт; смена одного поля не доказывает остальные. Пока нового acknowledgement/preflight нет, запуск закрыт; счётчики spawn/requests/run-store не меняются от отказанного действия.
+- Проверь поздний ответ старого preflight после смены выбора и повторное открытие диалога. Устаревший ответ не восстанавливает разрешение запуска. Изменение самого checkbox не должно самопроизвольно снимать только что поставленное подтверждение при неизменном выборе.
+- Покажи unknown/blocked/ready-for-pilot и конкретную причину отказа без ложной подписи прошедшего пилота. API credential, portal session и OAuth остаются разными сущностями; для отказа до spawn используй синтетические данные.
+
+**Критерий:** выполненный browser сценарий доказывает всю цепочку и запрет запуска с неподходящим evidence; скриншоты и structural report сохранены. HTTP-only и launcher stub не заменяют эту проверку.
+
+## M10-R.4 — lifecycle, restart и отсутствие повторного side effect
+
+1. Пройди cancel через browser/HTTP на активном fake child. До подтверждённого stop состояние остаётся нетерминальным; после подтверждения UI/HTTP/disk согласованы. Повторный cancel terminal run не создаёт новый запуск/запрос. Существующие unconfirmed-stop тесты используй как доказательство соответствующей ветки, не добавляя продуктовый RPC-режим ради smoke.
+2. При restart создай **новые** repository/service/supervisor над тем же каталогом records. Проверь сохранение terminal runs и отдельный активный orphan: предусмотренный кодом reconcile отмечает потерю ownership, не придумывает `SUCCEEDED` и не сигналит чужому PID. Используй контролируемые собственные child/fixtures. Зафиксируй, какие части пройдены через browser, какие через существующий integration harness.
+3. Сверь existing matrix: 401/403/429/5xx, broken streaming, exit до readiness, tool-side-effect-then-error. Для каждой строки проверь итоговый state, число попыток и отсутствие подмены маршрута/аккаунта/credential. Безопасная причина отказа доходит до публичной поверхности без marker/header/сырых кадров.
+4. Через browser пройди хотя бы один отказ после фактически выполненного side effect. Проверь сам fixture-файл/счётчик, затем refresh, чтение runs и restart: числа spawn, upstream requests и side effects остаются прежними. При последующих отдельных ручных сценариях учитывай новые попытки отдельно.
+5. Опиши native resume по существующим контрактам: поддержан ли пользовательский путь и что осталось открытым. Reconcile, повторный launch и transcript import не являются native resume. Новую resume-функцию и реальный MCP в этот пакет не добавляй.
+
+**Критерий:** lifecycle не содержит ложного terminal/success; restart читает persistent state новым экземпляром; автоматического повторения side effect нет. Fake tool и fake child явно ограничивают доказательство.
+
+## M10-R.5 — завершить матрицу прав по закреплённым исходникам
+
+Обнови существующий [STEP6_PERMISSION_BOUNDARY.md](STEP6_PERMISSION_BOUNDARY.md), не создавай параллельный документ. Pin: `0c6c981ee5838d97700180383077eb0a3790637c`; расположение checkout ищи в [инвентаре Step 4](STEP4_READONLY_INVENTORY_2026-09-29.md). Проверь HEAD/drift до использования источников; upstream только читай.
+
+Для shell/write/network/MCP/extensions/skills/rules/project bindings укажи: наш конкретный контроль → точный upstream файл/символ и значение настройки на этом pin → фактически выполненная локальная проверка → остаточное поведение → статус. Раздели создание policy, чтение её upstream-кодом и исполнение настоящим бинарником.
+
+Сверь загрузчики project/global settings, `.env` и discovery с HOME/USERPROFILE/PI/XDG isolation. Запиши точные поддержанные имена; формулировка `.env*` требует доказательства охвата. Для реально блокируемых вариантов, читаемых upstream, дополни существующую параметризованную regression-проверку: отказ до secretStore/spawn/managed writes, исходный файл не изменён. Не расширяй guard догадками.
+
+Укажи границы `read` с абсолютным путём, `fetch.enabled=false`, user-level MCP, auto-discovery и старого full-auto. Для недоказанного применения и OS egress сохраняй `NOT PROVEN`; из argv/policy нельзя вывести OS sandbox.
+
+**Критерий:** каждая строка имеет воспроизводимый источник и проверяемый предел; обобщения шире реализации устранены, новых заявлений о real OMP нет.
+
+## M10-R.6 — финальная проверка и обновление статуса
+
+После каждого исправления выполняй его целевую проверку. На финальных файлах:
+
+```powershell
+node node_modules/vitest/vitest.mjs run tests/omp-runtime.test.ts tests/omp-launch-service.test.ts tests/omp-process-supervisor.test.ts tests/omp-integration-harness.test.ts tests/provider-dashboard-omp.test.ts tests/omp-route-readiness-preview.test.ts tests/provider-dashboard-server.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd test
+node scripts/dashboard-ui-smoke.mjs
+node scripts/dashboard-ui-smoke.mjs --negative
+node scripts/omp-browser-stack-smoke.mjs
+git diff --check
+```
+
+Также выполни добавленные negative/fault команды нового smoke, проверь ссылки изменённых документов и просмотри собственный diff, включая untracked. Записывай реальные команды, env overrides, exit, counts и расположение evidence; число тестов не является заданной константой. UI запускается на свежем `dist` после build.
+
+Обнови активные статусы главы 5 [REMAINING_PLAN.md](REMAINING_PLAN.md), [runbook](../omp-runtime-runbook-ru.md) и матрицы прав. Исторические отчёты/вердикты сохраняй. Step 4 без свежего Doctor/live v2/пилота, Step 5 по [решению M8](STEP5_FIXTURE_IMPORT_DECISION.md) остаётся BLOCKED/NOT PROVEN; глава 6/cutover не начинается. Если остаётся реальный blocker, сохрани точную причину и следующий воспроизводимый шаг, завершив остальные доступные проверки.
+
+**Критерий:** все выполненные локальные пункты имеют свежие доказательства; каждый невыполненный пункт назван отдельно. Успех этого пакета означает только готовность к независимому review локальной части.
+
+## M10-R.7 — итог обязательно в PEER_REVIEW и дословно в чат
+
+1. Подготовь единый текст: дата, branch/HEAD, статус **«отчёт исполнителя, ожидает независимого review»**; что сделано по R.1–R.6 и трём reviewer findings; RED→GREEN; команды/exit/counts; фактический browser/lifecycle результат и доступные evidence; изменённые файлы; оставшиеся ограничения; реально использованные skills.
+2. **До финального ответа и завершения отдельной цели M10-R** добавь этот текст в конец [PEER_REVIEW.md](PEER_REVIEW.md) под заголовком `## M10-R — отчёт исполнителя`. Предыдущие отчёты и исторические разделы сохраняются. Если продолжаешь уже существующий раздел M10-R, обнови его с сохранением истории фактических проверок вместо дублирования. Замечания координатора находятся только в handoff; свой результат записывает исполнитель.
+3. Перечитай свой раздел с диска. Финальный ответ пользователю должен **дословно совпадать с текстом под этим заголовком**. Итог только в чате без файла не завершает задание.
+4. При частичном результате честно перечисли NOT PROVEN/BLOCKED и остаток. Завершение локального пакета не закрывает общую миграционную цель.
+
+## Область изменений
+
+Основные файлы: оба browser smoke, `tests/omp-runtime.test.ts`, существующие OMP integration/runtime/service/supervisor/dashboard tests и `tests/support/omp-fake-child.mjs`. Production-код в `src/clients/omp/`, `src/application/omp-launch-service.ts`, OMP UI/HTTP и preview меняй только для воспроизведённого дефекта в этом контракте. Сопутствующие модули — только после установленной зависимости с кратким пояснением в плане. Документы результата перечислены выше; отдельные новые планы/skills не нужны.
+
+Выполни R.1 → R.7 короткими проверяемыми шагами. Следующий самостоятельный пакет назначит reviewer после проверки отчёта M10-R.
+> Заменённые результаты и задания M10-R/M10-R2 перенесены в [архив 18 октября 2026](archive/2026-10-18-m10r-and-m10r2-handoff-archive.md); устаревший статус `BLOCKED до реализации` отозван завершённой работой M10-R2.
+
+### Результат проверки M10-R2 координатором — 18 октября 2026
+
+**Вердикт: принято полностью для локальных критериев M10-R2.**
+
+Подтверждённые гейты:
+
+- `npx vitest run tests/omp-integration-harness.test.ts` — три независимых последовательных прогона, каждый **19/19 PASS**.
+- `npx vitest run tests/provider-dashboard-omp.test.ts tests/provider-dashboard-server.test.ts` — **56/56 PASS**.
+- `npx vitest run tests/omp-run-repository.test.ts` — **44/44 PASS**.
+- `npm run typecheck` — exit 0; `npm run build` — `{"ok":true,"jsEmitted":130}`; `node --check` обоих smoke — OK; `git diff --check` — чисто.
+- Просмотрен diff из шести файлов (**+277/-7**): минимальная правка `assertReadIdentity()` (+29), два набора regression-проверок, bounded startup в browser smoke, отчёт Sol и handoff-редакции. Новых P1/P2, debug-кода, секретов, ослабленных assertions либо лишнего scope не обнаружено.
+
+**Оценка `assertReadIdentity()`:** контрпримеров в контракте M10-R2 не найдено. Для открытого regular inode с `nlink=0` функция дополнительно проверяет текущий путь; отсутствие пути либо другой безопасный regular inode дают только retryable `OMP_RUN_CHANGED`. Symlink, non-regular, hard link (`nlink>1`) и небезопасный объект по текущему пути остаются fail-closed с `OMP_RUN_UNSAFE_PATH`. Во всех ветвях atomic replacement чтение не возвращает смешанный или невалидированный record. Замечаний P1/P2 нет.
+
+Локальные критерии главы 5 выполнены. Browser acceptance закрыт (см. «Дополнение — 18 октября 2026: browser acceptance»); M11 требует отдельного решения пользователя. До закрытия главы 5 фактически остаётся только внешнее pilot-доказательство: actual OMP binary, native resume, external egress/isolation и живая provider route. Локальный fake-child результат их не заменяет.
+
+### Дополнение — 18 октября 2026: browser acceptance закрыт
+
+Статус BLOCKED извернут авторизацией пользователя (gateway-owner, разрешение на root-установку в чате): 13 недостающих системных библиотек установлены через `su root` (`apt-get install -y libasound2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libcairo2 libcups2 libgbm1 libpango-1.0-0 libxcomposite1 libxdamage1 libxfixes3 libxkbcommon0 libxrandr2`; примечание: `sudo` отверг пароль пользователя, `su root` принял — проверено `su root -c whoami`). `ldd chrome` → 0 missing, `chrome --version` → `Google Chrome for Testing 155.0.8059.84`.
+
+С `PROVIDERDOCK_TEST_BROWSER=/home/agent/.cache/browsers/chrome/linux-155.0.8059.84/chrome-linux64/chrome` (профиль пользователя не создавался):
+- normal: `node scripts/omp-browser-stack-smoke.mjs` → exit 0, `ok:true`, 12/12 checks; evidence `.scratch/m10-browser-stack-evidence-93ZMpH` (report.json + screenshots).
+- negative: `node scripts/omp-browser-stack-smoke.mjs --negative` → exit 0, `ok:true`, 4 фазы (spawn/cdp-close/network/cleanup), каждая с ожидаемым дочерним exit 1 и собственной evidence-папкой `.scratch/m10-browser-negative-*`.
+
+**Вердикт дополнен: M10-R2 принят полностью, включая browser acceptance. Локальные условия главы 5 закрыты.** Остаточные ограничения прежние: real OMP/native resume/external egress/isolation не доказаны без внешнего этапа (M11).
+
+### M11 — граница после M10-R2
+
+Начинать только после принятия M10-R2 и отдельного разрешения пользователя на внешний этап. Глава 5 требует реального OMP/pilot доказательства для actual binary, native resume, external egress/isolation и живой provider route; локальный fake-child не может его заменить. По умолчанию M11 ограничивается подготовкой проверяемого плана и evidence schema; выполнение реального `omp.exe`, live credentials, paid Doctor/VSLLM, сеть вне loopback, OS isolation, cutover, commit/push/PR запрещены до отдельного задания. Критерий старта внешней части — явная авторизация каждой из этих границ и лимитов стоимости/запросов.
