@@ -1,71 +1,109 @@
 # Текущий статус M11
 
-**A1 NOT PROVEN; A4 BLOCKED на шаге 1.** Пакет `df53911..2e8f92b` принят как честная фиксация неудачного elevated A1-rerun с перечисленными ниже P2; успешная приёмка A1 не состоялась. Единственный actual launch израсходован (`actualLaunches=1`, `retries=0`), новых запусков это ревью не разрешает. Причина exit 1 не установлена.
+**A1 NOT PROVEN; A4 BLOCKED на шаге 1.** Пакет `df53911..2e8f92b` принят как честная фиксация неудачного elevated A1-rerun (вердикт `717785c`): self-test PASS для мониторинга, actual OMP exit 1 через 6.924 с до ответа ACP `initialize`, причина не установлена из-за отсутствия диагностики на аварийном пути, бюджет запуска израсходован, повторов не было.
 
-Прежнее [задание elevated A1-rerun](archive/2026-10-19-a1-failed-handoff-archive.md) перенесено в архив. Исторические [вердикт prelaunch BLOCKED](archive/2026-10-19-a1-elevated-handoff-archive.md), [приёмка P2](archive/2026-10-19-a1-rerun-handoff-archive.md) и [исходный контракт evidence](archive/2026-10-19-a1-blocked-handoff-archive.md) сохраняются; их истёкшие окна не дают нового разрешения.
+Владелец (gateway-owner MEGAJava505) 19 октября 2026 разрешил: **второй диагностический запуск** и **закрытие P2-S1 (internal integrity) в одном пакете**. Координатор команд на машине пользователя не выполняет: исполняет пользователь в elevated PowerShell, координатор проверяет evidence.
 
-## Результат проверки elevated A1-rerun координатором — 19 октября 2026
+Прежний вердикт перенесён в [архив](archive/2026-10-19-a1-diagnostic-handoff-archive.md). [Задание elevated](archive/2026-10-19-a1-failed-handoff-archive.md), [вердикт prelaunch BLOCKED](archive/2026-10-19-a1-elevated-handoff-archive.md), [приёмка P2](archive/2026-10-19-a1-rerun-handoff-archive.md) остаются в силе.
 
-Проверка выполнена в отдельном checkout `/tmp/omp-review-2e8f92b`, после `git fetch origin omp-integration`: HEAD и remote branch совпали с `2e8f92b2e8f47e72e21b97b2e81114a5dd0f8cbe`. Основной checkout и evidence не менялись; сеть использовалась только для fetch. Два независимых read-only ревью Standards/Spec выполнены в отдельных ветках/worktrees. Windows, OMP и исходные приватные ETL/XML здесь не запускались/не декодировались: выводы относятся к опубликованным нормализованным данным, их согласованности и целостности. Hash приватного источника не заменяет доступ к нему.
+## Задание A1-diagnostic — 19 октября 2026
 
-### Диапазон и append-only
+### 1. Границы и бюджет
 
-Точный диапазон: `df5391199daf944f59d871e45db27018c85859a0..2e8f92b2e8f47e72e21b97b2e81114a5dd0f8cbe`; база является предком, поэтому diff с `..` и `...` совпадает. `git diff --stat`: **25 files changed, 19188 insertions(+), deletions 0**. Все 25 name-status — `A`, только `evidence/m11-pilot/A1-actual-binary/`; каждый коммит отдельно также содержит только добавления.
+- Один диагностический launch pinned `omp.exe` **18.0.4**, SHA-256 **`1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba`**.
+- inert fixture, deadline ≤45 с, `actualLaunches=1`, `retries=0`, live requests/cost=0.
+- Без provider route, без credentials, без inference; A4 не открывается.
+- Цель прогона — **установить причину exit 1** и собрать полную диагностику на всех путях, а не доказать успех протокола.
+- Старые evidence не изменяются; всё новое — append-only.
 
-| Коммит | Добавлено | Что фиксирует |
-|---|---:|---|
-| `eea301384d2b49f211740271ac70bf37062830e6` | 4 файла, 139 строк | Token 000109, log 000116, summary 000118, manifest 000119: Medium/IsAdmin=false, STOP на token gate, actual launches=0; отсутствующие runtime измерения оставлены null. |
-| `27134831c1c3de4d868c502091cf607dfabf4835` | 8 файлов, 9732 строки | 000121–000124, 000128–000131: elevation PASS, metadata/config и self-test; negative helper exit 1 без сохранённого stderr, WFP/decoder coverage не доказаны, STOP до actual launch, бюджет не потрачен. |
-| `2e8f92b2e8f47e72e21b97b2e81114a5dd0f8cbe` | 13 файлов, 9317 строк | 000132–000144: исправленный self-test, authorization/preflight, единственный failed launch, дерево/сеть/side effects/summary, manifest и token actual collector. |
+### 2. P2-S1 — integrity backfill (в этом же пакете)
 
-Прямое сравнение байтов каждого прежнего Git blob с итоговым файлом: **172/172** из `df53911`, **176/176** из `eea3013`, **184/184** из `2713483` неизменны. Итого 197 evidence-файлов. Число 184 в summary относится к состоянию перед последним коммитом, а не к началу всего диапазона. P1 изменения старых evidence не обнаружено.
+Создать `integrity-correction-backfill-000145.json`:
 
-### Standards: integrity и redaction
+- для каждого из новых JSON пакета `df53911..2e8f92b`, у которых нет внутреннего `integrityHash` (18 из 19; `authorization-000132` уже имеет), записать вычисленный хеш и путь;
+- зафиксировать параметры canonicalization: удаляется только верхний `integrityHash`, recursive key sort `localeCompare('en')`, arrays preserved, pretty2 UTF-8 + LF, SHA-256;
+- append-only: старые файлы не переписывать.
 
-- SHA-256 [manifest 000143](../../evidence/m11-pilot/A1-actual-binary/integrity-hashes-elevated-000143.txt) точно равен **`ef50a8e02eb0fc28f7a5e5379cd0aef0266ffa5f930bb37d691d27058eed0c91`**. `sha256sum -c` из каталога A1: **000119 — 3/3, 000131 — 7/7, 000143 — 12/12 OK**, missing/mismatch 0. Манифесты исключают себя; SHA последнего передан отдельно.
-- **000144 покрыт** последней строкой 000143: SHA-256 `e8d5c4606337d8f47afc51839cf8f93b96f5c352cd43b391e5fa17ebac4d43e4` совпал. Поздний номер evidenceId не означает отсутствие в финальном манифесте. Сам token record наблюдает collector PID 26160 в 17:09:17.4129513–17:09:17.9448072 UTC, до actual launch. P2 «непокрытый 000144» отсутствует.
-- **P2-S1 — неполный внутренний integrity-контракт.** Из 19 новых JSON только [authorization 000132](../../evidence/m11-pilot/A1-actual-binary/authorization-rerun-elevated-000132.json) содержит `integrityHash`; у остальных **18** он отсутствует. Его digest `bd2688728db60a6b165797cfa9c06ce1b95a8f7c70e1fd2faf4a1a9cc05bb9b3` воспроизводится по заявленным Python `sort_keys=True`, `ensure_ascii=True`, pretty2 UTF-8 + LF без верхнего `integrityHash`. Однако это иной контракт, чем обязательные recursive `localeCompare('en')`, Node/ICU/Unicode metadata в исходном задании (архив, раздел общих полей и canonicalization). Не называть 19/19 internal hashes проверенными; manifest coverage не заменяет это требование. Это прозрачное отклонение формата, не обнаруженная подмена байтов. Duplicate JSON keys — 0; config/self-test hash bindings в authorization совпали.
-- Проверены **все 25 новых JSON/TXT**, включая полностью provider metadata **000122 (8360 строк)** и **000134 (8136 строк)**: текстовый поиск и просмотр структурированных значений на credentials/tokens, raw Authorization/headers/cookies, абсолютные Windows/POSIX/UNC пути, email и live account identifiers. Утечек не обнаружено. `MEGAJava505` — уже указанный владелец разрешения; стандартные Windows group/integrity SID, provider GUID, PID, hash, aliases и TEST-NET-1 `192.0.2.1` не являются live credential/account values. Имена полей вроде `clientPid`, упоминания headers/token и относительный `Temp/.../home/...` не являются утечками. Приватные исходники в этот redaction verdict не входят.
+Критерий: все 19 JSON покрыты, хеши воспроизводимы той же процедурой.
 
-Итог Standards: **1 P2**, P1 нет. Формальные требования internal integrity остаются открытыми; исправление возможно только новым append-only correction-пакетом, без переписывания этих 25 файлов.
+### 3. Обязательная диагностика на всех путях
 
-### Spec: self-test, launch, процессы и сеть
+До запуска настроить и проверить:
 
-[Self-test 000136](../../evidence/m11-pilot/A1-actual-binary/self-test-elevated-000136.json) обоснованно **PASS для проверки мониторинга**, не для OMP. Предыдущий EPERM/lstat negative helper исправлен `--preserve-symlinks-main` (log 000140). Затем controller ошибочно выдал STOP из-за transient PowerShell `Process.ExitCode`; исходный `controllerReportedStatus=BLOCKED` сохранён. В декодированных ProcessStop negative helper PID 29776 и его controller PID 29772 имеют exit 0; отдельный inert `cmd /c exit 7` после кеширования `Process.Handle` перед timed WaitForExit вернул 7. Коррекция — переоценка того же self-test по OS evidence; полного replay после неё не было, OS-критерии не ослаблены.
+1. **stdout/stderr в файлы** для OMP и контроллера, на всех ветках (успех, ошибка, таймаут, kill):
+   ```powershell
+   $p = Start-Process -FilePath $omp -ArgumentList @('<ARGS>') `
+        -WorkingDirectory '<OWNED_FIXTURE_CWD>' `
+        -RedirectStandardOutput '<OWNED>\logs\omp-stdout.log' `
+        -RedirectStandardError  '<OWNED>\logs\omp-stderr.log' -PassThru
+   ```
+   Файлы создаются всегда; ротация/усечение запрещены.
+2. **WER LocalDumps** для `omp.exe` (на время прогона, затем восстановить прежние значения):
+   ```powershell
+   $k = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\omp.exe'
+   New-Item -Path $k -Force | Out-Null
+   New-ItemProperty $k -Name DumpFolder -Value '<OWNED>\dumps' -PropertyType ExpandString -Force
+   New-ItemProperty $k -Name DumpType   -Value 1 -PropertyType DWord -Force
+   ```
+   Зафиксировать, был ли создан дамп; если да — путь/размер/SHA-256 в metadata (сам дамп не публиковать).
+3. **ACP handshake log**: CreateProcess/ResumeThread, UTC и монотонные тайминги, write/flush `initialize`, каждая граница frame/parse, ожидание ответа, EOF/таймаут, размеры сообщений. Без содержимого секретов.
+4. **Exit-code mapping**: `GetExitCodeProcess`/ETW ProcessStop PID+CreateTime, decimal и hex, применимые Win32/NTSTATUS/WER значения.
+5. **Runtime version/header до ACP** — без нового запуска: `Get-Item $omp | Select-Object -ExpandProperty VersionInfo` (FileVersion/ProductVersion) и, если применимо, версия из header, прочитанного файловым API.
+6. **Expected helpers**: `conhost.exe` предобъявить как ожидаемый system helper (путь, SHA-256, подпись, parent identity). Любой другой child вне списка — stop.
+7. **Job peak accounting** читать после завершения, на всех путях.
+8. ETW-сессии и self-test — как в предыдущем задании; self-test обязателен перед launch, PASS фиксируется в новом файле.
 
-Подтверждены ProcessStart ID 1 v4 / ProcessStop ID 2 v2, PID/CreateTime/sequence и parent linkage; synthetic child PID 28224 exit 7; loopback PID 29648 — 1 запрос, 64 sent/64 received на уровне приложения и Kernel-Network IDs 10/11; отрицательная проба `EACCES`, TCPIP IDs 1044/1034 v1 со статусом `0xC0000022`, WFP ID 1001 v2 Packet Dropped. Во всех пяти self-test источниках `EventsLost`, `LogBuffersLost`, `RealTimeBuffersLost`, `etlEventsLost`, `etlBuffersLost` равны 0. Это сильнее прежнего self-test 000124, где отрицательный результат и decoder coverage были не доказаны.
+### 4. Evidence-контракт (новые ID)
 
-[Authorization 000132](../../evidence/m11-pilot/A1-actual-binary/authorization-rerun-elevated-000132.json) issued в **17:09:15.411500 UTC**, окно **17:09:55.411500–17:11:55.411500 UTC**. Точное время conversation approval честно неизвестно. [Preflight 000137](../../evidence/m11-pilot/A1-actual-binary/preflight-elevated-000137.json) фиксирует static hash pinned 18.0.4 `1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba`, без исполнения для preflight, fresh zero-capability AppContainer, явное окружение без credentials/routes, Job limit=1/kill-on-close до ResumeThread. Запись не содержит собственного UTC времени; утверждение о записи/rehash до запуска и Running sessions содержится в run-log, детальные частные receipts недоступны.
+| ID | Файл | Обязательное содержимое |
+|---|---|---|
+| 000145 | `integrity-correction-backfill-000145.json` | пути, вычисленные hashes, canonicalization, покрытие 19 JSON |
+| 000146 | `authorization-diagnostic-000146.json` | phase/evidenceId, authorizationRef (это разрешение владельца), supersedes (`000132`), scope/project, responsible/approver, UTC window, monitoringPlan, stopCriterion, limits, integrityHash |
+| 000147 | `diagnostic-config-000147.json` | ETW sessions, WER config, redirect paths, handshake logging, expected helpers, restore plan |
+| 000148 | `preflight-diagnostic-000148.json` | binary hash без исполнения, VersionInfo, environment attestation, policy, free paths |
+| 000149 | `process-tree-diagnostic-000149.json` | parent→omp.exe→children, PID+creation time, path+SHA-256, exit codes, conhost declared, orphan check |
+| 000150 | `network-counters-diagnostic-000150.json` | attempted/allowed/denied, connections, bytes, requests, source/unit/baseline/final/delta, scope |
+| 000151 | `stdout-diagnostic-000151.log` | сырой stdout OMP, UTC-метки, без редакции секретов (их не должно быть) |
+| 000152 | `stderr-diagnostic-000152.log` | сырой stderr OMP |
+| 000153 | `wer-dump-metadata-diagnostic-000153.json` | dump yes/no, путь/размер/SHA-256, restore HKLM подтверждён |
+| 000154 | `acp-handshake-diagnostic-000154.json` | события handshake с таймингами и границами |
+| 000155 | `run-log-diagnostic-000155.txt` | хронология UTC, команды, exit codes, teardown |
+| 000156 | `side-effects-diagnostic-000156.json` | только owned fixture, перечень изменений, отсутствие внешних эффектов |
+| 000157 | `summary-diagnostic-000157.json` | итог, причина (или честно «не установлена»), ссылки на артефакты |
+| 000158 | `integrity-hashes-diagnostic-000158.txt` | SHA-256 всех новых файлов, манифест |
 
-[Process tree 000138](../../evidence/m11-pilot/A1-actual-binary/process-tree-elevated-000138.json), [run-log 000140](../../evidence/m11-pilot/A1-actual-binary/run-log-elevated-000140.txt), [network 000139](../../evidence/m11-pilot/A1-actual-binary/network-counters-elevated-000139.json) и [summary 000142](../../evidence/m11-pilot/A1-actual-binary/summary-elevated-000142.json) согласуются:
+Каждый новый JSON обязан содержать внутренний `integrityHash` по той же canonicalization (P2-S1 закрывается и для этого пакета).
 
-| Процесс | PID / parent | UTC create → exit | Exit |
-|---|---|---|---:|
-| Python controller | 32164 / 26160 | 17:09:55.503821500 → 17:10:09.517349100 | 1 |
-| Pinned OMP | 32708 / 32164 | 17:10:01.817702600 → 17:10:08.741964800 | 1 |
-| Windows console host | 15428 / 32708 | 17:10:01.828918800 → 17:10:08.744191400 | 0 |
+### 5. Критерии приёмки
 
-OMP lifetime **6.9242622 с**, округлённые **6.924262 с** верны; start/stop и controller/conhost lifecycle внутри окна и лимита 45 с. Exit 1 атрибутирован Kernel-Process **ProcessStop Event ID 2 v2**, с совпадением PID/CreateTime/sequence; нормализованное дерево содержит соответствующие поля, исходный actual event доступен только приватно. Отправлен только ACP `initialize`, ответа не получено; `session/new` и inference не отправлялись. `actualLaunches=1`, `retries=0`, requests/cost=0 согласованы. Runtime version/header не наблюдался: pin из preflight не подменяет runtime proof.
+**Пакет как диагностика — PASS**, если: все 14 файлов присутствуют; манифест `000158` и внутренние хеши сходятся; stdout/stderr захвачены на аварийном пути; WER metadata документирует dump или обоснованное его отсутствие; handshake log показывает границы и точку отказа; exit code замаплен; `conhost.exe` предобъявлен; `EventsLost=0`; orphan=0; side effects только fixture; redaction чист.
 
-- **P2-E1 — потеря диагностики и Job accounting на failure path.** Summary 000142 прямо признаёт: stdout/stderr обрабатывались в памяти, diagnostic/count fields копировались только в success-ветке; Job peak 000138 также остался null. Поэтому причину exit 1 и Job peak установить нельзя. Exit 1 сам по себе не доказывает crash, проблему auth/model/config или конкретный NTSTATUS. Это дефект сбора evidence, не свидетельство фабрикации.
-- **P2-E2 — непредобъявленный helper.** `conhost.exe` по lifecycle, parent linkage, image hash и заявленному QueryDosDeviceW path matching согласуется со штатным Windows console host. Публичной проверки Authenticode/точного системного пути нет, поэтому «криптографически подтверждённый штатный бинарь» не утверждается. Он корректно включён в дерево и network scope и честно помечен как не разрешённый заранее. Это отклонение expected helpers/stop-контракта; нельзя задним числом разрешить его или утверждать unexpected descendants=0. Доказательств вредоносности нет; Job limit=1 не доказывает, что OS console host входил в тот же Job, и не заменяет полный ETW tree.
-- **P2-E3 — неполный сетевой scope.** В 000139 нули — baseline/final/delta scoped counters: connections, DNS, transport attempts, WFP denied, sent/received bytes. Пять сессий остановлены/декодированы с exit 0, все native/ETL loss counters=0; actual event sets пусты, self-test counters не переиспользованы. 21 TCPIP event с одним execution-context PID исключён с объяснением: DPC context нельзя автоматически приписать OMP. Подмены неизвестных значений константными нулями не выявлено, но это **0 наблюдаемого egress/bytes для PID 32708 и 15428**, а не абсолютное доказательство любой сети. Controller/helpers исключены, отдельные требуемые счётчики для них отсутствуют. `applicationRequestCountFromTransport=null` корректен; отсутствие inference следует из метода/сценария, не из TCP packets. Независимо пересчитать приватный trace здесь невозможно.
-- **P2-E4 — полное время teardown не доказано.** Ранний postcheck в 17:10:09.7285832 охватывает controller/OMP и profile deletion HRESULT=0. Расширенный postcheck с conhost выполнен **17:16:11.1815338**, после окна: remaining=[], orphan=0 для трёх известных PID. ETW показывает, что все три завершились внутри окна, но точных UTC остановки ETW-сессий нет. Следовательно, `withinAuthorizationWindow=true` подтверждается для launch lifecycle; полный teardown/orphan check в окне не доказан. Поздний postcheck сам по себе не доказывает позднее завершение процессов.
+**A1 claim — PASS** только если получен ответ `initialize` и минимальный протокол завершился. Иначе A1 остаётся `NOT PROVEN` даже при полной диагностике.
 
-[Side effects 000141](../../evidence/m11-pilot/A1-actual-binary/side-effects-elevated-000141.json): пять новых файлов в owned profile (agent DB и native extraction), прежние fixture-файлы не изменены/не удалены, profile directory после cleanup отсутствует, traces сохранены приватно с hashes. Whole-host filesystem snapshot не снимался; отсутствие любых внешних изменений не выдаётся за измеренный факт.
+### 6. Stop-правила
 
-Итог Spec: **4 P2**, P1 не выявлено. **Пакет честно фиксирует неудачу; признаков фабрикации в опубликованных данных не обнаружено.** Это не гарантия происхождения недоступных исходников. A1 NOT PROVEN из-за failed launch до ACP initialize response; A4 BLOCKED. Ни self-test PASS, ни целые manifests этого не меняют.
+Self-test fail, `EventsLost>0`, child вне declared helpers, unexpected egress, cap breach, timeout, hash mismatch, side effect вне fixture, невозможность захвата диагностики на всех путях → **STOP**, `BLOCKED`/`NOT PROVEN`, без повторов без нового разрешения.
 
-### Следующий шаг: подготовить диагностический план для решения владельца
+### 7. После выполнения
 
-**Нужна новая явная авторизация владельца**, потому что единственный разрешённый actual launch уже израсходован. Решение о втором actual launch, числе дополнительных version/help запусков и новом будущем UTC-окне принимает владелец. Этот handoff задаёт содержание плана, но сам не разрешает исполнение. До успешного нового прогона и независимой приёмки A1 остаётся NOT PROVEN, A4 BLOCKED; само разрешение gate не закрывает. Retries=0, credentials/provider route/inference/cost=0 сохраняются.
+```powershell
+git add evidence/m11-pilot
+git commit -m "evidence(m11): record A1 diagnostic launch and integrity backfill"
+git push origin omp-integration
+```
 
-1. **Сначала проверить сборщик на inert helpers без OMP.** Покрыть exit 0/1/7, отказ до ответа, EOF, timeout/kill, переполнение output cap и ошибку чтения. Во всех случаях завершить drains/flush, получить hashes и counts, Job accounting и teardown timestamps; потерю/обрезку явно отмечать. Success и failure должны проходить один путь финализации. Это критерий готовности нового плана, а не повод потратить ещё один OMP launch на проверку logger.
-2. **stdout/stderr писать в отдельные ограниченные файлы с момента CreateProcess на ВСЕХ путях.** Сохранить их при early exit, ошибке ACP/decoder, timeout, watchdog kill и исключении controller; внешний supervisor обеспечивает финализацию при смерти controller. Зафиксировать byte counts, timestamps, hash, truncation/capture errors и EOF; неизвестные counts остаются null с причиной. Приватные файлы в owned защищённом каталоге; публиковать только проверенные redacted diagnostics и ссылки/hashes, не raw streams.
-3. **WER LocalDumps для `omp.exe`.** План должен явно включать scoped настройку Windows и её восстановление, owned dump folder, ACL, размер/число dumps и retention. Перед OMP проверить доступность WER в выбранной среде/изоляции на inert crash helper в рамках отдельно разрешённого self-test: для его отдельного executable нужна собственная временная per-executable настройка LocalDumps, аналогичная будущей настройке OMP, с последующим восстановлением. Dump и WER/Application Error records сохраняются приватно; наличие/отсутствие и ошибки сбора фиксируются. Обычный exit 1 может не породить WER dump: отсутствие dump не доказывает отсутствие ошибки.
-4. **ACP handshake log с UTC и монотонными таймингами.** Записать CreateProcess/ResumeThread, stdin initialize request ID и время успешного write/flush, каждую границу frame/parse/error, stdout/stderr byte arrival, response ID, EOF, process stop и watchdog. Зафиксировать, был ли runtime banner/header и на каком stream; отличать преждевременное завершение от timeout/ошибки framing. `session/new` только после валидного initialize response, inference запрещён.
-5. **Exit-code mapping и runtime version до ACP.** Сопоставить GetExitCodeProcess/WaitForExit/ETW PID+CreateTime+sequence, decimal/hex и только применимые Win32/NTSTATUS/WER значения; сохранить отдельно exit controller и OMP. До протокола проверить hash/metadata бинаря и попытаться получить реальный version/header. Отдельный non-protocol `omp.exe --version` или `--help` всё равно является запуском actual binary: разрешён только если владелец явно включит его в новый бюджет, с мониторингом, deadline и нулевыми credentials/network/inference. Не прятать такой шаг в preflight и не считать прежний бюджет доступным. Если версия недоступна без дополнительного запуска, записать ограничение и вынести его в решение владельца.
-6. **Обновить expected helpers и полноту наблюдения.** Предобъявить Windows `conhost.exe` с проверкой system image/hash/signature и parent identity; разрешение по одному basename недостаточно. Любой другой неожиданный child — STOP. Снимать Job peak/total/active/process/memory accounting до закрытия последнего handle на каждом пути; явно отделять Job membership от OS-created console host. ETW scope включает actual и всех descendants, controller/helpers/probes получают отдельные counters. Записать preflight/Running, final loss, процессный/orphan postcheck и stop каждой сессии с UTC так, чтобы bounded teardown был доказан внутри нового окна.
-7. **Новый append-only пакет.** После отдельного разрешённого прогона — новые IDs, все обязательные internal hashes с согласованной canonicalization, один финальный manifest со всеми поздними token/diagnostic records, его hash отдельно, redaction всех public artifacts. Прежние evidence и manifests неизменяемы. Без нового launch нельзя восстановить утраченные stdout/stderr или выдать A1 PASS; можно лишь дополнить доступные старые приватные источники честным correction record.
+Прислать координатору hash коммита и SHA-256 манифеста `integrity-hashes-diagnostic-000158.txt`. Далее — независимое ревью Astra; при приёмке диагностики A1-вопрос закрывается по факту (PASS или NOT PROVEN с установленной причиной), и только затем обсуждается шаг 1 для A4.
 
-При подготовке этого вердикта изменены только текущий handoff и архив прежнего задания; commit/push не выполнялись. Проверки результата: совпадение manifest SHA, 22/22 manifest entries, internal hash и bindings, отсутствие duplicate keys, полное byte comparison старых evidence, redaction scan, проверка ссылок/архивной копии и просмотр итогового diff. Реальный повтор Windows/OMP не выполнялся и без нового разрешения не входит в задачу.
+### 8. Сводная таблица
+
+| Шаг | Что сделать | Evidence |
+|---|---|---|
+| Backfill | пересчитать 18 хешей | 000145 |
+| Authorization | заполнить окно/роли/лимиты | 000146 |
+| Config | ETW, WER, redirects, helpers | 000147 |
+| Preflight | hash + VersionInfo + среда | 000148 |
+| Self-test | повторить перед launch | в 000147/000155 |
+| Launch | один, с redirect stdout/stderr | 000149–000156 |
+| WER | проверить dump и restore | 000153 |
+| Teardown | сессии, процессы, orphan | 000155 |
+| Публикация | manifest + push | 000158 |
