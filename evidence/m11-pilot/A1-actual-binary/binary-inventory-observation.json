@@ -1,0 +1,16 @@
+{
+  "actualBinaryExecuted": false,
+  "artifactId": "pinned-omp-0c6c981ee583",
+  "bytes": 190118912,
+  "expectedHashMatched": true,
+  "expectedPackageVersion": "18.0.4",
+  "observedAtUtc": "2026-10-19T07:47:57.524Z",
+  "peFileVersion": "1.4.0",
+  "pinnedBunVersion": "1.4.0",
+  "provenanceStatus": "isolated-validation-not-production",
+  "runtimeVersionObserved": false,
+  "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "snapshotArtifactRef": "../phase0-preparation/snapshot-observation.json",
+  "sourceCommit": "0c6c981ee5838d97700180383077eb0a3790637c",
+  "versionSource": "Static artifact.json and pinned source package; not executable stdout"
+}

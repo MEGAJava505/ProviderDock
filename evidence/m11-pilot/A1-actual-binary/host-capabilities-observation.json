@@ -1,0 +1,21 @@
+{
+  "actualOmpExecuted": false,
+  "administrator": false,
+  "alternativeIsolationProven": false,
+  "containerOrDistroStarted": false,
+  "docker": {
+    "classification": "daemon-not-operational; no raw output published",
+    "exitCode": 1,
+    "serverAvailable": false
+  },
+  "dockerService": "Stopped",
+  "observedAtUtc": "2026-10-19T07:45:12.901489Z",
+  "scope": "Read-only inventory; no external claim proven",
+  "windowsSandboxInstalled": false,
+  "wsl": {
+    "distributionCount": 2,
+    "distributionNamesPublished": false,
+    "exitCode": 0,
+    "nativeWindowsContainerAttestationAvailable": false
+  }
+}

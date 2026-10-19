@@ -1,0 +1,78 @@
+{
+  "actualBinaryLaunchLimit": 1,
+  "allowlistedOperations": [
+    "Read inventory/hash and source provenance",
+    "Create/delete one uniquely named owned zero-capability AppContainer profile",
+    "One bounded inert helper to attest process identity, low integrity, denied outside-fixture access and denied network",
+    "Only after preflight PASS, one managed RPC launch using existing OmpRuntime safe arguments, get_state and abort/EOF; no prompt/inference/tool execution"
+  ],
+  "approval": {
+    "approvalScope": "Operator selects safe concrete parameters within requested M11 workflow",
+    "basis": "User instructed execution, filling phase gates and delegated environment/parameter choices in this conversation",
+    "recordReviewedIndividuallyByUser": false,
+    "reference": "conversation:2026-10-19:M11-runbook-request-and-choice-delegation",
+    "signatureType": "Conversation authorization; no forged signature"
+  },
+  "approver": "requesting-user-via-explicit-delegation",
+  "authorizationRef": "A1",
+  "binary": {
+    "artifactId": "pinned-omp-0c6c981ee583",
+    "peVersionMeaning": "1.4.0 is the pinned Bun runtime, not the OMP package version",
+    "provenanceReference": "docs/omp-runtime-runbook-ru.md and local artifact.json",
+    "provenanceStatus": "isolated-validation-not-production",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "sourceCommit": "0c6c981ee5838d97700180383077eb0a3790637c",
+    "version": "18.0.4"
+  },
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClassAndAllowlistedRoute": {
+    "allowlistedRoute": "none",
+    "credentialClass": "none-live; synthetic fixture marker only if needed for managed configuration",
+    "liveCredentialsPermitted": false
+  },
+  "deadlineSeconds": 45,
+  "evidenceId": "M11-20261019-000005",
+  "executionPreconditionsSatisfied": false,
+  "gateStatus": "APPROVED-FOR-BOUNDED-SCOPE-BY-DELEGATION",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "e415c728de5142f0ad773a99a7fd20f8d38d18ec2ba89a2df85d343c9f8d2bf0"
+  },
+  "isolationPolicy": {
+    "globalFirewallOrAclChangesPermitted": false,
+    "liveUserStateAccessPermitted": false,
+    "mechanism": "Windows AppContainer with zero network capabilities; owned temporary profile and owned fixture ACLs only",
+    "readiness": "Must be positively attested in Phase 1 before actual OMP launch",
+    "revision": "m11-appcontainer-no-network-v1"
+  },
+  "phase": "phase1-authorization-preflight",
+  "phases": [
+    "phase1-authorization-preflight",
+    "phase2-actual-binary-launch"
+  ],
+  "preflightProbeLimit": {
+    "deniedNetworkAttempt": 1,
+    "inertIsolationProcess": 1,
+    "profileCreateDelete": 1,
+    "requestPayloadBytes": 0
+  },
+  "project": "ProviderDock/omp-integration/M11/isolated-pilot",
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "scope": "One isolated bounded actual OMP RPC initialization/checkpoint using inert fixture; no inference or live provider route",
+  "snapshotRef": "../phase0-preparation/snapshot-observation.json",
+  "status": "PASS",
+  "stopCriterion": "Stop on missing isolation attestation, profile/probe failure, hash/version mismatch, unexpected child or egress, side effect, launch/probe deadline, nonzero live request/cost counter, or ambiguous lifecycle; no fallback or automatic retry",
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:58:55.260Z",
+    "start": "2026-10-19T07:28:55.260Z"
+  }
+}

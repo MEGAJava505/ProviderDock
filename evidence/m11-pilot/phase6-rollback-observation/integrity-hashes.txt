@@ -1,0 +1,6 @@
+# sha256; JSON sorted-keys-pretty-json-utf8-lf-v1, text UTF-8 LF; this file excludes itself
+11e15ffc76a2cfc071364aaa5a213e87db8e891de9f79bc903064e6a35c79394  authorization.json
+b03222fd4fbb492a7e1cdb38f25aa9c8bbffe998cdd0d8f009cc75a509570a6c  preflight.json
+b622c0034d6f0cb1ef7d3cb8170e37a814a896bf2ceacb491741167b5d0bc7a3  run-log.txt
+773094e1dfeed7932ce255fa3c3476a66a368e639ab0fa5a0b0b8efbe21d04a9  side-effects.json
+a7e6cc6598bb183fa68a7c1135980f2c521b0d193577ec1f2dd1cc517478bf87  summary.json

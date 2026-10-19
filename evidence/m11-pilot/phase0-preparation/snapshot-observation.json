@@ -1,0 +1,45 @@
+{
+  "bundleRefMatchesBaseCommit": true,
+  "bundleVerifyExitCode": 0,
+  "capturedAtUtc": "2026-10-19T07:25:29.681Z",
+  "locationLocalOnly": ".scratch/m11-pilot-work-20261019/.m11-snapshot",
+  "manifest": {
+    "baseCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035",
+    "binary": {
+      "packageVersion": "18.0.4",
+      "peFileVersion": "1.4.0",
+      "runtimeVersionObserved": false,
+      "sourceCommit": "0c6c981ee5838d97700180383077eb0a3790637c",
+      "trustReference": "docs/omp-runtime-runbook-ru.md"
+    },
+    "branch": "omp-integration",
+    "capturedAtUtc": "2026-10-19T07:25:29.681Z",
+    "files": [
+      {
+        "bytes": 2464085,
+        "path": "omp-integration.bundle",
+        "sha256": "4906284a756839becb6fbf5a5210376e1d3d6eb6cde6e4c4f6f1c1178f396742"
+      },
+      {
+        "bytes": 12,
+        "path": "provider-dock-state-hashes.txt",
+        "sha256": "0ff1a75c0c43488e5745e9a6449e7b7f3c1ca9483dc36004851656ee68726716"
+      },
+      {
+        "bytes": 190118912,
+        "path": "actual-omp.exe",
+        "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba"
+      }
+    ],
+    "immutability": {
+      "mechanism": "Read-only file attributes plus pinned SHA-256 verified before use",
+      "osIsolationAttestation": "not-applicable-to-local-snapshot",
+      "wormMedia": false
+    },
+    "providerDockState": "not-present-in-isolated-worktree",
+    "scope": "Clean isolated pilot worktree; original checkout and user state preserved without copying or opening live state"
+  },
+  "manifestSha256": "a064f8571e45f894f8742a304690d3bf0ec7bc21ff788aa6dae289ea6ccac962",
+  "originalProviderDockStateTouched": false,
+  "snapshotContentsPublished": false
+}

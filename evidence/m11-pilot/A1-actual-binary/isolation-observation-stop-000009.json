@@ -1,0 +1,24 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualOmpExecuted": false,
+  "authorizationRef": "authorization-runtime-profile-000008.json",
+  "diagnosis": {
+    "actualInertProcessesLaunched": 0,
+    "actualOmpLaunches": 0,
+    "cleanup": "Owned profile delete HRESULT 0; mapping count later observed 0",
+    "firewallChanged": false,
+    "fixtureOwnerMatchesProfileCreatingIdentity": false,
+    "win32FailureCode": 5
+  },
+  "endedAtUtc": "2026-10-19T07:34:40Z",
+  "errorClass": "RuntimeError",
+  "evidenceId": "M11-20261019-000009",
+  "normalizedCause": "owned-fixture-acl-rejected:exit=5",
+  "phase": "phase1-authorization-preflight",
+  "policyRevision": "m11-appcontainer-no-network-v1",
+  "profileCleanupComplete": true,
+  "profileCreateHresult": 0,
+  "profileDeleteHresult": 0,
+  "startedAtUtc": "2026-10-19T07:34:40Z",
+  "status": "BLOCKED"
+}

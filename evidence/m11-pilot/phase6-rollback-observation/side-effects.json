@@ -1,0 +1,20 @@
+{
+  "artifactsAffected": [],
+  "assessment": "none",
+  "decision": "Do not advance; preserve Phase 0 snapshot and A1 stop evidence",
+  "evidenceId": "M11-20261019-000033",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "bf361e81a21c5fc61bf391e59965f203772d45b4d365081718f6d28c4196dbd6"
+  },
+  "observedAtUtc": "2026-10-19T07:47:57.524Z",
+  "owner": "codex-pilot-operator",
+  "phase": "phase6-rollback-observation",
+  "scope": "No operation for this phase executed",
+  "status": "BLOCKED"
+}

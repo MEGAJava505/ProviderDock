@@ -1,0 +1,74 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualOmpLaunches": 0,
+  "artifactLocations": [
+    "phase0-preparation/summary.json",
+    "A1-actual-binary/summary.json",
+    "A2-native-resume/summary.json",
+    "A3-egress-isolation/summary.json",
+    "A4-provider-route/summary.json",
+    "phase6-rollback-observation/summary.json"
+  ],
+  "baseCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035",
+  "blocker": "A1 isolation preflight cannot be accepted: two different inert helpers exited 0xc0000142 under the contained launch before valid filesystem/network observations. Process identity attestation alone does not prove the required isolation boundary.",
+  "capturedAtUtc": "2026-10-19T07:47:57.524Z",
+  "claims": {
+    "actualOmpExe": "NOT PROVEN",
+    "externalEgressIsolation": "NOT PROVEN",
+    "liveProviderRoute": "NOT PROVEN",
+    "nativeResume": "NOT PROVEN"
+  },
+  "cleanup": {
+    "globalFirewallChanged": false,
+    "matchingInertOrOmpProcessNames": 0,
+    "originalUserStateMutated": false,
+    "ownAppContainerMappings": 0
+  },
+  "evidenceId": "M11-20261019-000035",
+  "executionScope": "Attempted sequential runbook execution; stopped in Phase 1, no skipped dependency gate executed",
+  "externalPilotAccepted": false,
+  "inertHelperLaunches": 2,
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "74096358fc9d071fbc1a5680470e965b03ca044faed74c93bde3b56d5930dc0b"
+  },
+  "integrityPolicy": {
+    "canonicalJson": "sorted-keys-pretty-json-utf8-lf-v1",
+    "corrections": "Every failed observation and authorization correction retained; fixed files not overwritten",
+    "fileManifests": "Each phase integrity-hashes.txt lists every published file in that phase except itself; this root manifest covers all published artifacts except itself",
+    "localSnapshotVerification": "Observed locally; only redacted snapshot metadata is committed",
+    "recordHashExcludes": [
+      "integrityHash"
+    ]
+  },
+  "liveCredentialValuesRead": false,
+  "liveProviderCommands": 0,
+  "phaseStatus": {
+    "phase0": "PASS",
+    "phase1": "BLOCKED",
+    "phase2": "NOT STARTED",
+    "phase3": "NOT STARTED",
+    "phase4": "NOT STARTED",
+    "phase5": "NOT STARTED",
+    "phase6": "NOT STARTED; current-phase setup teardown only"
+  },
+  "providerCost": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "rootCauseStatus": "NOT ESTABLISHED for DLL initialization failure; ownership and label setup observations retained separately",
+  "runbook": "docs/omp-migration/M11_PILOT_RUNBOOK.md",
+  "schema": "docs/omp-migration/M11_EXTERNAL_PILOT_PLAN.md",
+  "snapshot": {
+    "bundleSha256": "4906284a756839becb6fbf5a5210376e1d3d6eb6cde6e4c4f6f1c1178f396742",
+    "localOnly": ".scratch/m11-pilot-work-20261019/.m11-snapshot",
+    "metadata": "phase0-preparation/snapshot-observation.json",
+    "note": "Read-only attributes plus hashes; no tamper-proof/WORM or external isolation claim; no original live state copied"
+  },
+  "status": "BLOCKED"
+}

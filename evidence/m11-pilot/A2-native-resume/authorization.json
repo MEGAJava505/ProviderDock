@@ -1,0 +1,45 @@
+{
+  "approver": "not-issued-prerequisites-blocked",
+  "authorizationRef": "A2",
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD",
+    "meaning": "Current closed-gate limit, not a future approval"
+  },
+  "credentialClassAndAllowlistedRoute": {
+    "allowlistedRoute": "not-issued",
+    "availableCredentialClass": "none",
+    "requiredCredentialClass": "none"
+  },
+  "evidenceId": "M11-20261019-000019",
+  "execution": "NOT STARTED",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "63222bafe7467259e1799ca70ea0bcd477fa1438772f4c3f510ee005d762319d"
+  },
+  "missingFieldsOrPrerequisites": [
+    "accepted Phase 2 run",
+    "immutable source state hash",
+    "native resume linkage",
+    "approved concrete resume operation/window"
+  ],
+  "phase": "phase3-native-resume",
+  "project": "ProviderDock/omp-integration/M11",
+  "reason": "A1 preflight BLOCKED and Phase 2 not executed; phase was not entered",
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "scope": "Native resume",
+  "status": "BLOCKED",
+  "stopCriterion": "Do not enter this phase while preceding evidence or its own required gate/observations are missing",
+  "userDelegationContext": "Workflow/environment choices delegated; no fictional approval of missing route, credential or prerequisite evidence",
+  "utcTimeWindow": {
+    "authorized": false,
+    "end": null,
+    "start": null
+  }
+}

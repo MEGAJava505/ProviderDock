@@ -1,0 +1,27 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualOmpLaunches": 0,
+  "actualResult": "PowerShell stdin has no script root; observation writer failed after the native-probe try/finally, before HRESULTs were published",
+  "authorizationRef": "A1/authorization.json",
+  "correction": "Use explicit owned observation path and publish normalized result before file write; retain this stop record",
+  "cost": 0,
+  "createDeleteOutcome": "unknown-no-PASS-claim",
+  "evidenceId": "M11-20261019-000006",
+  "expectedResult": "Normalized create/delete HRESULTs durably recorded",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "0951f2c6a7863f1828147adb340781515c0d8385cdc1d6a120e376a329bdbc83"
+  },
+  "observedAtUtc": "2026-10-19T07:30:07.691Z",
+  "operation": "Owned AppContainer profile create/delete probe; no child process or actual OMP launch",
+  "phase": "phase1-authorization-preflight",
+  "providerRequests": 0,
+  "rollbackDecision": "No original state or production setting changed; own profile cleanup ran in finally, exact HRESULT was not captured",
+  "status": "NOT PROVEN",
+  "stopOutcome": "Stopped before any actual OMP or inert helper process; Phase 1 not accepted"
+}

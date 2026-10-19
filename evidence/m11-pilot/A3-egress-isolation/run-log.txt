@@ -1,0 +1,2 @@
+2026-10-19T07:47:57.524Z NOT STARTED phase4-egress-isolation; A1 preflight BLOCKED and Phase 2 not executed; phase was not entered.
+2026-10-19T07:47:57.524Z No execution, phase gate/window not opened, no synthetic result promoted to external evidence.

@@ -1,0 +1,100 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "A1 isolation preflight cannot be accepted: two different inert helpers exited 0xc0000142 under the contained launch before valid filesystem/network observations. Process identity attestation alone does not prove the required isolation boundary.",
+  "approver": "requesting-user-via-explicit-delegation",
+  "artifactLocations": [
+    "authorization.json",
+    "authorization-native-node-probe-000014.json",
+    "binary-inventory-observation.json",
+    "host-capabilities-observation.json",
+    "isolation-observation-stop-000013.json",
+    "isolation-observation-stop-000015.json",
+    "final-cleanup-observation.json",
+    "run-log.txt",
+    "side-effects.json",
+    "summary.json"
+  ],
+  "authorizationRef": "authorization-native-node-probe-000014.json",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD",
+    "scope": "No provider command issued"
+  },
+  "credentialClass": "none-live; no credential value read or supplied",
+  "environmentAttestation": {
+    "actorAdministrator": false,
+    "liveCredentialValuesRead": false,
+    "originalLiveVaultOrSessionStateOpened": false,
+    "os": "Windows",
+    "sourceCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035",
+    "staticToolProvenanceRead": true,
+    "version": "10.0.26300.0"
+  },
+  "evidenceId": "M11-20261019-000016",
+  "execution": "Preflight stopped; Phase 2 NOT STARTED",
+  "expectedResult": "Positive process identity, owned-fixture write, denied outside-fixture read and denied network from a bounded inert helper before one actual OMP launch",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "c889c44491c3bd1cfa1485c211ce2cc8d76b9790921602847c1cf7c92be84ed9"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "networkEgressObservation": {
+    "noPacketPayloadOrRawEndpointCaptured": true,
+    "noRealProviderRequestIssued": true,
+    "processNetworkCapabilitiesObserved": 0,
+    "status": "NOT PROVEN",
+    "validInertNetworkProbeOutput": false
+  },
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4-static-provenance-only",
+  "osIsolationAttestation": {
+    "accepted": false,
+    "filesystemObservation": "NOT PROVEN",
+    "networkObservation": "NOT PROVEN",
+    "policyRevision": "m11-appcontainer-native-profile-no-network-v2",
+    "processIdentity": {
+      "activeProcessLimit": 1,
+      "capabilityCount": 0,
+      "childProcessCreationDenied": true,
+      "inheritedHandlesRestrictedToStdio": true,
+      "integrityRid": 4096,
+      "isAppContainer": true,
+      "jobKillOnClose": true,
+      "packageIdentityMatches": true
+    },
+    "rootCauseOfDllInitializationFailure": "NOT ESTABLISHED; no unsupported claim about a global OS defect"
+  },
+  "phase": "phase1-authorization-preflight",
+  "preflightId": "m11-a1-isolation-preflight",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1: normalized observations only; no secrets, raw headers, payloads, transcripts, provider endpoints, account identities or absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "Live provider commands issued by operator; not a claim about global host network traffic"
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-via-explicit-delegation",
+    "decision": "not-needed",
+    "reason": "No actual binary run or original-state mutation; owned setup profiles were torn down"
+  },
+  "routeIdRedacted": "none",
+  "runId": "not-applicable-actual-binary-not-launched",
+  "sideEffectAssessment": "Owned preparation artifacts and temporary AppContainer profiles only; all owned profiles removed; no actual OMP or provider action",
+  "status": "BLOCKED",
+  "utcTimeWindow": {
+    "authorizationWindowRef": "authorization.json",
+    "end": "2026-10-19T07:47:57.524Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T07:42:01Z"
+  }
+}

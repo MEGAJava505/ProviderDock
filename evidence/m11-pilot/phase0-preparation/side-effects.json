@@ -1,0 +1,28 @@
+{
+  "artifacts": [
+    "owned-worktree/node_modules",
+    "owned-worktree/dist",
+    "owned-worktree/.scratch",
+    "owned-worktree/.m11-snapshot",
+    "evidence/m11-pilot/phase0-preparation"
+  ],
+  "assessment": "observed",
+  "classification": "Expected preparation writes only",
+  "decision": "Preserve owned preparation artifacts and snapshot; no restore needed",
+  "evidenceId": "M11-20261019-000003",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "2f30e879b52d8fc05f626f07c04c1eb16a01afada4ed3d94473a1d74ffe31a8b"
+  },
+  "observedAtUtc": "2026-10-19T07:25:29.681Z",
+  "originalUserState": "Not opened or modified",
+  "owner": "codex-pilot-operator",
+  "phase": "phase0-preparation",
+  "status": "PASS",
+  "unexpectedEffects": "None observed within preparation scope"
+}

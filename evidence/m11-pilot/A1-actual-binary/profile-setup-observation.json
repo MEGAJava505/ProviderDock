@@ -1,0 +1,13 @@
+{
+  "actualOmpExecuted": false,
+  "childProcessesLaunched": 0,
+  "cleanupComplete": true,
+  "createHresult": 0,
+  "deleteHresult": 0,
+  "endedAtUtc": "2026-10-19T07:30:13.7056222Z",
+  "networkCapabilitiesRequested": 0,
+  "operation": "Create then delete one uniquely named owned AppContainer profile",
+  "profileIdRedacted": "owned-M11-preflight-profile",
+  "startedAtUtc": "2026-10-19T07:30:13.6506879Z",
+  "status": "PASS"
+}

@@ -1,0 +1,32 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualOmpExecuted": false,
+  "actualOmpLaunches": 0,
+  "authorizationRef": "authorization-native-node-probe-000014.json",
+  "endedAtUtc": "2026-10-19T07:42:03Z",
+  "errorClass": "JSONDecodeError",
+  "evidenceId": "M11-20261019-000015",
+  "filesystemAndNetworkProof": "NOT PROVEN",
+  "inertProbeExitCode": 3221225794,
+  "normalizedCause": "local-controller-error-no-raw-details-published",
+  "normalizedProcessExit": "0xc0000142 DLL initialization failure; no valid probe observation emitted",
+  "phase": "phase1-authorization-preflight",
+  "policyRevision": "m11-appcontainer-native-profile-no-network-v2",
+  "processAttestation": {
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": true,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "packageIdentityMatches": true
+  },
+  "profileCleanupComplete": true,
+  "profileCreateHresult": 0,
+  "profileDeleteHresult": 0,
+  "startedAtUtc": "2026-10-19T07:42:01Z",
+  "status": "BLOCKED",
+  "stderrBytes": 0,
+  "workDirectoryPolicy": "Native owned AppContainer profile Temp; no filesystem integrity-label change requested"
+}

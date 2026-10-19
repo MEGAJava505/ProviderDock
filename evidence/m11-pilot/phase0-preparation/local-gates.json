@@ -1,0 +1,86 @@
+{
+  "gates": [
+    {
+      "command": "git pull --ff-only origin omp-integration",
+      "exitCode": 0,
+      "result": "Fast-forward 30f95f7 to b9fa02f"
+    },
+    {
+      "command": "npm ci --cache <owned-relative-cache> --no-audit --no-fund",
+      "exitCode": 0,
+      "packagesAdded": 49
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "jsEmitted": 130,
+      "ok": true
+    },
+    {
+      "command": "node --check scripts/omp-browser-stack-smoke.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node --check scripts/dashboard-ui-smoke.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "npx vitest run tests/omp-run-repository.test.ts tests/omp-runtime.test.ts tests/omp-launch-service.test.ts tests/omp-process-supervisor.test.ts tests/omp-integration-harness.test.ts tests/provider-dashboard-omp.test.ts tests/provider-dashboard-server.test.ts",
+      "exitCode": 0,
+      "filesPassed": 7,
+      "skipped": 0,
+      "testsPassed": 228
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "git bundle create / verify / list-heads",
+      "exitCode": 0,
+      "result": "Complete history; base ref verified"
+    }
+  ],
+  "observedAtUtc": "2026-10-19T07:25:29.681Z",
+  "suites": [
+    {
+      "file": "omp-integration-harness.test.ts",
+      "status": "passed",
+      "tests": 19
+    },
+    {
+      "file": "omp-launch-service.test.ts",
+      "status": "passed",
+      "tests": 25
+    },
+    {
+      "file": "omp-process-supervisor.test.ts",
+      "status": "passed",
+      "tests": 47
+    },
+    {
+      "file": "omp-run-repository.test.ts",
+      "status": "passed",
+      "tests": 44
+    },
+    {
+      "file": "omp-runtime.test.ts",
+      "status": "passed",
+      "tests": 37
+    },
+    {
+      "file": "provider-dashboard-omp.test.ts",
+      "status": "passed",
+      "tests": 15
+    },
+    {
+      "file": "provider-dashboard-server.test.ts",
+      "status": "passed",
+      "tests": 41
+    }
+  ]
+}

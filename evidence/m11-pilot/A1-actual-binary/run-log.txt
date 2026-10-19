@@ -1,0 +1,9 @@
+2026-10-19T07:16:57.662Z OBSERVED static binary inventory and trusted repository pin; no execution.
+2026-10-19T07:30:13.705Z OBSERVED corrected owned profile create/delete HRESULT=0/0; no process launch.
+2026-10-19T07:34:40Z STOP own fixture DACL grant exit=5; profile cleanup HRESULT=0; no inert or OMP launch. Prior evidence retained.
+2026-10-19T07:36:13.401Z OBSERVED fixture owner differs from profile-creating identity; owned profile mapping count=0.
+2026-10-19T07:38:11Z STOP fresh fixture ownership corrected; DACL setup passed; custom low-integrity label exit=5; profile cleanup HRESULT=0; no process launch.
+2026-10-19T07:39:41Z STOP native profile storage used without label changes; inert managed helper token attested but process exit=0xc0000142; no valid file/network observations; profile removed.
+2026-10-19T07:42:03Z STOP same containment with native Node inert helper: token attested, exit=0xc0000142, no valid file/network observation; profile removed.
+2026-10-19T07:45:13.472Z OBSERVED final owned profile mapping count=0 and matching inert/OMP process names=0; actual OMP launches=0; no original user-state mutation.
+2026-10-19T07:47:57.524Z FINAL Phase 1 BLOCKED; Phase 2 NOT STARTED. No inference, provider command, retry of actual OMP, global firewall change or cutover.

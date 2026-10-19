@@ -1,0 +1,24 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualOmpExecuted": false,
+  "authorizationRef": "authorization-owned-fixture-000010.json",
+  "diagnosis": {
+    "actualOmpLaunches": 0,
+    "customLowIntegrityLabelDenied": true,
+    "fixtureOwnershipCorrected": true,
+    "inertProcessesLaunched": 0,
+    "ownDaclGrantPassed": true,
+    "profileDeleted": true
+  },
+  "endedAtUtc": "2026-10-19T07:38:11Z",
+  "errorClass": "RuntimeError",
+  "evidenceId": "M11-20261019-000011",
+  "normalizedCause": "owned-low-integrity-label-failed:exit=5",
+  "phase": "phase1-authorization-preflight",
+  "policyRevision": "m11-appcontainer-no-network-v1",
+  "profileCleanupComplete": true,
+  "profileCreateHresult": 0,
+  "profileDeleteHresult": 0,
+  "startedAtUtc": "2026-10-19T07:38:11Z",
+  "status": "BLOCKED"
+}

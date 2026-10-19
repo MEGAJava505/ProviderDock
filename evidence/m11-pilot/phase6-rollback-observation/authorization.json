@@ -1,0 +1,43 @@
+{
+  "approver": "not-applicable-no-new-gate",
+  "authorizationRef": "none",
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD",
+    "meaning": "Current closed-gate limit, not a future approval"
+  },
+  "credentialClassAndAllowlistedRoute": {
+    "allowlistedRoute": "not-issued",
+    "availableCredentialClass": "none",
+    "requiredCredentialClass": "none"
+  },
+  "evidenceId": "M11-20261019-000031",
+  "execution": "NOT STARTED",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "e6b5293f90533992e66c592be7bf71c5248cdbe75546b7f14535b4ea8866a0c4"
+  },
+  "missingFieldsOrPrerequisites": [
+    "external phase completed or stopped after an actual run",
+    "phase-specific restore decision and observation"
+  ],
+  "phase": "phase6-rollback-observation",
+  "project": "ProviderDock/omp-integration/M11",
+  "reason": "No external pilot action occurred; only current-phase setup teardown was needed and is recorded under A1",
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "scope": "External pilot rollback observation",
+  "status": "BLOCKED",
+  "stopCriterion": "Do not enter this phase while preceding evidence or its own required gate/observations are missing",
+  "userDelegationContext": "Workflow/environment choices delegated; no fictional approval of missing route, credential or prerequisite evidence",
+  "utcTimeWindow": {
+    "authorized": false,
+    "end": null,
+    "start": null
+  }
+}

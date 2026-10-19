@@ -1,0 +1,97 @@
+{
+  "actualBinaryLaunchLimit": 1,
+  "allowlistedOperations": [
+    "Read inventory/hash and source provenance",
+    "Create/delete one uniquely named owned zero-capability AppContainer profile",
+    "One bounded inert helper to attest process identity, low integrity, denied outside-fixture access and denied network",
+    "Only after preflight PASS, one managed RPC launch using existing OmpRuntime safe arguments, get_state and abort/EOF; no prompt/inference/tool execution"
+  ],
+  "approval": {
+    "approvalScope": "Operator selects safe concrete parameters within requested M11 workflow",
+    "basis": "User instructed execution, filling phase gates and delegated environment/parameter choices in this conversation",
+    "recordReviewedIndividuallyByUser": false,
+    "reference": "conversation:2026-10-19:M11-runbook-request-and-choice-delegation",
+    "signatureType": "Conversation authorization; no forged signature"
+  },
+  "approver": "requesting-user-via-explicit-delegation",
+  "authorizationRef": "A1",
+  "binary": {
+    "artifactId": "pinned-omp-0c6c981ee583",
+    "peVersionMeaning": "1.4.0 is the pinned Bun runtime, not the OMP package version",
+    "provenanceReference": "docs/omp-runtime-runbook-ru.md and local artifact.json",
+    "provenanceStatus": "isolated-validation-not-production",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "sourceCommit": "0c6c981ee5838d97700180383077eb0a3790637c",
+    "version": "18.0.4"
+  },
+  "controllerSourceSha256": "94bb0bce2cc18016dc0bfa1cf535f6d61abd50bc20d792b048406d17c0cd9d6e",
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClassAndAllowlistedRoute": {
+    "allowlistedRoute": "none",
+    "credentialClass": "none-live; synthetic fixture marker only if needed for managed configuration",
+    "liveCredentialsPermitted": false
+  },
+  "deadlineSeconds": 45,
+  "evidenceId": "M11-20261019-000008",
+  "executionPreconditionsSatisfied": false,
+  "finalPreflightScope": "One owned AppContainer instance retained only if its inert isolation proof passes; no launch of OMP until complete attestation",
+  "gateStatus": "APPROVED-FOR-BOUNDED-SCOPE-BY-DELEGATION",
+  "inertProbeSourceSha256": "8b88d0a55d8307b0896c5e844acbcb75a94068ea9bcb1d8377a8472a8f97c8b4",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "888f43daf751293264c26614e95a2440e7fe1ba1c1763038ca72a45802013e52"
+  },
+  "isolationPolicy": {
+    "globalFirewallOrAclChangesPermitted": false,
+    "liveUserStateAccessPermitted": false,
+    "mechanism": "Windows AppContainer with zero network capabilities; owned temporary profile and owned fixture ACLs only",
+    "readiness": "Must be positively attested in Phase 1 before actual OMP launch",
+    "revision": "m11-appcontainer-no-network-v1"
+  },
+  "issuedAtUtc": "2026-10-19T07:34:33.435Z",
+  "phase": "phase1-authorization-preflight",
+  "phases": [
+    "phase1-authorization-preflight",
+    "phase2-actual-binary-launch"
+  ],
+  "policySources": [
+    "https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer",
+    "https://learn.microsoft.com/en-us/windows/win32/secauthz/appcontainer-isolation"
+  ],
+  "preflightProbeLimit": {
+    "deadlineSeconds": 10,
+    "deniedNetworkAttempt": 1,
+    "inertIsolationProcess": 1,
+    "requestPayloadBytes": 0,
+    "runtimeContainerProfiles": 1
+  },
+  "project": "ProviderDock/omp-integration/M11/isolated-pilot",
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "scope": "One isolated bounded actual OMP RPC initialization/checkpoint using inert fixture; no inference or live provider route",
+  "setupProbeHistory": {
+    "correctedProfileProbeCreateHresult": 0,
+    "correctedProfileProbeDeleteHresult": 0,
+    "observationWriterFailure": "preflight-observer-stop-000006.json",
+    "stopOutcomeClosedBy": "Corrected observer and captured successful create/delete; no OMP attempt occurred"
+  },
+  "snapshotRef": "../phase0-preparation/snapshot-observation.json",
+  "status": "PASS",
+  "stopCriterion": "Single attempt only. On nonzero launch, failed attestation, denied write inside fixture, outside-fixture access, network not positively denied, timeout, cleanup failure or unknown observation: stop Phase 1, delete only owned profile, do not launch OMP or open later phases.",
+  "supersedesForFutureExecution": [
+    "authorization.json",
+    "authorization-correction-000007.json"
+  ],
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:58:55.260Z",
+    "start": "2026-10-19T07:28:55.260Z"
+  }
+}

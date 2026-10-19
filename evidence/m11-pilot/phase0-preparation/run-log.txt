@@ -1,0 +1,7 @@
+2026-10-19T07:16:57.662Z OBSERVED pull fast-forward to b9fa02f; original untracked user files preserved.
+2026-10-19T07:18:29.593Z OBSERVED clean isolated worktree; npm ci exit=0 packages=49; no source changes.
+2026-10-19T07:19:02.910Z START local build/typecheck/syntax gates and seven OMP/dashboard suites.
+2026-10-19T07:19:29.217Z OBSERVED local gates exit=0; tests=228/228; skipped=0; build jsEmitted=130.
+2026-10-19T07:20:42.298Z OBSERVED git bundle verify exit=0; complete history and base ref match; isolated provider state not-present.
+2026-10-19T07:25:29.681Z OBSERVED pinned binary copied without execution; snapshot SHA-256 checked and files marked read-only.
+2026-10-19T07:25:29.681Z STOP Phase 0 complete; A1-A4 not opened by local PASS. No actual OMP execution, resume, provider command or OS policy change.

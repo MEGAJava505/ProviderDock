@@ -1,0 +1,54 @@
+{
+  "approver": "requesting-user-for-preparation-only",
+  "authorizationBasis": "User instructed runbook execution and delegated environment choices in this conversation",
+  "authorizationRef": "none",
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "credentialClassAndAllowlistedRoute": {
+    "credentialClass": "none",
+    "route": "none-for-provider"
+  },
+  "evidenceId": "M11-20261019-000001",
+  "externalAuthorizations": {
+    "A1": {
+      "issuedByPhase0": false,
+      "status": "BLOCKED"
+    },
+    "A2": {
+      "issuedByPhase0": false,
+      "status": "BLOCKED"
+    },
+    "A3": {
+      "issuedByPhase0": false,
+      "status": "BLOCKED"
+    },
+    "A4": {
+      "issuedByPhase0": false,
+      "status": "BLOCKED"
+    }
+  },
+  "externalGateStatus": "BLOCKED",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "140ad7d654845bea6b72953e996d10d1c86d6932a4a22c2b52679b609888aa13"
+  },
+  "phase": "phase0-preparation",
+  "project": "ProviderDock/omp-integration/M11",
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "scope": "Local preparation in clean isolated worktree only",
+  "status": "PASS",
+  "stopCriterion": "Stop preparation on dependency/build/test/hash failure or secret exposure; no actual OMP launch during Phase 0",
+  "utcTimeWindow": {
+    "appliesTo": "Observed preparation; not an external approval window",
+    "end": "2026-10-19T07:25:29.681Z",
+    "start": "2026-10-19T07:16:57.662Z"
+  }
+}

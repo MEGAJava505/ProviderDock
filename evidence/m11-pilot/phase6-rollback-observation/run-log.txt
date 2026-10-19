@@ -1,0 +1,2 @@
+2026-10-19T07:47:57.524Z NOT STARTED phase6-rollback-observation; No external pilot action occurred; only current-phase setup teardown was needed and is recorded under A1.
+2026-10-19T07:47:57.524Z No execution, phase gate/window not opened, no synthetic result promoted to external evidence.

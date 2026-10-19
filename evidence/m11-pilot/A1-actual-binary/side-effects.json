@@ -1,0 +1,31 @@
+{
+  "actualOmpLaunches": 0,
+  "assessment": "observed",
+  "classification": "Expected owned setup artifacts only; no external pilot action",
+  "customLowIntegrityLabelChange": "Requested once and denied; subsequently not requested",
+  "decision": "Retain local artifacts and read-only snapshot; do not launch actual OMP; do not advance to A2/A3/A4",
+  "evidenceId": "M11-20261019-000017",
+  "existingOwnershipChanged": false,
+  "globalFirewallChanged": false,
+  "inertProcessLaunches": 2,
+  "initialObserverLossProbe": "Outcome not captured, later owned mapping count 0",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "12cd605e4718517bad78ea821fa7c79052455ea82efac69717d94697f5581496"
+  },
+  "knownSuccessfulProfileCreateDeletePairs": 5,
+  "matchingInertOrOmpProcessNamesAfterCleanup": 0,
+  "observedAtUtc": "2026-10-19T07:47:57.524Z",
+  "originalLiveUserStateOpenedOrModified": false,
+  "ownedProfileMappingsAfterCleanup": 0,
+  "owner": "codex-pilot-operator",
+  "phase": "phase1-authorization-preflight",
+  "providerCommands": 0,
+  "staticBinaryProvenanceMetadataRead": true,
+  "status": "BLOCKED"
+}

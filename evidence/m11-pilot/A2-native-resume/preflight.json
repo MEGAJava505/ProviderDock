@@ -1,0 +1,67 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "A1 preflight BLOCKED and Phase 2 not executed; phase was not entered",
+  "approver": "not-issued-prerequisites-blocked",
+  "artifactLocations": [
+    "authorization.json",
+    "run-log.txt",
+    "side-effects.json",
+    "summary.json",
+    "../A1-actual-binary/summary.json",
+    "../A1-actual-binary/final-cleanup-observation.json"
+  ],
+  "authorizationRef": "A2",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD",
+    "scope": "No command for this phase issued"
+  },
+  "credentialClass": "none",
+  "environmentAttestation": "not-applicable-phase-not-entered",
+  "evaluationKind": "Dependency status only; not a phase preflight execution",
+  "evidenceId": "M11-20261019-000020",
+  "execution": "NOT STARTED",
+  "expectedResult": "Native resume requires accepted predecessors and its own complete gate/evidence",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "84db46c89c69168ab9f369bdffb75ccbe93f159df629d5065a6ce6ebeb36b1f4"
+  },
+  "nativeResumeLinkage": "not-applicable-no-source-run",
+  "networkEgressObservation": "not-applicable-no-phase-execution; no external network acceptance claim",
+  "ompBinarySha256": "not-applicable-no-binary-executed",
+  "ompBinaryVersion": "not-applicable-no-binary-executed",
+  "osIsolationAttestation": "NOT PROVEN; A1 inert containment startup did not yield valid file/network proof",
+  "phase": "phase3-native-resume",
+  "preflightId": "not-applicable-phase-not-entered",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1: normalized observations only; no secrets, raw headers, payloads, transcripts, provider endpoints, account identities or absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "No command for this phase issued"
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-via-delegated-workflow",
+    "decision": "not-needed",
+    "reason": "No actual OMP run, resume, provider request or original-state mutation; owned setup profiles removed"
+  },
+  "routeIdRedacted": "not-applicable-no-route-executed",
+  "runId": "not-applicable",
+  "sideEffectAssessment": "none from this phase because no phase command was executed; A1 setup teardown is recorded separately",
+  "status": "BLOCKED",
+  "utcTimeWindow": {
+    "end": "2026-10-19T07:47:57.524Z",
+    "meaning": "Blocked-status publication only; no execution window issued",
+    "observationWithinWindow": false,
+    "start": "2026-10-19T07:47:57.524Z"
+  }
+}

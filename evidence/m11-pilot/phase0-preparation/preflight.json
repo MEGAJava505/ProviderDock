@@ -1,0 +1,81 @@
+{
+  "actor": "codex-pilot-operator",
+  "actualResult": "Seven suites 228/228 PASS; local gates exit 0; bundle ref/hash verified; snapshot files marked read-only",
+  "approver": "requesting-user-for-preparation-only",
+  "artifactLocations": [
+    "authorization.json",
+    "local-gates.json",
+    "snapshot-observation.json",
+    "run-log.txt",
+    "side-effects.json",
+    "summary.json"
+  ],
+  "authorizationRef": "none",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD",
+    "scope": "No live provider command issued"
+  },
+  "credentialClass": "none",
+  "environmentAttestation": {
+    "ambientSensitiveVariableNamesCount": 0,
+    "architecture": "x64",
+    "credentialValuesRead": false,
+    "node": "v24.20.0",
+    "npm": "11.19.0",
+    "os": "Windows",
+    "sourceCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035",
+    "version": "10.0.26300.0",
+    "worktreeCleanBeforeGates": true
+  },
+  "evidenceId": "M11-20261019-000002",
+  "expectedResult": "Clean isolated checkout, installed dependencies, all local gates and verified read-only source/binary snapshot",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "b82de78a78959a5ec2d826875564900f0414e5ba87ea9dce4af3f76976be1b1b"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "networkEgressObservation": {
+    "actualOmpExecuted": false,
+    "claim": "not-applicable-to-external-pilot",
+    "externalPilotTelemetry": "not-started",
+    "localTests": "Synthetic loopback and fake child",
+    "packageRegistryFetch": "Expected npm ci dependency fetch only"
+  },
+  "ompBinarySha256": "not-applicable-no-binary-executed",
+  "ompBinaryVersion": "not-applicable-no-binary-executed",
+  "osIsolationAttestation": "not-applicable-Phase0-local-preparation-only",
+  "phase": "phase0-preparation",
+  "preflightId": "m11-phase0-local-preparation",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-redaction-v1: normalized observations only; no raw output, credentials, headers, payloads, transcripts, endpoints or absolute paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "Live provider commands issued by this operator; not global network telemetry"
+  },
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-for-preparation-only",
+    "decision": "not-needed",
+    "reason": "No external pilot action or original-state mutation occurred"
+  },
+  "routeIdRedacted": "not-applicable",
+  "runId": "not-applicable",
+  "sideEffectAssessment": "Only authorized preparation artifacts created in owned paths; original checkout state preserved",
+  "status": "PASS",
+  "utcTimeWindow": {
+    "authorizationWindowApplicable": false,
+    "end": "2026-10-19T07:25:29.681Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T07:16:57.662Z"
+  }
+}

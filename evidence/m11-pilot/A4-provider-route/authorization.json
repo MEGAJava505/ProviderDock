@@ -1,0 +1,45 @@
+{
+  "approver": "not-issued-prerequisites-blocked",
+  "authorizationRef": "A4",
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD",
+    "meaning": "Current closed-gate limit, not a future approval"
+  },
+  "credentialClassAndAllowlistedRoute": {
+    "allowlistedRoute": "not-issued",
+    "availableCredentialClass": "none",
+    "requiredCredentialClass": "scoped/ephemeral-not-provided"
+  },
+  "evidenceId": "M11-20261019-000027",
+  "execution": "NOT STARTED",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "artifactManifest": "integrity-hashes.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "exclude": [
+      "integrityHash"
+    ],
+    "value": "3387422663db06a361c5b80e0c6cee9262ebf188b1425519061cb8b563dfdf95"
+  },
+  "missingFieldsOrPrerequisites": [
+    "accepted Phase 1-4 evidence",
+    "redacted allowlisted provider route",
+    "protected scoped ephemeral credential mechanism",
+    "phase-specific numerical cost/request caps and UTC window"
+  ],
+  "phase": "phase5-provider-route",
+  "project": "ProviderDock/omp-integration/M11",
+  "reason": "A1 preflight BLOCKED and Phase 2 not executed; phase was not entered",
+  "requestLimit": 0,
+  "responsible": "codex-pilot-operator",
+  "scope": "Live provider route",
+  "status": "BLOCKED",
+  "stopCriterion": "Do not enter this phase while preceding evidence or its own required gate/observations are missing",
+  "userDelegationContext": "Workflow/environment choices delegated; no fictional approval of missing route, credential or prerequisite evidence",
+  "utcTimeWindow": {
+    "authorized": false,
+    "end": null,
+    "start": null
+  }
+}

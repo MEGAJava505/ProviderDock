@@ -1,0 +1,8 @@
+# sha256; JSON sorted-keys-pretty-json-utf8-lf-v1, text UTF-8 LF; this file excludes itself
+0eb38890e9ac9b00031444aced928ac6621deb3c4710f19ffcb21ff3aa778646  authorization.json
+919a084ce5d4a757f983ea33d4a5fd8d503403f5e1434d2e29dcd4827a6e47cb  local-gates.json
+d8f4e77c2710af4dae7dd6c27c3873a907ca88b3f5954d1bf78db9fbbd3bfab0  snapshot-observation.json
+7505a80e9ab80768ca139dfb342cd0c521ce7ed365340f5f77733111dcde1d06  preflight.json
+71b6e5facacc36608bbef165137609cad203b1779caaf53bd40cf6f00ee5bb2c  run-log.txt
+b0127d192a6950769061154b35131d14505bfbbd60bc5818f9175fad9b0e2b48  side-effects.json
+d30b536c7379236f19f636b7abe9f4bda6ee7c40709b1cf1fb135e3cd105684c  summary.json
