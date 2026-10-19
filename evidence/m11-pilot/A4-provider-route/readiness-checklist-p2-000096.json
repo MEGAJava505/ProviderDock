@@ -1,0 +1,140 @@
+{
+  "actor": "codex-evidence-owner",
+  "approvalRef": null,
+  "approver": null,
+  "artifactLocations": [
+    "../A1-actual-binary/summary-p2-correction-000091.json",
+    "summary-p2-correction-000093.json",
+    "../redaction-owner-decision-000089.json"
+  ],
+  "authorizationIssued": false,
+  "authorizationRef": "none-issued",
+  "blockers": [
+    "A1 observed process tree and measured attempted-egress evidence absent; separate future authorization would be needed for a new run",
+    "Independent acceptance of correction chain pending",
+    "No issuer-issued scoped/ephemeral credential/expiry/revocation capability confirmed",
+    "No exact selected model/revision, tariff or enforceable cost cap",
+    "No current provider-route isolation/monitor/ownership binding",
+    "No future execution UTC window or approved complete A4 authorization"
+  ],
+  "costApprover": null,
+  "costEnforcement": {
+    "counterSource": null,
+    "issuerOrGatewayEnforcement": null,
+    "preDispatchEnforcement": null,
+    "status": "NOT CONFIGURED",
+    "tariffSource": null,
+    "tariffVerifiedAtUtc": null
+  },
+  "costLimit": {
+    "amount": 0,
+    "currency": "USD",
+    "scope": "Current authorized live spending; prior proposed budgets are not approvals"
+  },
+  "credentialClass": "unavailable",
+  "credentialClassAndAllowlistedRoute": {
+    "credentialClass": "scoped/ephemeral-required-not-issued",
+    "routeIdRedacted": "PILOT_PROVIDER_ROUTE_ALIAS_01"
+  },
+  "credentialExpiryUtc": null,
+  "credentialRefRedacted": "PILOT_CREDENTIAL_ALIAS_01",
+  "credentialScope": null,
+  "environmentAttestationRef": null,
+  "evidenceId": "M11-20261019-000096",
+  "executionMechanism": {
+    "bindingPolicy": "Protected alias registry, inactive pilot profile, exact credential reference; verify presence without value or suffix",
+    "credentialImportPreparation": {
+      "cleanup": "finally: clear temporary process env, free marshaled buffer, dispose secure input; close local session; clear clipboard if used",
+      "forbidden": [
+        "setx",
+        "user/machine env writes",
+        "plaintext files",
+        "secret command literals",
+        "transcript/debug/env dumps"
+      ],
+      "hiddenInput": "Read-Host -AsSecureString in a local operator session",
+      "status": "NOT EXECUTED; step 1 remains blocked",
+      "transport": "Process-scoped env only for normal secrets set --from-env; command arguments contain names only"
+    },
+    "kind": "Normal ProviderDock CLI/API only after full authorization"
+  },
+  "expectedResult": "One approved minimal request on an exact model/revision and route under enforced caps, normalized outcome and teardown",
+  "futureAuthorizationFilename": "A4-authorization.json",
+  "gateStatus": "BLOCKED",
+  "historicalAttestationCorrectionRef": "summary-p2-correction-000093.json",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "eac2a02274bfa58fa3c8a973e36a9c58c196715394694d20db32f84d2c94ffe9"
+  },
+  "issuedAtUtc": "2026-10-19T13:15:45.524Z",
+  "issuerRevocationConfirmed": false,
+  "limits": {
+    "byteCap": null,
+    "currentlyAuthorizedProviderRequests": 0,
+    "maxInputTokens": null,
+    "maxOutputTokens": null,
+    "retries": 0,
+    "timeoutSeconds": null
+  },
+  "logAuditPlan": {
+    "fullCredentialSearch": "Local memory-only search, no value in command arguments or printed matches",
+    "performed": false,
+    "requiredSources": [
+      "application",
+      "controller/gateway",
+      "local shell history/transcripts",
+      "temp/config/crash artifacts",
+      "issuer usage/revocation audit"
+    ],
+    "unavailableSourcePolicy": "Explicitly unverified; never silently treated as zero matches"
+  },
+  "observationOwner": "evidence-operator",
+  "osIsolationAttestationRef": null,
+  "phase": "phase5-provider-route-preparation",
+  "prerequisiteChainAccepted": false,
+  "profileIdRedacted": "PILOT_PROFILE_ALIAS_01",
+  "project": "ProviderDock/omp-integration/M11",
+  "projectIdRedacted": "PROJECT_ALIAS_01",
+  "redactionPolicy": "m11-p2-alias-v1; no credential values, raw endpoints or real profile IDs in this checklist",
+  "requestLimit": 0,
+  "responsible": "evidence-operator",
+  "revocationPlan": {
+    "issuerCredentialOwner": null,
+    "issuerRevocationConfirmation": null,
+    "localVaultRemoval": "Only exact pilot entry after binding checks; local removal is not issuer revocation",
+    "noUnapprovedPostRevocationProbe": true,
+    "status": "REQUIRED BEFORE RUN"
+  },
+  "rollbackDecision": {
+    "decision": "not-needed",
+    "reason": "No A4 run; future approved run needs fresh owner decision"
+  },
+  "rollbackOwner": "evidence-operator",
+  "routeIdRedacted": "PILOT_PROVIDER_ROUTE_ALIAS_01",
+  "scope": "Read-only preparation checklist; not live/paid execution authorization",
+  "selectedModel": null,
+  "sideEffectPolicy": "Only explicitly approved pilot request/billing effects; no production default or user-data deletion",
+  "status": "BLOCKED",
+  "stopCriterion": "No dispatch until all preceding gates are accepted and all required bindings/caps/credential/window exist. Stop 401/403/429/5xx/503/timeout, hash/route/model drift, unknown counters, unexpected egress/child/side effect or exposure; no automatic retry.",
+  "supersedes": [
+    "authorization-pending-000073.json"
+  ],
+  "utcTimeWindow": {
+    "end": null,
+    "start": null
+  },
+  "vaultMechanism": "Normal ProviderDock DpapiFileSecretVault/WindowsDpapiProtector, CurrentUser outside checkout; no Credential Manager integration assumed"
+}

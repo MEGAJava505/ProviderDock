@@ -1,0 +1,128 @@
+{
+  "acceptedObservationRef": "summary-blocked-000075.json",
+  "actor": "codex-pilot-operator",
+  "actualResult": "Prior AppContainer was deleted before A4 metadata observations. Current profile remains inactive; no credential value accessed. A1 completeness and independent chain acceptance remain unresolved; A4 has not executed.",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "../redaction-owner-decision-000089.json",
+    "../A1-actual-binary/summary-p2-correction-000091.json",
+    "../phase6-rollback-observation/summary-p2-correction-000092.json",
+    "profile-created-000072.json"
+  ],
+  "authorizationRef": "none-issued-current-A4",
+  "claim": "Reviewed complete phase evidence; external acceptance remains subject to independent review",
+  "claimScope": "A4 remains not started; historical isolation cannot open its execution gate",
+  "correctionRecordedAtUtc": "2026-10-19T13:15:45.524Z",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "unavailable; scoped/ephemeral required",
+  "credentialRefRedacted": "PILOT_CREDENTIAL_ALIAS_01",
+  "environmentAttestation": {
+    "credentialValuesRead": false,
+    "executionEnvironment": "not-established",
+    "existingVaultEntriesModified": false,
+    "metadataObservedAtUtc": "2026-10-19T13:10:25.971Z",
+    "profile": {
+      "automaticHealthProbes": false,
+      "credentialRefRedacted": "PILOT_CREDENTIAL_ALIAS_01",
+      "credentialValidityChecked": false,
+      "enabled": false,
+      "metadataCredentialFilePresent": false,
+      "profileIdRedacted": "PILOT_PROFILE_ALIAS_01",
+      "profileSha256": "e392b26ca561dd71632df6bf99fd6891c1a2dc02073b5eccfa1177365e2bc939",
+      "routeIdRedacted": "PILOT_PROVIDER_ROUTE_ALIAS_01",
+      "selectedModel": null
+    }
+  },
+  "evidenceId": "M11-20261019-000093",
+  "expectedResult": "Accepted preceding gates plus fresh current provider-specific isolation/route, protected scoped credential, exact model, enforced caps and future approved window",
+  "finding": "P2-5",
+  "gate": "A4",
+  "historicalA4MetadataWindow": {
+    "end": "2026-10-19T08:35:02.256Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:33:18.936Z"
+  },
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "799cfd9f73fe1fd266a302ee9111d8dea63466377ac651956e9338db8e531284"
+  },
+  "liveProviderRequests": 0,
+  "metadataInspectionAuthority": "Current explicit user request for P2 owner corrections and alias preparation; not an extension of the expired historical A4 proposal",
+  "nativeResumeLinkage": "../A2-native-resume/native-resume-pass-000052.json",
+  "networkEgressObservation": {
+    "credentialAccesses": 0,
+    "liveProviderRequests": 0
+  },
+  "newActualOmpLaunches": 0,
+  "ompBinarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "ompBinaryVersion": "18.0.4",
+  "opensExecutionGate": false,
+  "osIsolationAttestation": {
+    "accepted": false,
+    "currentActiveEnvironmentAttested": false,
+    "deletedAtUtc": "2026-10-19T08:28:42Z",
+    "deletionSourceRef": "../phase6-rollback-observation/rollback-pass-000076.json#/observation/ownProfileCleanup",
+    "freshEnvironmentAndProviderRouteAttestationRequired": true,
+    "historicalSourceRefs": [
+      "../A1-actual-binary/fresh-isolation-proof-000045.json",
+      "../A2-native-resume/native-resume-pass-000052.json",
+      "../A3-egress-isolation/external-egress-pass-000062.json"
+    ],
+    "scope": "historical-A1-A3-only",
+    "validForA4Execution": false
+  },
+  "phase": "phase5-provider-route",
+  "phaseExecution": "NOT STARTED",
+  "preflightId": "m11-a4-profile-created-no-credential",
+  "priorPendingAuthorizationRef": "authorization-pending-000073.json",
+  "profileIdRedacted": "PILOT_PROFILE_ALIAS_01",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-p2-alias-v1: new evidence uses aliases; protected mapping outside checkout; historical source files remain byte-identical; no secrets/raw captured data/user paths",
+  "remainingInput": "Step 1: independent acceptance of preceding chain and resolution of missing A1 monitor evidence; do not import a credential or dispatch a request yet",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "Provider/inference HTTP requests within this phase"
+  },
+  "reviewAcceptance": "PENDING",
+  "reviewCorrection": "Consolidates previously recorded facts into full schema and explicitly labels counter scope; earlier observations and manifests remain unchanged",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "PILOT_PROVIDER_ROUTE_ALIAS_01",
+  "runId": "not-started",
+  "sideEffectAssessment": "New protected alias metadata only; no new profile, credential import, provider/issuer operation or runtime",
+  "status": "BLOCKED",
+  "supersedes": [
+    "preflight-blocked-000074.json#/osIsolationAttestation",
+    "summary-reviewed-000085.json"
+  ],
+  "utcTimeWindow": {
+    "end": "2026-10-19T13:10:25.971Z",
+    "executionWindowOpen": false,
+    "observationWithinWindow": false,
+    "scope": "Read-only metadata inspection under current owner-correction task, not an approved A4 execution window",
+    "start": "2026-10-19T13:10:25.971Z"
+  }
+}

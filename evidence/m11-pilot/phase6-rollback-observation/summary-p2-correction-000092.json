@@ -1,0 +1,123 @@
+{
+  "acceptedObservationRef": "rollback-pass-000076.json",
+  "actor": "codex-pilot-operator",
+  "actualResult": "The final verification is at 08:29:58Z, inside the unchanged 000070 authorization. Earlier restore and 08:28:42 teardown are separately timed and not moved into this later window.",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "authorization-continuation-000070.json",
+    "preflight-continuation-000071.json",
+    "rollback-pass-000076.json",
+    "run-log-continuation-20261019.txt",
+    "../redaction-owner-decision-000089.json"
+  ],
+  "authorizationRef": "authorization-continuation-000070.json",
+  "chronology": {
+    "earlyRestoreSourceRef": "run-log-continuation-20261019.txt:1",
+    "finalSourceRef": "rollback-pass-000076.json#/observation",
+    "finalVerificationUtc": "2026-10-19T08:29:58Z",
+    "residualPostcheckUtc": "2026-10-19T08:28:42.8521095Z",
+    "residualSourceRef": "rollback-pass-000076.json#/observation/residualPostcheck",
+    "subsequentAuthorizedMetadataUtc": "2026-10-19T08:33:18.936Z",
+    "supportingHistoricalLocalTrace": {
+      "available": true,
+      "embeddedHistoricalEntries": [
+        {
+          "actionClass": "checkout",
+          "entryTimestampUtc": "2026-10-19T08:14:26Z",
+          "rawActorOrActionPublished": false
+        }
+      ],
+      "inspectedAtUtc": "2026-10-19T13:09:01.851573Z",
+      "interpretation": "Retrieved historical local trace, not a new restore and not an independently signed clock attestation",
+      "sourceClass": "Owned restored-checkout local HEAD reflog"
+    },
+    "teardownSourceRef": "rollback-pass-000076.json#/observation/ownProfileCleanup",
+    "teardownUtc": "2026-10-19T08:28:42Z"
+  },
+  "claim": "Reviewed complete phase evidence; external acceptance remains subject to independent review",
+  "claimScope": "Corrected historical final rollback observation; independent acceptance pending",
+  "correctionRecordedAtUtc": "2026-10-19T13:15:45.524Z",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none-live",
+  "earlierAuthority": "Existing user task authority for independent restore/owned teardown; 000070 already discloses that the earlier restore predates that record.",
+  "earlierObservationsPresentedAsAfterLaterAuthorization": false,
+  "environmentAttestation": {
+    "isolatedPilot": true,
+    "originalUserStateMutated": false,
+    "snapshotMechanism": "Readonly file attributes plus pinned SHA-256; not WORM"
+  },
+  "evidenceId": "M11-20261019-000092",
+  "expectedResult": "Restore from readonly snapshot matches; own processes/profiles gone; retained native state hash verified",
+  "finding": "P2-3",
+  "gate": "none-new-A-gate",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "72c9b143705b011e2966434134e20b771d176b78ea69f08d704c0300898a3ccb"
+  },
+  "nativeResumeLinkage": "not-applicable",
+  "networkEgressObservation": {
+    "hostWideEgressClaim": false,
+    "ownedAppContainers": 0,
+    "ownedBrokersExited": true,
+    "ownedPilotProcesses": 0,
+    "ownedSocketsClosed": true,
+    "providerRequests": 0
+  },
+  "observationIntervalBasis": "From final preflight/authorization record instant through the recorded final hash/postcheck observation. Exact verification-command start time was not separately persisted; no exact duration is invented.",
+  "ompBinarySha256": "not-applicable",
+  "ompBinaryVersion": "not-applicable",
+  "osIsolationAttestation": {
+    "globalPolicyChanged": false,
+    "ownedAppContainerDeletionObserved": true
+  },
+  "phase": "phase6-rollback-observation",
+  "phaseExecution": "EXECUTED",
+  "preflightId": "m11-rollback-final-observation",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "redactionPolicy": "m11-p2-alias-v1: new evidence uses aliases; protected mapping outside checkout; historical source files remain byte-identical; no secrets/raw captured data/user paths",
+  "requestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "scope": "Provider/inference HTTP requests within this phase"
+  },
+  "reviewAcceptance": "PENDING",
+  "reviewCorrection": "Consolidates previously recorded facts into full schema and explicitly labels counter scope; earlier observations and manifests remain unchanged",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "completed",
+    "scope": "Owned pilot runtime and isolated approved checkout; retain requested inactive provider metadata"
+  },
+  "routeIdRedacted": "none",
+  "runId": "m11-rollback-from-readonly-bundle",
+  "sideEffectAssessment": "Own restore/audit/native-state artifacts and user-requested inactive profile retained; no user homes/archives deleted; no existing user data overwritten",
+  "status": "PASS",
+  "supersedes": [
+    "summary-reviewed-000086.json"
+  ],
+  "utcTimeWindow": {
+    "authorizationWindowRef": "authorization-continuation-000070.json",
+    "end": "2026-10-19T08:29:58Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:29:52.396Z"
+  }
+}

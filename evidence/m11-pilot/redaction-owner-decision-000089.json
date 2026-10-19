@@ -1,0 +1,103 @@
+{
+  "actor": "codex-evidence-owner",
+  "aliases": {
+    "CONTROL_ROUTE_ALIAS_01": {
+      "jsonPointer": "/credentialClassAndAllowlistedRoute/route",
+      "source": "A3-egress-isolation/authorization-correction-000060.json"
+    },
+    "DENIED_ROUTE_ALIAS_01": {
+      "line": 12,
+      "source": "A3-egress-isolation/egress-probe-audit.mjs.txt"
+    },
+    "PILOT_CREDENTIAL_ALIAS_01": {
+      "credentialValueIncluded": false,
+      "location": "LOCAL_DPAPI_ALIAS_REGISTRY_01",
+      "source": "Current normal pilot profile auth metadata"
+    },
+    "PILOT_PROFILE_ALIAS_01": {
+      "jsonPointer": "/observation/profileId",
+      "source": "A4-provider-route/profile-created-000072.json"
+    },
+    "PILOT_PROVIDER_ROUTE_ALIAS_01": {
+      "jsonPointer": "/routeIdRedacted",
+      "source": "A4-provider-route/summary-reviewed-000085.json"
+    }
+  },
+  "artifactLocations": [
+    "audit-source-index-000079.json",
+    "validation-final-000081.json",
+    "validation-reviewed-000088.json"
+  ],
+  "claimScope": "Owner decision and new alias preparation only; independent acceptance pending",
+  "decisionAuthority": "Current user instruction explicitly requests the evidence owner decision on aliases; no external reviewer signature claimed",
+  "evidenceId": "M11-20261019-000089",
+  "exclusions": "No issuer keys, credential suffixes, account identities or raw endpoints are mapped into public evidence",
+  "finding": "P2-4",
+  "futureEvidencePolicy": "Use aliases consistently, including nested observations, statuses and logs; resolve actual metadata only through protected local mapping. Do not republish literal mapping pairs.",
+  "historicalScope": "147 files reviewed by Astra at f95c2e5 and referenced in the 1f6df6d handoff. Known literal non-secret identifiers remain in these immutable historical files; strict identifier-redaction PASS is withdrawn for that scope.",
+  "historicalStrictIdentifierRedaction": "NOT PROVEN",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-000098.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "004d6855c7669b85e5d5cea3cd3b5d5e799f5572cf04c0e1cf8b886571ed1975"
+  },
+  "issuedAtUtc": "2026-10-19T13:15:45.524Z",
+  "legacyExceptionDecision": "Preserve the already-reviewed inert fixture and user-authorized local-profile identifiers only at the pre-existing locations under the explicit append-only rule. This does not permit raw identifiers in new evidence or imply removal from Git history.",
+  "phase": "cross-phase-redaction-owner-correction",
+  "previousScanScopeCorrection": "Previous unconditional redactionScan PASS meant the implemented secret/user-path pattern scan, which did not prove literal route/profile aliasing. No full-package strict identifier-redaction PASS is asserted.",
+  "protectedMapping": {
+    "aliases": [
+      "CONTROL_ROUTE_ALIAS_01",
+      "DENIED_ROUTE_ALIAS_01",
+      "PILOT_PROFILE_ALIAS_01",
+      "PILOT_PROVIDER_ROUTE_ALIAS_01",
+      "PILOT_CREDENTIAL_ALIAS_01"
+    ],
+    "aliasRegistryRefRedacted": "LOCAL_DPAPI_ALIAS_REGISTRY_01",
+    "ciphertextFileSha256": "d7030c0d540043a9b07b8014dafdb8e3f9e321fdb3f722e27a450541a233c07e",
+    "credentialValuesRead": false,
+    "directoryAcl": {
+      "allowIdentityCount": 2,
+      "currentUserOwnsDirectory": true,
+      "directoryAclProtected": true,
+      "unexpectedAllowEntries": 0
+    },
+    "existingVaultEntriesModified": false,
+    "issuerOperations": 0,
+    "mechanism": "Windows DPAPI CurrentUser through normal ProviderDock protector; alias metadata only",
+    "observedAtUtc": "2026-10-19T13:10:25.971Z",
+    "outsideCheckout": true,
+    "pilotProfile": {
+      "automaticHealthProbes": false,
+      "credentialRefRedacted": "PILOT_CREDENTIAL_ALIAS_01",
+      "credentialValidityChecked": false,
+      "enabled": false,
+      "metadataCredentialFilePresent": false,
+      "profileIdRedacted": "PILOT_PROFILE_ALIAS_01",
+      "profileSha256": "e392b26ca561dd71632df6bf99fd6891c1a2dc02073b5eccfa1177365e2bc939",
+      "routeIdRedacted": "PILOT_PROVIDER_ROUTE_ALIAS_01",
+      "selectedModel": null
+    },
+    "protectedReadbackVerified": true,
+    "providerRequests": 0,
+    "status": "PASS"
+  },
+  "reviewAcceptance": "PENDING",
+  "status": "PASS",
+  "supersedes": [
+    "validation-final-000081.json",
+    "validation-reviewed-000088.json"
+  ]
+}

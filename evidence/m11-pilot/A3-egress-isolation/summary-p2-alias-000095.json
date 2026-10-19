@@ -1,0 +1,144 @@
+{
+  "acceptedObservationRef": "external-egress-pass-000062.json",
+  "actor": "codex-pilot-operator",
+  "actualResult": "Direct external EACCES; unlisted broker route rejected; one exact-route pinned TLS HEAD 200, exit 0; provider requests zero",
+  "approver": "requesting-user-resumed-work-and-delegated-choices",
+  "artifactLocations": [
+    "preflight-correction-000061.json",
+    "external-egress-pass-000062.json",
+    "run-log-continuation-20261019.txt",
+    "../redaction-owner-decision-000089.json",
+    "../A1-actual-binary/summary-p2-correction-000091.json"
+  ],
+  "authorizationRef": "authorization-correction-000060.json",
+  "claim": "Attested AppContainer direct-network denial and permitted exact-route host stdio broker control; no direct OMP TCP or host-wide packet-capture claim",
+  "claimScope": "historical-observation-only",
+  "correction": "Report aliases replace fixture/profile literals in this new current summary; executed historical scenario and measurements are unchanged.",
+  "correctionRecordedAtUtc": "2026-10-19T13:15:45.524Z",
+  "costCounter": {
+    "after": 0,
+    "before": 0,
+    "cap": 0,
+    "currency": "USD"
+  },
+  "credentialClass": "none",
+  "dependencyGate": {
+    "A1CompleteEvidence": "NOT PROVEN",
+    "correctionReviewAcceptance": "PENDING"
+  },
+  "environmentAttestation": {
+    "executedArtifact": "Inert Node probe, not OMP",
+    "hostBrokerOutsideAppContainer": true,
+    "isolatedHomeAndTemp": true,
+    "liveCredentialValuesRead": false,
+    "minimalExplicitEnvironment": true,
+    "nodeProbeSha256": "5c976096e04e5c2c1f091938926234cc9fbebfe9787ddd149351b3b0ecc707b5",
+    "originalVaultOpened": false,
+    "snapshotHashesVerified": true,
+    "sourceCommit": "b9fa02f037c0b71fa9f10411c13a99e4ede81035"
+  },
+  "evidenceId": "M11-20261019-000095",
+  "expectedResult": "Direct external denied by OS, unlisted broker denied, allowlisted external TLS control observed",
+  "finding": "P2-4",
+  "gate": "A3",
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "9cb7015a1bad600c6001984fea08d9bec36000f2437807b541934ec9d0f68e41"
+  },
+  "nativeResumeLinkage": {
+    "acceptedRunRef": "../A2-native-resume/native-resume-pass-000052.json",
+    "sourceStateSha256": "edf5116475f6d0d419d23813f40a28fa251ced5b536ed3b55c3d3a8c6505b6ea"
+  },
+  "networkEgressObservation": {
+    "allowedExternalControl": {
+      "connections": 1,
+      "httpStatus": 200,
+      "payloadBytes": 0,
+      "pinnedPeerMatched": true,
+      "requestBytes": 57,
+      "requests": 1,
+      "responseHeaderBytes": 315,
+      "tlsVerified": true,
+      "tlsVersion": "TLSv1.3"
+    },
+    "directExternalAttempt": {
+      "attempts": 1,
+      "osError": "EACCES",
+      "result": "denied"
+    },
+    "proxyUsed": false,
+    "redirects": 0,
+    "status": "PASS",
+    "teardown": "Probe process/job exited and broker socket context closed",
+    "unexpectedDestinations": 0,
+    "unlistedBrokerRoute": {
+      "attempts": 1,
+      "result": "denied-before-network"
+    }
+  },
+  "ompBinarySha256": "not-applicable",
+  "ompBinaryVersion": "not-applicable",
+  "opensA4Gate": false,
+  "osIsolationAttestation": {
+    "accepted": true,
+    "activeProcessLimit": 1,
+    "capabilityCount": 0,
+    "childProcessCreationDenied": false,
+    "globalPolicyChanged": false,
+    "inheritedHandlesRestrictedToStdio": true,
+    "integrityRid": 4096,
+    "isAppContainer": true,
+    "jobKillOnClose": true,
+    "negativeChildBehaviorProven": false,
+    "packageIdentityMatches": true,
+    "policyRevision": "m11-appcontainer-stdio-broker-exact-route-v1"
+  },
+  "phase": "phase4-egress-isolation",
+  "phaseExecution": "EXECUTED",
+  "preflightId": "m11-a3-corrected-network-only",
+  "projectIdRedacted": "ProviderDock/isolated-M11-worktree",
+  "providerRequestCount": {
+    "after": 0,
+    "before": 0,
+    "cap": 0
+  },
+  "redactionPolicy": "m11-p2-alias-v1: new evidence uses aliases; protected mapping outside checkout; historical source files remain byte-identical; no secrets/raw captured data/user paths",
+  "requestCount": {
+    "after": 1,
+    "before": 0,
+    "cap": 1,
+    "scope": "Allowlisted external control HTTP HEAD requests via explicit host stdio broker"
+  },
+  "reviewAcceptance": "Own-scenario observation accepted in Astra table; sequential chain not accepted",
+  "reviewCorrection": "Consolidates previously recorded facts into full schema and explicitly labels counter scope; earlier observations and manifests remain unchanged",
+  "rollbackDecision": {
+    "actor": "codex-pilot-operator",
+    "approver": "requesting-user-resumed-work-and-delegated-choices",
+    "decision": "not-needed"
+  },
+  "routeIdRedacted": "CONTROL_ROUTE_ALIAS_01",
+  "runId": "m11-a3-bounded-control-2",
+  "sideEffectAssessment": "Expected control access log possible; no provider/account mutation; optional child negative test not accepted as proof",
+  "status": "PASS",
+  "supersedes": [
+    "summary-reviewed-000084.json"
+  ],
+  "utcTimeWindow": {
+    "end": "2026-10-19T08:25:27Z",
+    "observationWithinWindow": true,
+    "start": "2026-10-19T08:25:26Z"
+  }
+}

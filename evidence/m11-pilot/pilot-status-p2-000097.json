@@ -1,0 +1,111 @@
+{
+  "actor": "codex-evidence-owner",
+  "credentialValuesRead": false,
+  "currentArtifacts": {
+    "A1": "A1-actual-binary/summary-p2-correction-000091.json",
+    "A2": "A2-native-resume/summary-p2-alias-000094.json",
+    "A3": "A3-egress-isolation/summary-p2-alias-000095.json",
+    "A4": "A4-provider-route/summary-p2-correction-000093.json",
+    "phase0": "phase0-preparation/summary.json",
+    "rollback": "phase6-rollback-observation/summary-p2-correction-000092.json"
+  },
+  "currentReadinessChecklist": "A4-provider-route/readiness-checklist-p2-000096.json",
+  "evidenceId": "M11-20261019-000097",
+  "existingVaultEntriesModified": false,
+  "externalPilotAccepted": false,
+  "findings": {
+    "P2-1": {
+      "ref": "A1-actual-binary/timing-correction-p2-1-000090.json",
+      "state": "CORRECTION PROVIDED; REVIEW PENDING"
+    },
+    "P2-2": {
+      "ref": "A1-actual-binary/summary-p2-correction-000091.json",
+      "state": "NOT PROVEN; EXISTING SOURCE LIMIT DOCUMENTED"
+    },
+    "P2-3": {
+      "ref": "phase6-rollback-observation/summary-p2-correction-000092.json",
+      "state": "CORRECTION PROVIDED; REVIEW PENDING"
+    },
+    "P2-4": {
+      "ref": "redaction-owner-decision-000089.json",
+      "state": "OWNER ALIAS DECISION PROVIDED; LEGACY SCOPE EXPLICIT"
+    },
+    "P2-5": {
+      "ref": "A4-provider-route/summary-p2-correction-000093.json",
+      "state": "HISTORICAL ATTESTATION MARKED; A4 STILL BLOCKED"
+    }
+  },
+  "historicalLaunchAccounting": {
+    "A1": 2,
+    "A2NativeResume": 1,
+    "doesNotAddMissingHistoricalObservations": true,
+    "sourceRef": "pilot-status-reviewed-000087.json#/actualOmpLaunches",
+    "total": 3
+  },
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-000098.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "fb7d441936565e482744a1f19e8fd446928547255b7c51973497fa7c75f3f198"
+  },
+  "integrityPolicy": {
+    "canonicalization": "Recursive String.localeCompare with explicit en locale; arrays preserved; pretty2 JSON UTF-8 LF; entire integrityHash excluded from record digest; runtime versions included in each new hash block",
+    "completeRootManifest": "integrity-hashes-p2-000098.txt",
+    "currentPhaseManifests": "integrity-hashes-p2-20261019.txt",
+    "historical147Files": "Unmodified, including all old manifests"
+  },
+  "issuedAtUtc": "2026-10-19T13:15:45.524Z",
+  "newActualOmpLaunches": 0,
+  "newIssuerOperations": 0,
+  "newLiveProviderRequests": 0,
+  "opensA4Gate": false,
+  "phase": "pilot-owner-p2-corrections",
+  "phaseStatus": {
+    "phase0": "PASS",
+    "phase1": "NOT PROVEN",
+    "phase2": "NOT PROVEN",
+    "phase3": "PASS",
+    "phase4": "PASS",
+    "phase5": "BLOCKED",
+    "phase6": "PASS"
+  },
+  "phaseStatusScope": {
+    "phase1": "Timing correction supplied; full chain acceptance pending",
+    "phase2": "Bounded launch confirmed; process tree/measured egress remain unproven",
+    "phase3": "Historical idle native resume observation only",
+    "phase4": "Historical inert AppContainer plus host broker control observation only",
+    "phase6": "Owner-corrected historical final window, awaiting independent acceptance"
+  },
+  "redactionScope": {
+    "historicalStrictIdentifierRedaction": "NOT PROVEN; reviewed literal IDs retained under append-only rule",
+    "newEvidence": "Alias-only policy; validation separate",
+    "publishedSecrets": "No new secret value read or written into evidence; not a claim about uninspected private logs"
+  },
+  "remainingAction": "Independent review of these corrections. Full A1 needs an explicitly authorized new monitored run if no other acceptable observation exists; then obtain accepted preceding gates before credential/model/cost/current-isolation/future-window A4 steps.",
+  "reviewAcceptance": {
+    "notSelfApproved": true,
+    "reviewer": "Astra/coordinator",
+    "status": "PENDING"
+  },
+  "reviewSource": {
+    "commit": "1f6df6d",
+    "file": "docs/omp-migration/AGENT_HANDOFF.md",
+    "reviewedEvidenceCommit": "f95c2e5"
+  },
+  "sideEffects": "Owned encrypted alias registry outside checkout only; pilot stays inactive, no credential imported or issuer request performed",
+  "status": "BLOCKED",
+  "supersedes": [
+    "pilot-status-reviewed-000087.json"
+  ]
+}

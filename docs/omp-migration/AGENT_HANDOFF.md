@@ -347,3 +347,20 @@ evidence/m11-pilot/
 | `pilot-status-reviewed-000087.json` | 78 |
 
 **Прочие ложные срабатывания path/URL scan:** Microsoft documentation URLs в `A1-actual-binary/authorization-native-node-probe-000014.json:76,77,78`, `authorization-native-profile-work-000012.json:71,72,73`, `authorization-owned-fixture-000010.json:69,70`, `authorization-runtime-profile-000008.json:66,67`; regex literals в `A1-actual-binary/containment-launcher-audit.py.txt:282,283,286`. Email/account-name scan: 0. Строка `phase0-preparation/side-effects.json:7` содержит относительное имя каталога evidence, а не profile/account identifier.
+
+
+## Ответ владельца evidence на P2 — 19 октября 2026
+
+Ветка синхронизирована с вердиктом 1f6df6d. Исходные 147 evidence-файлов и предыдущий текст этого handoff сохранены. Текущий owner-status: [pilot-status-p2-000097.json](../../evidence/m11-pilot/pilot-status-p2-000097.json); проверка и полный manifest — validation-p2-000098.json и integrity-hashes-p2-000098.txt рядом с ним. Это ответ владельца, а не новая приёмка Astra.
+
+| Замечание | Append-only ответ | Итог и ограничение |
+|---|---|---|
+| P2-1 | A1-actual-binary/timing-correction-p2-1-000090.json | Probe 08:17:52–08:17:53 относится к прежнему inert-разрешению 000036 (08:00:33.050–10:00:33.050, восемь проверок из восьми). Запись 000044 с началом 08:18:37.258 относится к actual-повтору 08:18:47–08:18:54. Окна не расширялись; точное UTC время conversation approval не выдумывается. |
+| P2-2 | A1-actual-binary/summary-p2-correction-000091.json | Bounded launch подтверждён; observed process tree и измеренный attempted egress остаются NOT PROVEN. Сохранившиеся local observations не содержат этих данных; в Security нет событий нужного окна, Sysmon log отсутствует. Константы controller counters не заменяют monitor. Новый actual-запуск не выполнялся и требует отдельного разрешения. |
+| P2-3 | phase6-rollback-observation/summary-p2-correction-000092.json | Финальный интервал: 08:29:52.396–08:29:58Z. Ранний restore (дополнительная local reflog запись 08:14:26Z), teardown 08:28:42Z и residual postcheck 08:28:42.8521095Z перечислены отдельно. Они не представлены действиями после позднего 000070. |
+| P2-4 | redaction-owner-decision-000089.json; alias summaries 000094/000095 | Для новых records используются CONTROL_ROUTE_ALIAS_01, DENIED_ROUTE_ALIAS_01, PILOT_PROFILE_ALIAS_01, PILOT_PROVIDER_ROUTE_ALIAS_01 и PILOT_CREDENTIAL_ALIAS_01. Mapping хранится вне checkout под DPAPI CurrentUser; ACL ограничен текущим пользователем/SYSTEM, encrypted roundtrip проверен. Исторические literal IDs остаются только в прежних файлах; безусловный strict identifier-redaction PASS для них не заявляется. Имена каталогов evidence являются структурными путями, а не действующими profile bindings. |
+| P2-5 | A4-provider-route/summary-p2-correction-000093.json | Attestation явно историческая, accepted:false и validForA4Execution:false; прежний AppContainer удалён в 08:28:42Z. Нужна новая среда с provider-specific route, ownership и monitors перед actual A4. |
+
+A2/A3 сохраняют PASS только собственного исторического idle/inert сценария и не открывают A4. Полный A1 остаётся NOT PROVEN; приёмка correction-цепочки ожидается. Phase 6 имеет исправленное owner observation window, также без подмены независимой приёмки.
+
+Для продолжения чек-листа подготовлен A4-provider-route/readiness-checklist-p2-000096.json. Шаг 1 ещё заблокирован; credential import, запрос каталога, inference и issuer operations не выполнялись. Никакая новая A4 authorization не выдана: действующий лимит запросов/затрат равен нулю, selectedModel/issuer expiry/cost enforcement/будущее UTC window/fresh isolation ещё не подтверждены. Неизвестные поля не заполнены предположениями. Механизм будущего импорта — ровно DPAPI/process-env/скрытый ввод/finally из чек-листа выше; local vault removal не считается issuer revocation.

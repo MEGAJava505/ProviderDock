@@ -1,0 +1,76 @@
+{
+  "actor": "codex-evidence-owner",
+  "checks": {
+    "allCurrentPhaseSummaryFields": true,
+    "canonicalJsonAndRecordHashes": true,
+    "historical147FilesByteIdentical": true,
+    "P2_1": {
+      "actualLaunchInsideUnchangedActualAuthorizationWindow": true,
+      "noBackdatedApprovalTimestamp": true,
+      "priorInertAuthorizationWindowAndEightProbeCapVerified": true,
+      "probeNotInsideLaterActualAuthorizationWindow": true
+    },
+    "P2_2": {
+      "boundedLaunchPreserved": true,
+      "existingSourcesOnly": true,
+      "missingProcessTreeRetainedAsNotProven": true,
+      "unknownMeasuredCountersRemainNull": true
+    },
+    "P2_3": {
+      "correctionRecordTimeSeparate": true,
+      "earlierRestoreAndTeardownKeptSeparate": true,
+      "finalVerificationCoveredAtActualSourceTime": true
+    },
+    "P2_4": {
+      "historicalLiteralIdentifierLimitExplicit": true,
+      "newArtifactsAliasOnly": true,
+      "noFullHistoricalStrictRedactionPass": true,
+      "protectedLocalMappingRoundtripAndAclObserved": true
+    },
+    "P2_5": {
+      "activeIsolationNotAssumed": true,
+      "attestationHistoricalAndNotValidForA4": true
+    },
+    "previousManifestsUnchanged": true,
+    "uniqueContiguousEvidenceIds": true
+  },
+  "claimScope": "Completed owner evidence integrity/semantic checks only; not independent phase acceptance or an A4 execution authorization",
+  "currentStatusIndex": "pilot-status-p2-000097.json",
+  "evidenceId": "M11-20261019-000098",
+  "futureRunReadiness": {
+    "A1CompleteEvidence": "NOT PROVEN",
+    "A4": "BLOCKED",
+    "issuedActualRunAuthorization": false,
+    "issuedProviderAuthorization": false,
+    "newActualRuns": 0,
+    "newIssuerOperations": 0,
+    "newProviderRequests": 0
+  },
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-000098.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "7f357b2c9a535686e23613bdb7346c1d3325771955b58826e268c433bb2faf8f"
+  },
+  "phase": "owner-p2-correction-validation",
+  "recordedAtUtc": "2026-10-19T13:17:58.040Z",
+  "redactionScope": {
+    "historical147Files": "Byte-identical to the Astra-reviewed package; known literal identifier limitations preserved",
+    "newPublicArtifacts": "Secret/user-path patterns and known historical literal identifier scan passed",
+    "privateLogsAndVault": "No blanket leak-free claim; credential values not read; raw OS events not published"
+  },
+  "reviewAcceptance": "PENDING",
+  "status": "PASS",
+  "testBasis": "Local verifier independently derives timing/caps and hash lineage from original records, checks current schema/status and append-only handoff prefix; does not manufacture runtime observations"
+}

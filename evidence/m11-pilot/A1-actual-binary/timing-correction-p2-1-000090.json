@@ -1,0 +1,71 @@
+{
+  "actor": "codex-evidence-owner",
+  "actualLaunchAuthorizationRef": "authorization-explicit-user-000044.json",
+  "actualLaunchAuthorizationWindow": {
+    "end": "2026-10-19T08:48:37.258Z",
+    "start": "2026-10-19T08:18:37.258Z"
+  },
+  "actualLaunchObservationUtc": {
+    "end": "2026-10-19T08:18:54Z",
+    "start": "2026-10-19T08:18:47Z"
+  },
+  "actualLaunchWithinItsAuthorizationWindow": true,
+  "artifactLocations": [
+    "authorization-resume-000036.json",
+    "diagnosis-continuation-000037.json",
+    "fresh-isolation-proof-000045.json",
+    "authorization-explicit-user-000044.json",
+    "actual-launch-pass-000047.json"
+  ],
+  "authorizationRecordTimeBasis": "The recorded start of 000044 is 08:18:37.258Z; the conversation approval exists but its exact UTC timestamp was not independently persisted. No earlier approval timestamp is fabricated.",
+  "claimScope": "Timing and earlier inert-probe authorization linkage only; not acceptance of the complete A1 gate",
+  "correctionRecordedAtUtc": "2026-10-19T13:15:45.524Z",
+  "evidenceId": "M11-20261019-000090",
+  "finding": "P2-1",
+  "inertProbeAccounting": {
+    "cap": 8,
+    "earlierObservationCount": 7,
+    "earlierObservationRef": "diagnosis-continuation-000037.json#/observations",
+    "lastProbeCount": 1,
+    "lastProbeRef": "fresh-isolation-proof-000045.json#/observation",
+    "noNewProbeExecuted": true,
+    "probeDeadlineSeconds": 12,
+    "total": 8
+  },
+  "integrityHash": {
+    "algorithm": "sha256",
+    "arrayOrder": "preserved",
+    "artifactManifest": "integrity-hashes-p2-20261019.txt",
+    "canonicalization": "sorted-keys-pretty-json-utf8-lf-v1",
+    "comparator": "String.prototype.localeCompare",
+    "exclude": [
+      "integrityHash"
+    ],
+    "locale": "en",
+    "runtime": {
+      "icu": "78.3",
+      "node": "24.20.0",
+      "unicode": "17.0"
+    },
+    "value": "2c884075bcb9f10a7d117e9377af17fd96bf129a7d9f4ed6974d28122fe0bb36"
+  },
+  "interpretation": "The earlier inert probe belongs to 000036, not to the later 000044 actual-repeat execution window. The later preflight record used an earlier valid observation. No past window was extended and the probe is not labeled unauthorized.",
+  "phase": "phase1-authorization-preflight",
+  "probeAuthorizationRef": "authorization-resume-000036.json",
+  "probeAuthorizationWindow": {
+    "end": "2026-10-19T10:00:33.050Z",
+    "start": "2026-10-19T08:00:33.050Z"
+  },
+  "probeObservationUtc": {
+    "end": "2026-10-19T08:17:53Z",
+    "start": "2026-10-19T08:17:52Z"
+  },
+  "probeWithinActualLaunchAuthorizationWindow": false,
+  "probeWithinEarlierInertAuthorization": true,
+  "reviewAcceptance": "PENDING",
+  "status": "PASS",
+  "supersedes": [
+    "fresh-isolation-proof-000045.json#/authorizationRef",
+    "preflight-explicit-user-pass-000046.json#/utcTimeWindow"
+  ]
+}
