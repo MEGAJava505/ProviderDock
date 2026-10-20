@@ -1,0 +1,159 @@
+{
+  "actualLaunches": 1,
+  "allowedChanges": [
+    "fresh owned AppContainer profile",
+    "owned fixture/config/log/dump/ETW files",
+    "temporary scoped WER LocalDumps key",
+    "thirteen append-only public evidence files"
+  ],
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "cleanup": {
+    "orphanCount": 0,
+    "ownedEtwSessionsStopped": true,
+    "profileDeleted": true,
+    "werRestored": true
+  },
+  "evidenceId": "M11-20261020-000169",
+  "externalEffects": {
+    "firewallChanges": null,
+    "inferenceRequests": 0,
+    "liveCredentialsRead": null,
+    "paidRequests": null,
+    "providerRequests": 0,
+    "scope": "bounded ETW/WER/controller observation plus owned-fixture inventory; this does not monitor unrelated processes or external account state",
+    "userConfigurationChanges": null
+  },
+  "fixtureEffects": {
+    "afterCount": 9,
+    "beforeCount": 2,
+    "captured": true,
+    "inventory": [
+      {
+        "after": {
+          "sha256": "da63a52bdf62b3fc863995d79f497584be3ba97c1de4c55d1d301afbafab6cfc",
+          "size": 4096
+        },
+        "alias": "OWNED_FIXTURE_FILE_001",
+        "before": null,
+        "change": "added"
+      },
+      {
+        "after": {
+          "sha256": "2277c3af033fc80dadace7a7da491cea817ea3355b228328aa8e4a6ec72f196d",
+          "size": 32768
+        },
+        "alias": "OWNED_FIXTURE_FILE_002",
+        "before": null,
+        "change": "added"
+      },
+      {
+        "after": {
+          "sha256": "95dea5af068f6bb31c90311360b2c6a1376e39d35fb2986bae4cdc0eadc42348",
+          "size": 469712
+        },
+        "alias": "OWNED_FIXTURE_FILE_003",
+        "before": null,
+        "change": "added"
+      },
+      {
+        "after": {
+          "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+          "size": 816
+        },
+        "alias": "OWNED_FIXTURE_FILE_004",
+        "before": {
+          "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+          "size": 816
+        },
+        "change": "unchanged"
+      },
+      {
+        "after": {
+          "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+          "size": 399
+        },
+        "alias": "OWNED_FIXTURE_FILE_005",
+        "before": {
+          "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+          "size": 399
+        },
+        "change": "unchanged"
+      },
+      {
+        "after": {
+          "sha256": "b586ad1cd9f93a039dd5f2f9626359f2251f66b4c242ea86b913e9bce0b659cb",
+          "size": 921
+        },
+        "alias": "OWNED_FIXTURE_FILE_006",
+        "before": null,
+        "change": "added"
+      },
+      {
+        "after": {
+          "sha256": "d864946e623f986782fcbe9ad17d665838e1a5a0fbcf372f9a363d819e5bd8d8",
+          "size": 154
+        },
+        "alias": "OWNED_FIXTURE_FILE_007",
+        "before": null,
+        "change": "added"
+      },
+      {
+        "after": {
+          "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+          "size": 159689728
+        },
+        "alias": "OWNED_FIXTURE_FILE_008",
+        "before": null,
+        "change": "added"
+      },
+      {
+        "after": {
+          "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+          "size": 159689728
+        },
+        "alias": "OWNED_FIXTURE_FILE_009",
+        "before": null,
+        "change": "added"
+      }
+    ],
+    "privateSource": "OWNED/private/fixture-effects.json",
+    "retention": "Ephemeral native, database and log files deleted by owned profile cleanup; only inventory metadata retained, contents not retained"
+  },
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "3e6218e22603722c43851e787bce9e8568736fca79086835df2be2fed324be86"
+  },
+  "phase": "A1-D-diagnostic-launch",
+  "project": "ProviderDock/omp-integration/M11",
+  "publicRedaction": {
+    "result": "PASS",
+    "stderrReplacements": 0,
+    "stdoutReplacements": 0
+  },
+  "recordedAtUtc": "2026-10-20T18:25:28.8621809Z",
+  "retainedPrivateDiagnostics": {
+    "locationAlias": "IGNORED_OWNED_A1D_ROOT",
+    "purpose": "independent review of byte-exact logs, ETL and WER metadata"
+  },
+  "runId": "M11-A1D-20261020-000159",
+  "status": "NOT PROVEN"
+}

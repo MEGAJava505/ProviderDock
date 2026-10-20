@@ -1,0 +1,217 @@
+{
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "counters": {
+    "applicationRequests": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "unit": "provider/inference requests; initialize is local ACP control"
+    },
+    "connectAcceptEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-Kernel-Network",
+      "unit": "provider events"
+    },
+    "dnsEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-DNS-Client",
+      "unit": "provider events"
+    },
+    "receivedBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-Kernel-Network",
+      "unit": "directional Kernel-Network payload bytes"
+    },
+    "sentBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-Kernel-Network",
+      "unit": "directional Kernel-Network payload bytes"
+    },
+    "transportAllowedEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-TCPIP",
+      "unit": "provider events"
+    },
+    "transportAttemptEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-TCPIP",
+      "unit": "provider events"
+    },
+    "transportDeniedEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-TCPIP",
+      "unit": "provider events"
+    },
+    "wfpDropEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "final": 0,
+      "source": "Microsoft-Windows-WFP",
+      "unit": "provider events"
+    }
+  },
+  "etlHeadersAndSourceHashes": [
+    {
+      "buffersLost": 0,
+      "etlSha256": "d76747c30de1b6272935adf58e36227ce67ee281d767ad02c9a9496f360c1f5b",
+      "eventsLost": 0,
+      "kind": "Process",
+      "xmlSha256": "723665e781606fccbbed8925a170e0fc6faa9e9874458834492b9d4da1a433b6"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "b35e0c0133db27271919ea41fa170f35a334d5bbea1f560bda56fab3aff87eb4",
+      "eventsLost": 0,
+      "kind": "Transport",
+      "xmlSha256": "1c2022ae9eaa458f6048e9f4d50655189d5a6803c97734f2bd19a3ea7ea888c1"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "dfeacde363cf7666ba69a41ed5fdae10892f809a54b636adbbcb466d219252b0",
+      "eventsLost": 0,
+      "kind": "WFP",
+      "xmlSha256": "076e21a52853853c2e914a8dafce28d90a0cf9dc84e2eea1d15120b6e018dbc0"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "7606b83f308e157ad39ebf7836240f37a293a3b4bb5734ef594fd2f1198a4071",
+      "eventsLost": 0,
+      "kind": "KernelNetwork",
+      "xmlSha256": "a86256d37a2926d16ea805a500a2c933207fb0419acb5edc4b000b31482f3523"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "533acdec6b89b72909940dce705eae8fa07f394c9a479fddbe915e2135077a85",
+      "eventsLost": 0,
+      "kind": "DNS",
+      "xmlSha256": "5727739e018b600058980fb5405043b835308582de5e192d3b894d87aca51087"
+    }
+  ],
+  "events": [],
+  "eventsLostAllZero": true,
+  "evidenceId": "M11-20261020-000163",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "fc5c6059716ac32f0ff1d4f6d5ad92a3a4e7b1559aa14a1be38326766be3f27b"
+  },
+  "limitations": [
+    "Parser network correlations use scoped PIDs without an enforced process lifetime filter; independent current-run review verified unique start/stop and exact creation identities for the three self-test targets and the observed actual lineage; sequence 7357 -> 7418 -> 7419 confirmed. This is bounded PID-scoped observation, not a systemwide no-network assertion",
+    "Execution-context-only kernel events are excluded; WFP is correlated by exact AppId and DNS-Client by execution PID",
+    "TCPIP and WFP events are kept per layer and are not added into a synthetic connection count",
+    "AddressLength and TCP copy/retransmission events are not payload byte counters",
+    "Tracerpt timestamps are retained verbatim; process durations use UTC CreateTime/ExitTime payloads"
+  ],
+  "liveInferenceRequests": 0,
+  "loss": [
+    {
+      "buffersWritten": 60,
+      "eventsLost": 0,
+      "freeBuffers": 20,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-Process",
+      "numberOfBuffers": 32,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 17,
+      "eventsLost": 0,
+      "freeBuffers": 13,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-Transport",
+      "numberOfBuffers": 25,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 22,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-WFP",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-KernelNetwork",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-DNS",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    }
+  ],
+  "phase": "A1-D-diagnostic-launch",
+  "project": "ProviderDock/omp-integration/M11",
+  "providerRequests": 0,
+  "recordedAtUtc": "2026-10-20T18:25:28.8621809Z",
+  "runId": "M11-A1D-20261020-000159",
+  "scope": {
+    "baseline": "Capture running before scoped PIDs existed",
+    "includesDeclaredHelpers": true,
+    "pids": [
+      3708,
+      32252
+    ]
+  },
+  "sourceCounts": {
+    "DNS": 442,
+    "KernelNetwork": 2474,
+    "Process": 162123,
+    "TCPIP": 44841,
+    "WFP": 4
+  },
+  "status": "OBSERVED",
+  "unexpectedObservedEgress": 0
+}

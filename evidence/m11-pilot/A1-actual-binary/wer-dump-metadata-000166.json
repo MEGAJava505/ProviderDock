@@ -1,0 +1,44 @@
+{
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "dumpPresent": false,
+  "dumps": [],
+  "evidenceId": "M11-20261020-000166",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "79ece98decea0ddf2e72d4bb08c5d2ee0ba32f915ac03dc5940b9ac4eae58d54"
+  },
+  "phase": "A1-D-diagnostic-launch",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-20T18:25:28.8621809Z",
+  "restore": {
+    "backupSha256": null,
+    "preExistingKey": false,
+    "restored": true
+  },
+  "runId": "M11-A1D-20261020-000159",
+  "status": "PASS",
+  "werConfiguration": {
+    "dumpFolderAlias": "OWNED/dumps",
+    "dumpType": 1,
+    "temporary": true
+  }
+}

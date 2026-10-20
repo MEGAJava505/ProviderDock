@@ -1,0 +1,72 @@
+{
+  "a1": "NOT PROVEN",
+  "a1d": "NOT PROVEN",
+  "actualLaunches": 1,
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "binarySha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+  "cost": {
+    "amount": 0,
+    "currency": "USD"
+  },
+  "declaredConhostObserved": 1,
+  "eventsLostAllZero": true,
+  "evidenceId": "M11-20261020-000170",
+  "exitCode": 124,
+  "exitCodeMapping": {
+    "controllerGetExitCodeProcess": 124,
+    "etwKernelProcessStop": 124,
+    "imposedByWatchdog": true,
+    "matched": true
+  },
+  "freshProfileDeleted": true,
+  "inferenceRequests": 0,
+  "initializeResponseReceived": false,
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "0837c22f0596298b29e19b441249f804dbee7712aae0eb72a55c279ee832911e"
+  },
+  "nextRequirement": "Independent acceptance of A1-D, then separate owner authorization for A1-F. No automatic continuation.",
+  "opensA1FinalGate": false,
+  "opensA4Gate": false,
+  "orphanCount": 0,
+  "phase": "A1-D-diagnostic-launch",
+  "processTreeComplete": true,
+  "project": "ProviderDock/omp-integration/M11",
+  "providerRequests": 0,
+  "recordedAtUtc": "2026-10-20T18:25:28.8621809Z",
+  "retries": 0,
+  "rootCause": "Controller watchdog imposed exit 124 after its bounded deadline; this does not reproduce the original exit 1. An initialize write of 159 bytes occurred, but delivery was not proven: synchronous FlushFileBuffers blocked until watchdog termination and returned false. No initialize response was observed; the underlying reason remains unknown. This does not attribute a fault to OMP.",
+  "runId": "M11-A1D-20261020-000159",
+  "status": "NOT PROVEN",
+  "stderrCapturedOnTerminalPath": true,
+  "stdoutCapturedOnTerminalPath": true,
+  "timing": {
+    "controllerDeadlineSeconds": 40,
+    "controllerDurationMs": 40043.237,
+    "controllerPrecreateElapsedMs": 24435.447021484375,
+    "deadlineSatisfied": false,
+    "ompLifetimeMs": 15567.6669921875
+  },
+  "unexpectedObservedEgress": 0,
+  "watchdogFired": true,
+  "werRestored": true
+}

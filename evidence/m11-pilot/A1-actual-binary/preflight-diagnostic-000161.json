@@ -1,0 +1,293 @@
+{
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "binary": {
+    "alias": "PINNED_OMP_BINARY",
+    "copiedSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "fileVersion": "1.4.0",
+    "packageRuntimeVersion": "18.0.4",
+    "peVersionMeaning": "Bun runtime version, not the OMP package version",
+    "productVersion": "1.4.0",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba"
+  },
+  "elevation": {
+    "highOrSystem": true,
+    "isAdmin": true,
+    "privileges": [
+      {
+        "Name": "SeSystemProfilePrivilege",
+        "State": "включен"
+      },
+      {
+        "Name": "SeDebugPrivilege",
+        "State": "включен"
+      }
+    ]
+  },
+  "environment": {
+    "capabilityCount": 0,
+    "configSha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+    "freshProfileIdentitySha256": "4183bc760d2679ff17176020edea4a804e20ebb40fb37b644cce2c72767374fb",
+    "inferencePermitted": false,
+    "liveCredentialCount": 0,
+    "modelsSha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566"
+  },
+  "etwLossBeforeActual": [
+    {
+      "buffersWritten": 3,
+      "eventsLost": 0,
+      "freeBuffers": 13,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-Process",
+      "numberOfBuffers": 25,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-Transport",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 23,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-WFP",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-KernelNetwork",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 23,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-A1D-000159-DNS",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    }
+  ],
+  "evidenceId": "M11-20261020-000161",
+  "initialDirectoryFileCounts": {
+    "dumps": 0,
+    "etw": 0,
+    "logs": 0
+  },
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "04181899479da1d5c12b28c100c1b66ce8a0d3d12daad4118835a1f284abb045"
+  },
+  "monitorSelfTestDecodedVerification": {
+    "actualLaunches": 0,
+    "loopback": {
+      "bytesPerDirection": 64,
+      "pid": 5944,
+      "receivedBytesBothEndpoints": 128,
+      "requests": 1,
+      "sentBytesBothEndpoints": 128
+    },
+    "loss": [
+      {
+        "buffersLost": 0,
+        "eventsLost": 0,
+        "kind": "Process",
+        "xmlSha256": "e20d2757e1371a291cbb600ad5eff827cac0e9903849163f5d7524d7e666e7ec"
+      },
+      {
+        "buffersLost": 0,
+        "eventsLost": 0,
+        "kind": "Transport",
+        "xmlSha256": "e814e9ab35091d3a89ac4dadcd1d921217140b945614d8de3dedaff12d59a482"
+      },
+      {
+        "buffersLost": 0,
+        "eventsLost": 0,
+        "kind": "WFP",
+        "xmlSha256": "2d864b25fdd4b689e2f3361156310671c6cbfa233aace928264c1fc3299465eb"
+      },
+      {
+        "buffersLost": 0,
+        "eventsLost": 0,
+        "kind": "KernelNetwork",
+        "xmlSha256": "c45dbe4d06fa5e54d5e68ffcb61e7135eba3a8033a00c41c07bd45bd4e5a92be"
+      },
+      {
+        "buffersLost": 0,
+        "eventsLost": 0,
+        "kind": "DNS",
+        "xmlSha256": "46f0da35e3fbbbb7d2e103a5e1f6a46d45ead58b8b64acc5d084864b474c346f"
+      }
+    ],
+    "negativeTransportEvents": [
+      {
+        "eventId": 1044,
+        "status": "0xC0000022",
+        "version": 1
+      },
+      {
+        "eventId": 1034,
+        "status": "0xC0000022",
+        "version": 1
+      }
+    ],
+    "processLifecycle": [
+      {
+        "createTimeUtc": "2026-10-20T17:58:42.524266400Z",
+        "exitCode": 7,
+        "exitTimeUtc": "2026-10-20T17:58:42.604165300Z",
+        "kind": "cmdExitSeven",
+        "pid": 37672
+      },
+      {
+        "createTimeUtc": "2026-10-20T17:58:45.359808700Z",
+        "exitCode": 7,
+        "exitTimeUtc": "2026-10-20T17:58:45.459700200Z",
+        "kind": "captureFailurePath",
+        "pid": 32248
+      },
+      {
+        "createTimeUtc": "2026-10-20T17:58:45.501903400Z",
+        "exitCode": 0,
+        "exitTimeUtc": "2026-10-20T17:58:45.653506400Z",
+        "kind": "negativeDirectTcp",
+        "pid": 35644
+      }
+    ],
+    "profileDeleted": true,
+    "status": "PASS",
+    "werRestored": true,
+    "wfpDrop": {
+      "correlation": "Exact AppId equals ProcessStart image; no PID inferred from execution context",
+      "count": 1
+    }
+  },
+  "phase": "A1-D-diagnostic-launch",
+  "policy": {
+    "inferencePermitted": false,
+    "network": "deny by zero capabilities",
+    "providerRequestsPermitted": 0,
+    "retries": 0
+  },
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-20T18:24:38.5546131Z",
+  "runId": "M11-A1D-20261020-000159",
+  "scriptSha256": {
+    "a1d_controller.py": "7099690e1219427ffde5eaa8d4091da4b7520aa720b937f635f7feb54ed9b405",
+    "a1d_elevated.ps1": "dab8c0cca84f0315e40b528363014ddebd7d16b9ec301c1af47dc04b1d1c0611",
+    "prepare-config.mjs": "2d6293e9572bd96058a4139afaa7024f22b4fbab95415d271ca3daf65648a9ce"
+  },
+  "selfTest": {
+    "actualLaunches": 0,
+    "captureFailurePath": {
+      "attestation": {
+        "activeProcessLimit": 1,
+        "capabilityCount": 0,
+        "childProcessCreationDenied": false,
+        "inheritedHandlesRestrictedToStdio": true,
+        "integrityRid": 4096,
+        "isAppContainer": true,
+        "jobKillOnClose": true,
+        "packageIdentityMatches": true
+      },
+      "captureComplete": true,
+      "createdAtUtc": "2026-10-20T18:24:37.926345Z",
+      "exitCode": 7,
+      "pid": 10452,
+      "resumedAtUtc": "2026-10-20T18:24:37.943406Z",
+      "startedAtUtc": "2026-10-20T18:24:35.245311Z",
+      "stderrBytes": 26,
+      "stdoutBytes": 55,
+      "watchdogFired": false
+    },
+    "captureMarkers": {
+      "stderr": true,
+      "stdout": true
+    },
+    "cmdExitSeven": {
+      "exitCode": 7,
+      "handleCachedBeforeWait": true,
+      "pid": 34748
+    },
+    "loopback": {
+      "bytes": 64,
+      "clientReceivedBytes": 64,
+      "clientSentBytes": 64,
+      "errors": [],
+      "pid": 7488,
+      "port": 61347,
+      "requests": 1,
+      "serverReceivedBytes": 64,
+      "serverSentBytes": 64,
+      "status": "PASS"
+    },
+    "negativeDirectTcp": {
+      "attestation": {
+        "activeProcessLimit": 1,
+        "capabilityCount": 0,
+        "childProcessCreationDenied": false,
+        "inheritedHandlesRestrictedToStdio": true,
+        "integrityRid": 4096,
+        "isAppContainer": true,
+        "jobKillOnClose": true,
+        "packageIdentityMatches": true
+      },
+      "captureComplete": true,
+      "createdAtUtc": "2026-10-20T18:24:38.088397Z",
+      "exitCode": 0,
+      "pid": 7556,
+      "probe": {
+        "code": "EACCES",
+        "status": "PASS"
+      },
+      "resumedAtUtc": "2026-10-20T18:24:38.099476Z",
+      "startedAtUtc": "2026-10-20T18:24:38.087364Z",
+      "stderrBytes": 0,
+      "stdoutBytes": 34,
+      "targetClass": "TEST-NET-1:443",
+      "watchdogFired": false
+    },
+    "recordedAtUtc": "2026-10-20T18:24:38.293485Z",
+    "status": "PASS"
+  },
+  "status": "PASS"
+}

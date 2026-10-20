@@ -1,0 +1,127 @@
+{
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "declaredHelpers": [
+    "conhost.exe"
+  ],
+  "evidenceId": "M11-20261020-000160",
+  "handshakeLogging": [
+    "CreateProcess",
+    "ResumeThread",
+    "initialize write",
+    "FlushFileBuffers",
+    "stdout frame boundary",
+    "JSON parse",
+    "EOF",
+    "process exit/watchdog"
+  ],
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "fcdd83cd22a1cbab49a626e7c17e38f69fd168ba670c6293f50d64c35d42ee4d"
+  },
+  "isolation": {
+    "activeProcessLimit": 1,
+    "independentParentWatchdogSeconds": 43,
+    "killOnClose": true,
+    "mechanism": "fresh zero-capability AppContainer plus Job"
+  },
+  "phase": "A1-D-diagnostic-launch",
+  "project": "ProviderDock/omp-integration/M11",
+  "providerMetadata": [
+    {
+      "outputSha256": "9877702dcea08352139b8af5777727bfac544a1531cce784547e3d0a1c4b05fc",
+      "provider": "Microsoft-Windows-Kernel-Process",
+      "queryExit": 0
+    },
+    {
+      "outputSha256": "d917cc63a4ddea50ab47976d65fb39b7fc06081852ffb9567e81ef7e51d3b5eb",
+      "provider": "Microsoft-Windows-TCPIP",
+      "queryExit": 0
+    },
+    {
+      "outputSha256": "bb7af01b07792542efa2a6b706385351dc6649df9f2541f90a3007b8cfae6bf9",
+      "provider": "Microsoft-Windows-WFP",
+      "queryExit": 0
+    },
+    {
+      "outputSha256": "6d1d70ebf247fd1d4bb869486081adda18d8ca355b139f15007e74a9ee7a4454",
+      "provider": "Microsoft-Windows-Kernel-Network",
+      "queryExit": 0
+    },
+    {
+      "outputSha256": "11566edc3d5cd5a59b36db0fb7c1899aa88d22d33bbaab781c4be00c9308ae46",
+      "provider": "Microsoft-Windows-DNS-Client",
+      "queryExit": 0
+    }
+  ],
+  "recordedAtUtc": "2026-10-20T18:24:38.5546131Z",
+  "redirects": {
+    "stderr": "OWNED/logs/omp-stderr.raw.log",
+    "stdout": "OWNED/logs/omp-stdout.raw.log",
+    "writeMode": "streamed and fsync before diagnostic interpretation"
+  },
+  "restorePlan": "Stop only owned ETW sessions; restore the two changed WER values with original types, verify registry export hash, or remove newly-created empty keys; delete fresh AppContainer profile after capture",
+  "runId": "M11-A1D-20261020-000159",
+  "sessions": [
+    {
+      "file": "Process.etl",
+      "kind": "Process",
+      "name": "PD-A1D-000159-Process",
+      "provider": "Microsoft-Windows-Kernel-Process"
+    },
+    {
+      "file": "Transport.etl",
+      "kind": "Transport",
+      "name": "PD-A1D-000159-Transport",
+      "provider": "Microsoft-Windows-TCPIP"
+    },
+    {
+      "file": "WFP.etl",
+      "kind": "WFP",
+      "name": "PD-A1D-000159-WFP",
+      "provider": "Microsoft-Windows-WFP"
+    },
+    {
+      "file": "KernelNetwork.etl",
+      "kind": "KernelNetwork",
+      "name": "PD-A1D-000159-KernelNetwork",
+      "provider": "Microsoft-Windows-Kernel-Network"
+    },
+    {
+      "file": "DNS.etl",
+      "kind": "DNS",
+      "name": "PD-A1D-000159-DNS",
+      "provider": "Microsoft-Windows-DNS-Client"
+    }
+  ],
+  "status": "PASS",
+  "wer": {
+    "beforeState": {
+      "backupAlias": null,
+      "backupSha256": null,
+      "existed": false
+    },
+    "dumpFolderAlias": "OWNED/dumps",
+    "dumpType": 1,
+    "enabledTemporarily": true,
+    "exactRestoreRequired": true
+  }
+}

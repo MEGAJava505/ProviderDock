@@ -1,0 +1,16 @@
+# evidenceId: M11-20261020-000171
+# runId: M11-A1D-20261020-000159
+# algorithm: SHA-256 of final public UTF-8 LF bytes
+# scope: artifacts 000159-000170; this manifest excludes itself
+8484f1a0bb6c2c33e5760ca5c803cf1771f392f53cb2901d4765827307705010  authorization-diagnostic-000159.json
+f0db3743dfb4bbd471b285336e96ec9e30bb163258936e4e080627505653712f  diagnostic-config-000160.json
+8db5bc4fe5799e5ae946cb292e331eecc90e0f7b876d9ff25689b207589e4545  preflight-diagnostic-000161.json
+5bd488352def99b1200ebbae3a2959e17cc60065ce8c59efeb1f951cf43a144b  process-tree-diagnostic-000162.json
+c7226714c02ead34bab6eb0d1f37abf721d5e0f41fdd16a7bafbf3c41fe7bd68  network-counters-diagnostic-000163.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  stdout-diagnostic-000164.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  stderr-diagnostic-000165.log
+ed2a6ec3b205def8b8b2de823c7e79ab25c1f64178fa306b9d4852ba22c20912  wer-dump-metadata-000166.json
+706c82c9ad13e291f8b06a780672cd2aeabcb8cf78d51cdebcd78b91ccb7e4aa  acp-handshake-000167.json
+06082f0cd1fc7c35947a49428ff739c9aee532d09288bfa905c0e4f642cbdd84  run-log-diagnostic-000168.txt
+9aebf9c35a598f8c205da9906fa7509204399bb254a8c3d1fe03a557d4f3ba4e  side-effects-diagnostic-000169.json
+a72c4df77d46850d5afea46573338be611453dc74c1b25f669ca2192a7301358  summary-diagnostic-000170.json

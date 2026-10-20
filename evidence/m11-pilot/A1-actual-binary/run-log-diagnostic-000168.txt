@@ -1,0 +1,13 @@
+runId: M11-A1D-20261020-000159
+2026-10-20T18:24:38.5546131Z elevation/admin/high and SeSystemProfilePrivilege verified
+2026-10-20T18:24:38.5546131Z five owned ETW sessions started before self-test processes
+2026-10-20T18:24:38.5546131Z WER LocalDumps configured temporarily with exact restore plan
+2026-10-20T18:24:38.5546131Z mandatory self-test PASS: cached exit 7, streamed stdout/stderr crash path, one 64-byte loopback request, direct TCP denied
+2026-10-20T18:24:38.5546131Z public authorization/config/preflight evidence 000159-000161 sealed before actual launch
+2026-10-20T18:25:03.379566Z actual OMP CreateProcess suspended; pin and AppContainer/Job token attested
+2026-10-20T18:25:03.407741Z ResumeThread; initialize written and FlushFileBuffers attempted
+controllerDurationMs=40043.237; precreateElapsedMs=24435.447021484375; ompLifetimeMs=15567.6669921875; deadlineSatisfied=false; watchdogFired=true
+2026-10-20T18:25:18.986280Z exit=124; initializeResponse=false; stdoutBytes=0; stderrBytes=0
+2026-10-20T18:25:28.8621809Z sessions stopped and decoded; EventsLostAllZero=true; orphanCount=0
+2026-10-20T18:25:28.847625Z fresh AppContainer profile deleted=true; WER restored=true
+2026-10-20T18:25:28.8621809Z STOP after A1-D; no A1-F, A2, A3, A4, provider route, inference, or paid request

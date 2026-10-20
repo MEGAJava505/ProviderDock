@@ -1,0 +1,108 @@
+{
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "createProcessAtUtc": "2026-10-20T18:25:03.379566Z",
+  "durationMs": 40043.237,
+  "evidenceId": "M11-20261020-000167",
+  "exitCode": 124,
+  "exitCodeMapping": {
+    "controllerGetExitCodeProcess": 124,
+    "etwKernelProcessStop": 124,
+    "imposedByWatchdog": true,
+    "matched": true
+  },
+  "exitCodeSource": "GetExitCodeProcess compared with Kernel-Process stop",
+  "framePolicy": "Newline-delimited JSON; every raw byte streamed to private logs before parse; public logs redacted only for publication",
+  "initializeResponseHasError": false,
+  "initializeResponseReceived": false,
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "77025c557baf9da3487f955e5a06de624678c08e0cfc34e117eb8f2a3527c2b4"
+  },
+  "phase": "A1-D-diagnostic-launch",
+  "pid": 3708,
+  "project": "ProviderDock/omp-integration/M11",
+  "publicRedactions": {
+    "stderr": 0,
+    "stdout": 0
+  },
+  "recordedAtUtc": "2026-10-20T18:25:28.8621809Z",
+  "resumeThreadAtUtc": "2026-10-20T18:25:03.407741Z",
+  "runId": "M11-A1D-20261020-000159",
+  "runtimeVersion": null,
+  "status": "OBSERVED",
+  "stderrBytes": 0,
+  "stderrCapture": {
+    "bytes": 0,
+    "complete": true,
+    "endedAtUtc": "2026-10-20T18:25:18.983371Z",
+    "eof": true,
+    "pendingBytesAtEof": 0
+  },
+  "stderrPrivateSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdoutBytes": 0,
+  "stdoutCapture": {
+    "bytes": 0,
+    "complete": true,
+    "endedAtUtc": "2026-10-20T18:25:18.983288Z",
+    "eof": true,
+    "pendingBytesAtEof": 0
+  },
+  "stdoutPrivateSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "timeline": [
+    {
+      "atUtc": "2026-10-20T18:25:03.407741Z",
+      "elapsedMs": 24463.633,
+      "event": "ResumeThread"
+    },
+    {
+      "atUtc": "2026-10-20T18:25:03.407780Z",
+      "bytes": 159,
+      "elapsedMs": 24463.674,
+      "event": "initialize-write"
+    },
+    {
+      "atUtc": "2026-10-20T18:25:18.948207Z",
+      "elapsedMs": 40004.111,
+      "event": "initialize-flush",
+      "flushFileBuffers": false
+    },
+    {
+      "atUtc": "2026-10-20T18:25:18.948256Z",
+      "elapsedMs": 40004.149,
+      "event": "stdin-eof"
+    },
+    {
+      "atUtc": "2026-10-20T18:25:18.983304Z",
+      "complete": true,
+      "eof": true,
+      "event": "stdout-capture-ended"
+    }
+  ],
+  "timing": {
+    "controllerDeadlineSeconds": 40,
+    "controllerDurationMs": 40043.237,
+    "controllerPrecreateElapsedMs": 24435.447021484375,
+    "deadlineSatisfied": false,
+    "ompLifetimeMs": 15567.6669921875
+  },
+  "watchdogFired": true
+}

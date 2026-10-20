@@ -1,0 +1,53 @@
+{
+  "artifactLocations": [
+    "authorization-diagnostic-000159.json",
+    "diagnostic-config-000160.json",
+    "preflight-diagnostic-000161.json",
+    "process-tree-diagnostic-000162.json",
+    "network-counters-diagnostic-000163.json",
+    "stdout-diagnostic-000164.log",
+    "stderr-diagnostic-000165.log",
+    "wer-dump-metadata-000166.json",
+    "acp-handshake-000167.json",
+    "run-log-diagnostic-000168.txt",
+    "side-effects-diagnostic-000169.json",
+    "summary-diagnostic-000170.json",
+    "integrity-hashes-diagnostic-000171.txt"
+  ],
+  "authorizationBasis": "Explicit user instruction to repeat UAC and proceed with the bounded A1-D diagnostic run",
+  "authorizationRef": "authorization-diagnostic-000159.json",
+  "evidenceId": "M11-20261020-000159",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "27d47439e0adf820dac29a4b732d4dfb3ce85974ce378e9973e1b78fc9697bdd"
+  },
+  "limits": {
+    "actualLaunches": 1,
+    "cost": {
+      "amount": 0,
+      "currency": "USD"
+    },
+    "deadlineSeconds": 45,
+    "inferenceRequests": 0,
+    "providerRequests": 0,
+    "retries": 0
+  },
+  "nextPhaseRequiresIndependentAcceptance": true,
+  "operator": "codex-executing-assistant",
+  "phase": "A1-D-diagnostic-launch",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-20T18:24:38.5546131Z",
+  "responsible": "gateway-owner-MEGAJava505",
+  "runId": "M11-A1D-20261020-000159",
+  "scope": "One pinned OMP diagnostic ACP initialize launch after mandatory self-test; no session/new, prompt, inference, live provider route, or paid request",
+  "status": "PASS",
+  "stopCriterion": "Any failed self-test, pin mismatch, elevation/privilege failure, ETW loss, WER restore uncertainty, unexpected egress, deadline, or orphan stops A1-D without retry",
+  "utcTimeWindow": {
+    "end": "2026-10-20T18:29:38.5546131Z",
+    "start": "2026-10-20T18:24:38.5546131Z"
+  }
+}
