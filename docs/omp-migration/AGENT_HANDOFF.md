@@ -65,3 +65,26 @@
 - Stop-правила: self-test fail, EventsLost>0, unexpected child/egress, cap breach, timeout, hash mismatch, side effect вне fixture → стоп без повторов.
 
 **Итог:** A1-D принят; M11 остаётся BLOCKED; A4 не открыт; следующий шаг — решение владельца о втором диагностическом прогоне по пунктам выше.
+
+## Дополнение — независимое модельное ревью через Codex, 21 октября 2026
+
+**Как выполнено:** модели VSLLM были недоступны — `gpt-6-astra` отдаёт 410/hang, `claude-opus-5-5` и `claude-fable-5` — 429, `gpt-6-sol`/`gpt-6-luna` висят. Ревью выполнено через сам Codex (default route, ChatGPT auth), exit 0, полный отчёт в `/tmp/a1d-verdict.md` (75 строк). Основной репозиторий не изменялся.
+
+**Вердикт ревью:** A1-D принят как честная запись STOP; A1 остаётся NOT PROVEN. Integrity/redaction нарушений нет; P2-S1 backfill закрыт (19/19 fileSha256 и 19/19 canonicalSha256).
+
+**Уточнение к разделу выше:** классификация «P1 — нет» заменяется. Независимое ревью выявило P1:
+
+- **P1-1 — блокирующий синхронный `FlushFileBuffers` на управляющем пути.** `acp-handshake-000167.json:77–91`, `summary-diagnostic-000170.json:57`: flush удерживает шаг handshake ~15.54 с до watchdog, из-за чего прогон диагностически неполон (нет ответа, нет границ кадров).
+- **P2-1 — deadline не даёт заявленного окна actual OMP.** authorization 45 с, внешний watchdog 43 с, внутренние 40 с; подготовка заняла 24.44 с, OMP получил 15.57 с.
+- **P2-2 — decoded self-test не связан с текущим self-test.** Decoded lifecycle 17:58:42–45Z, PID 37672/32248/35644, loopback 5944 против текущего selfTest в 000161; связь не доказана.
+- **P2-3 — неполные I/O и protocol границы.** Нет точных write/flush begin/end, payload/frame hash, отдельных frame/parse outcomes; runtime header/version не наблюдались (PE VersionInfo есть в 000161).
+
+**Требования до A1-F:**
+1. Без actual OMP исправить P1-1 и P2-1, опубликовать проверяемый patch или безопасный audit excerpt контроллера/конфига с hashes.
+2. Проверить helper-сценариями: reader не читает stdin; раздельные setup/runtime/write/response/teardown deadlines; watchdog не маскирует причину.
+3. Закрыть P2-2 append-only коррекцией из сохранённых источников либо честно записать отсутствие подтверждения; в новом прогоне связать self-test с теми же monitor PID/временем.
+4. Закрыть P2-3: полные I/O-события, request ID, безопасная форма/хеш отправленных байтов, flush либо `not used` с причиной.
+5. Только после этого — отдельное разрешение владельца на дополнительный диагностический прогон (один launch, retries=0, увеличенный согласованный deadline, нулевые provider/inference/cost).
+6. A1-F — отдельно, по §3 `M11_FULL_EXECUTION_TASK.md`; PASS только при валидном ответе `initialize` и `session/new`.
+
+**Итог без изменений:** A1-D принят; A1 NOT PROVEN; A4 BLOCKED; M11 BLOCKED; следующий шаг — исправление P1-1/P2-1 и новое разрешение владельца.
