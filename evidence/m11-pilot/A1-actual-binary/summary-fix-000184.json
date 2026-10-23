@@ -1,0 +1,99 @@
+{
+  "a1": "NOT PROVEN",
+  "actualLaunches": 1,
+  "artifactLocations": [
+    "authorization-fix-000172.json",
+    "controller-fix-audit-000173.json",
+    "config-fix-000174.json",
+    "self-test-linked-000175.json",
+    "preflight-fix-000176.json",
+    "process-tree-fix-000177.json",
+    "network-counters-fix-000178.json",
+    "stdout-fix-000179.log",
+    "stderr-fix-000180.log",
+    "acp-handshake-fix-000181.json",
+    "run-log-fix-000182.txt",
+    "side-effects-fix-000183.json",
+    "summary-fix-000184.json",
+    "integrity-hashes-fix-000185.txt"
+  ],
+  "authorizationRef": "authorization-fix-000172.json",
+  "checks": {
+    "boundedHelpers": true,
+    "deadlines": false,
+    "eventsLostAllZero": true,
+    "exitMapping": true,
+    "noObservedEgress": true,
+    "noUnexpectedChildren": true,
+    "orphanZero": true,
+    "processTreeComplete": true,
+    "selfTestLinkage": false,
+    "singleLaunch": true,
+    "streamsComplete": true,
+    "teardownComplete": false
+  },
+  "controllerExit": {
+    "atUtc": "2026-10-23T07:42:30.447117Z",
+    "code": 1,
+    "source": "controller-return-code"
+  },
+  "deadlineSatisfied": {
+    "protocol": false,
+    "setup": false,
+    "teardown": true,
+    "total": true
+  },
+  "evidenceId": "M11-FIX-000184",
+  "initializeResponseHasError": false,
+  "initializeResponseReceived": false,
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "c1278135e31638a091e93ecee2e3032b85336f5b69e3f8bb85ec46c3db75d8b0"
+  },
+  "nextRequirement": "Independent acceptance; separate A1-F authorization only after valid initialize response. No automatic retry.",
+  "ompExit": {
+    "atUtc": "2026-10-23T07:42:30.436468Z",
+    "code": 125,
+    "source": "GetExitCodeProcess"
+  },
+  "opensA4Gate": false,
+  "parentWatchdog": {
+    "budgetSeconds": 135,
+    "fireUtc": null,
+    "reason": "parent-watchdog",
+    "scheduledAtUtc": "2026-10-23T07:42:04.0096993Z",
+    "terminationUtc": null
+  },
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "protocolMs": 0,
+  "recordedAtUtc": "2026-10-23T07:42:47.859Z",
+  "retries": 0,
+  "rootCause": "controller-error-underlying-cause-not-established",
+  "runId": "M11-A1D-FIX-93b9beb66d7f4371a99dbcc99023d938",
+  "runnerTeardownEndedAtUtc": "2026-10-23T07:42:47.6677697Z",
+  "runnerTeardownMs": 17067.4275,
+  "runnerTeardownStartedAtUtc": "2026-10-23T07:42:30.6002441Z",
+  "runtimeHeader": {
+    "reason": "no-runtime-version-in-initialize-response",
+    "status": "not-observed",
+    "version": null
+  },
+  "setupMs": 25448.639,
+  "status": "NOT PROVEN",
+  "teardownMs": 1013.88,
+  "totalMs": 26462.519,
+  "underlyingOriginalExitOneCause": "not-established by this observation",
+  "watchdog": {
+    "budgetSeconds": 120,
+    "fireUtc": null,
+    "reason": "total-watchdog",
+    "scheduledAtUtc": "2026-10-23T07:42:03.984552Z",
+    "scheduleUtc": "2026-10-23T07:44:03.984552Z",
+    "terminationUtc": null
+  }
+}

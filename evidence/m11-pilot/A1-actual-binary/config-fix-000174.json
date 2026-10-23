@@ -1,0 +1,127 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000172.json",
+    "controller-fix-audit-000173.json",
+    "config-fix-000174.json",
+    "self-test-linked-000175.json",
+    "preflight-fix-000176.json",
+    "process-tree-fix-000177.json",
+    "network-counters-fix-000178.json",
+    "stdout-fix-000179.log",
+    "stderr-fix-000180.log",
+    "acp-handshake-fix-000181.json",
+    "run-log-fix-000182.txt",
+    "side-effects-fix-000183.json",
+    "summary-fix-000184.json",
+    "integrity-hashes-fix-000185.txt"
+  ],
+  "authorizationRef": "authorization-fix-000172.json",
+  "budgets": {
+    "controllerWatchdogSeconds": 120,
+    "parentWatchdogSeconds": 135,
+    "protocolSeconds": 60,
+    "setupSeconds": 15,
+    "teardownSeconds": 15
+  },
+  "declaredHelpers": [
+    "conhost.exe"
+  ],
+  "evidenceId": "M11-FIX-000174",
+  "independentParentWatchdogSeconds": 135,
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "0504cbb1d39aee928a86a341c0cd43f26ec2c00abd12ea10bd2c023747b2788b"
+  },
+  "isolation": {
+    "activeProcessLimit": 1,
+    "mechanism": "fresh zero-capability AppContainer and kill-on-close Job"
+  },
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "protocol": {
+    "encoding": "utf-8",
+    "framing": "newline-delimited-json",
+    "method": "initialize",
+    "sessionNew": "not-used; separate A1-F authorization required"
+  },
+  "providerMetadata": [
+    {
+      "manifestSha256": "44262200d92c22e2e8d5133a41f02e998b52cd442259e92e11433fc507cf4cb9",
+      "provider": "Microsoft-Windows-Kernel-Process",
+      "querySha256": "9877702dcea08352139b8af5777727bfac544a1531cce784547e3d0a1c4b05fc"
+    },
+    {
+      "manifestSha256": "1f55f2cf705b9b78ea5ed18390363c6264e2491da8db524a35c4796c9a02a325",
+      "provider": "Microsoft-Windows-TCPIP",
+      "querySha256": "d917cc63a4ddea50ab47976d65fb39b7fc06081852ffb9567e81ef7e51d3b5eb"
+    },
+    {
+      "manifestSha256": "b4817255272fef39ec6e051d495db2ff5a7e8413964208a85c367ba382af200c",
+      "provider": "Microsoft-Windows-WFP",
+      "querySha256": "eead56a449a787b2fc163b9ae05caa72863beff42d264666b13788cdfc2700ab"
+    },
+    {
+      "manifestSha256": "6716a2dbc2c852c8afbf3236b728bf1d6ee88051c7ac1b7f50fbe1c7deca9b87",
+      "provider": "Microsoft-Windows-Kernel-Network",
+      "querySha256": "6d1d70ebf247fd1d4bb869486081adda18d8ca355b139f15007e74a9ee7a4454"
+    },
+    {
+      "manifestSha256": "beda2215a73ca851634f66e6343b0116dcb16dac0f2ba1c0d18623be7db7f534",
+      "provider": "Microsoft-Windows-DNS-Client",
+      "querySha256": "a1ae398aba3777fde4a58599067f03f55d3470ca30917d654ce58864bf252548"
+    }
+  ],
+  "recordedAtUtc": "2026-10-23T07:42:03.725Z",
+  "redirects": {
+    "stderr": "OWNED/logs/omp-stderr.raw.log",
+    "stdout": "OWNED/logs/omp-stdout.raw.log"
+  },
+  "runId": "M11-A1D-FIX-93b9beb66d7f4371a99dbcc99023d938",
+  "sessions": [
+    {
+      "file": "Process.etl",
+      "kind": "Process",
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-Process",
+      "provider": "Microsoft-Windows-Kernel-Process"
+    },
+    {
+      "file": "Transport.etl",
+      "kind": "Transport",
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-Transport",
+      "provider": "Microsoft-Windows-TCPIP"
+    },
+    {
+      "file": "WFP.etl",
+      "kind": "WFP",
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-WFP",
+      "provider": "Microsoft-Windows-WFP"
+    },
+    {
+      "file": "KernelNetwork.etl",
+      "kind": "KernelNetwork",
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-KernelNetwork",
+      "provider": "Microsoft-Windows-Kernel-Network"
+    },
+    {
+      "file": "DNS.etl",
+      "kind": "DNS",
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-DNS",
+      "provider": "Microsoft-Windows-DNS-Client"
+    }
+  ],
+  "status": "CONFIGURED",
+  "wer": {
+    "beforeState": {
+      "backupSha256": null,
+      "existed": false,
+      "values": []
+    },
+    "dumpFolderAlias": "OWNED/dumps",
+    "dumpType": 1,
+    "exactRestoreRequired": true
+  }
+}

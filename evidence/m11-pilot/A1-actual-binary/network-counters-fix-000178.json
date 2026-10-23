@@ -1,0 +1,285 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000172.json",
+    "controller-fix-audit-000173.json",
+    "config-fix-000174.json",
+    "self-test-linked-000175.json",
+    "preflight-fix-000176.json",
+    "process-tree-fix-000177.json",
+    "network-counters-fix-000178.json",
+    "stdout-fix-000179.log",
+    "stderr-fix-000180.log",
+    "acp-handshake-fix-000181.json",
+    "run-log-fix-000182.txt",
+    "side-effects-fix-000183.json",
+    "summary-fix-000184.json",
+    "integrity-hashes-fix-000185.txt"
+  ],
+  "authorizationRef": "authorization-fix-000172.json",
+  "counters": {
+    "connectAcceptEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "KernelNetwork",
+      "unit": "events"
+    },
+    "dnsEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "DNS",
+      "unit": "events"
+    },
+    "providerRequests": {
+      "baseline": null,
+      "delta": null,
+      "final": null,
+      "reason": "not-observed; permission budget is zero",
+      "source": "ETW does not decode HTTP",
+      "unit": "requests"
+    },
+    "receivedBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "KernelNetwork",
+      "unit": "bytes"
+    },
+    "sentBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "KernelNetwork",
+      "unit": "bytes"
+    },
+    "transportAllowedEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "TCPIP",
+      "unit": "events"
+    },
+    "transportAttemptEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "TCPIP",
+      "unit": "events"
+    },
+    "transportDeniedEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "TCPIP",
+      "unit": "events"
+    },
+    "wfpDropEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "WFP",
+      "unit": "events"
+    }
+  },
+  "events": [],
+  "eventsLostAllZero": true,
+  "evidenceId": "M11-FIX-000178",
+  "excludedNetworkEvents": 44098,
+  "filter": "PID and process lifetime; ambiguous AppId events excluded",
+  "finalLiveLoss": [
+    {
+      "atUtc": "2026-10-23T07:42:30.826839Z",
+      "buffersWritten": 24,
+      "eventsLost": 0,
+      "freeBuffers": 13,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-Process",
+      "numberOfBuffers": 25,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-23T07:42:30.826878Z",
+      "buffersWritten": 14,
+      "eventsLost": 0,
+      "freeBuffers": 13,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-Transport",
+      "numberOfBuffers": 25,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-23T07:42:30.826901Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 23,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-WFP",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-23T07:42:30.826919Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-KernelNetwork",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-23T07:42:30.826936Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-DNS",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    }
+  ],
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "90e7d150c79a7679d6224c083d4a72509254827098a036097f405584fd28bc2e"
+  },
+  "liveLossSnapshots": [
+    {
+      "atUtc": "2026-10-23T07:42:04.293829Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-23T07:42:04.293718Z",
+          "buffersWritten": 2,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-23T07:42:04.293752Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-Transport",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-23T07:42:04.293777Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-23T07:42:04.293803Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-23T07:42:04.293823Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 18,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-93b9beb66d7f4371a99dbcc99023d938-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    }
+  ],
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-23T07:42:47.859Z",
+  "runId": "M11-A1D-FIX-93b9beb66d7f4371a99dbcc99023d938",
+  "sources": [
+    {
+      "buffersLost": 0,
+      "etlSha256": "2964a9424144d75fd3483378b70afb1da75820fc3d9b4aed10c84ae1a13da817",
+      "eventsLost": 0,
+      "kind": "Process",
+      "xmlSha256": "4a54f31f3f480f0c70713a4bf6bf02facb5437eb6df0e3a8a2c368959c543db3"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "e0e5cc673b4e06a9dd6bcec935b9332af783d191d3e65cc4395c541a0b141328",
+      "eventsLost": 0,
+      "kind": "Transport",
+      "xmlSha256": "768ed3e8defd40ee68d9e72d751d5541dd98100fdc074f2f4c341b3e494284cb"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "7fb392da0066982c8fbb07db97049db35faba6444fecb0c5cc969c74f85f8026",
+      "eventsLost": 0,
+      "kind": "WFP",
+      "xmlSha256": "4db92c6b7e9b2da7b42c649225669ee5dca3335003e400136b4ef9ffd45bbf91"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "323c51c9ca67a12a4a37854c85bab0f99af001e4b1c1a637c98408a5ed30bc11",
+      "eventsLost": 0,
+      "kind": "KernelNetwork",
+      "xmlSha256": "44a28586642278d4ded0fbb64dca8c2da795e3018118b1140e6906155a19f397"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "10871e83f112bff5b5d0116a79de2776c295fa19e8d0c5cfdbf320704e610843",
+      "eventsLost": 0,
+      "kind": "DNS",
+      "xmlSha256": "fba43073149a47ec4b3b4bccc4299fba2d0f367efb3b53e87b3452c021498271"
+    }
+  ],
+  "status": "OBSERVED"
+}

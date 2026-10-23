@@ -1,0 +1,65 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000172.json",
+    "controller-fix-audit-000173.json",
+    "config-fix-000174.json",
+    "self-test-linked-000175.json",
+    "preflight-fix-000176.json",
+    "process-tree-fix-000177.json",
+    "network-counters-fix-000178.json",
+    "stdout-fix-000179.log",
+    "stderr-fix-000180.log",
+    "acp-handshake-fix-000181.json",
+    "run-log-fix-000182.txt",
+    "side-effects-fix-000183.json",
+    "summary-fix-000184.json",
+    "integrity-hashes-fix-000185.txt"
+  ],
+  "authorizationRef": "authorization-fix-000172.json",
+  "cleanupErrors": [
+    "etw-decode-failed",
+    "teardown-budget-exceeded"
+  ],
+  "dumpMetadata": [],
+  "evidenceId": "M11-FIX-000183",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "d17a0673d44e66bf645610ccc7129621cf6e5900b3aad4eb93b9e860bdc9c956"
+  },
+  "inventory": [
+    {
+      "after": {
+        "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+        "size": 816
+      },
+      "alias": "OWNED_FIXTURE_FILE_1",
+      "before": {
+        "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+        "size": 816
+      }
+    },
+    {
+      "after": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      },
+      "alias": "OWNED_FIXTURE_FILE_2",
+      "before": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      }
+    }
+  ],
+  "phase": "A1-D-controller-fix",
+  "profileDeleted": true,
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-23T07:42:47.859Z",
+  "runId": "M11-A1D-FIX-93b9beb66d7f4371a99dbcc99023d938",
+  "scope": "owned fixture inventory; no claim of host-wide filesystem observation",
+  "status": "OBSERVED",
+  "werRestored": true
+}
