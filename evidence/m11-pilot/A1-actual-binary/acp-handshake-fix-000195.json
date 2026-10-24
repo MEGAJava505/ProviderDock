@@ -1,0 +1,127 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000186.json",
+    "controller-fix-audit-000187.json",
+    "config-fix-000188.json",
+    "self-test-linked-000189.json",
+    "preflight-fix-000190.json",
+    "process-tree-fix-000191.json",
+    "network-counters-fix-000192.json",
+    "stdout-fix-000193.log",
+    "stderr-fix-000194.log",
+    "acp-handshake-fix-000195.json",
+    "run-log-fix-000196.txt",
+    "side-effects-fix-000197.json",
+    "summary-fix-000198.json",
+    "integrity-hashes-fix-000199.txt"
+  ],
+  "authorizationRef": "authorization-fix-000186.json",
+  "controllerExit": {
+    "atUtc": "2026-10-24T09:41:19.918609Z",
+    "code": 1,
+    "source": "controller-return-code"
+  },
+  "evidenceId": "M11-FIX-000195",
+  "frameBoundaries": [],
+  "framesReceived": 0,
+  "framesSent": 0,
+  "initializeIo": null,
+  "initializeResponseHasError": false,
+  "initializeResponseReceived": false,
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "6f04ea39a77354f74936f4409356b1d3c813639c58a48e78db5d9f76b730edf9"
+  },
+  "ompExit": {
+    "atUtc": "2026-10-24T09:41:19.898572Z",
+    "code": 125,
+    "source": "GetExitCodeProcess"
+  },
+  "parentWatchdog": {
+    "budgetSeconds": 135,
+    "fireUtc": null,
+    "reason": "parent-watchdog",
+    "scheduledAtUtc": "2026-10-24T09:40:54.7519487Z",
+    "terminationUtc": null
+  },
+  "parseResults": [],
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "protocolEndReason": "controller-error",
+  "recordedAtUtc": "2026-10-24T09:41:33.866Z",
+  "requestResponseLinkage": [],
+  "runId": "M11-A1D-FIX-716b19f18fdb4cb89340f93c96d69a13",
+  "runtimeHeader": {
+    "reason": "no-runtime-version-in-initialize-response",
+    "status": "not-observed",
+    "version": null
+  },
+  "sessionNew": {
+    "reason": "diagnostic initialize only; requires separate A1-F acceptance and authorization",
+    "status": "not-used"
+  },
+  "status": "OBSERVED",
+  "stderr": {
+    "artifact": "stderr-fix-000194.log",
+    "bytes": 0,
+    "complete": true,
+    "endedAtUtc": "2026-10-24T09:41:19.911320Z",
+    "eof": true,
+    "error": null,
+    "hashSource": "private original bytes",
+    "pendingAtEof": 0,
+    "pendingBytesAtEof": 0,
+    "publishedBytes": 0,
+    "publishedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "redactions": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "artifact": "stdout-fix-000193.log",
+    "bytes": 0,
+    "complete": true,
+    "endedAtUtc": "2026-10-24T09:41:19.911436Z",
+    "eof": true,
+    "error": null,
+    "hashSource": "private original bytes",
+    "pendingAtEof": 0,
+    "pendingBytesAtEof": 0,
+    "publishedBytes": 0,
+    "publishedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "redactions": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "timeline": [
+    {
+      "atUtc": "2026-10-24T09:41:18.891650Z",
+      "elapsedMs": 23942.924,
+      "event": "stdin-eof-requested",
+      "writerStillActive": false
+    },
+    {
+      "atUtc": "2026-10-24T09:41:19.911622Z",
+      "elapsedMs": 24962.892,
+      "event": "process-exit",
+      "exitCode": 125
+    },
+    {
+      "atUtc": "2026-10-24T09:41:19.911759Z",
+      "complete": true,
+      "elapsedMs": 24963.03,
+      "eof": true,
+      "event": "capture-ended"
+    }
+  ],
+  "watchdog": {
+    "budgetSeconds": 120,
+    "fireUtc": null,
+    "reason": "total-watchdog",
+    "scheduledAtUtc": "2026-10-24T09:40:54.736407Z",
+    "scheduleUtc": "2026-10-24T09:42:54.736407Z",
+    "terminationUtc": null
+  }
+}

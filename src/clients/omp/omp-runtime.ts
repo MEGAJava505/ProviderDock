@@ -79,8 +79,9 @@ function classify(error: unknown): OmpRuntimeError {
 /** These are discovery adapters, not the user-selected inference providers. */
 export const ompDisabledDiscoveryProviders = [
   "native", "agents", "agents-md", "agent-plugins", "claude", "claude-plugins",
-  "codex", "cline", "cursor", "gemini", "github", "mcp-json", "omp-plugins",
+  "codex", "cline", "cursor", "gemini", "google-vertex", "github", "mcp-json", "omp-plugins",
   "opencode", "ssh-json", "vscode", "windsurf", "ollama", "llama.cpp", "lm-studio",
+  "zenmux",
 ] as const;
 
 /** Read-only pilot, NOT an OS or network sandbox. No automatic retry/fallback. */

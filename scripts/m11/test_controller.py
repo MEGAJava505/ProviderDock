@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,6 +25,70 @@ c = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(c)
 import parse_etw as etw
 SCENARIOS = {}
+
+
+class ImageSetupChecks(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # os.pipe initializes persistent Windows runtime state on its first use.
+        # Complete that initialization before checking per-operation leaks.
+        read_fd, write_fd = os.pipe()
+        os.close(read_fd)
+        os.close(write_fd)
+
+    @staticmethod
+    def handle_count():
+        get_count = c.signature(c.K, "GetProcessHandleCount", c.W.BOOL,
+                                [c.W.HANDLE, c.C.POINTER(c.W.DWORD)])
+        count = c.W.DWORD()
+        c.check(get_count(c.W.HANDLE(-1), c.C.byref(count)), "handle-count")
+        return count.value
+
+    def test_image_remains_read_only_and_releases_handles_after_exception(self):
+        with tempfile.TemporaryDirectory(prefix="m11-image-") as folder:
+            target = Path(folder) / "helper.exe"
+            shutil.copyfile(Path(os.environ["SystemRoot"]) / "System32/cmd.exe", target)
+            before = self.handle_count()
+            with self.assertRaisesRegex(ValueError, "caller-failed"):
+                with c.executable_image(target):
+                    with self.assertRaises(PermissionError):
+                        with target.open("r+b"):
+                            pass
+                    raise ValueError("caller-failed")
+            with target.open("r+b"):
+                pass
+            self.assertEqual(self.handle_count(), before)
+
+    def test_invalid_image_is_rejected_before_create_without_handle_leak(self):
+        with tempfile.TemporaryDirectory(prefix="m11-image-") as folder:
+            target = Path(folder) / "invalid.exe"
+            target.write_bytes(b"This is not a PE executable.\n")
+            sid = c.profile_sid({"sidText": "S-1-15-2-1-2-3-4-5-6-7"})
+            before = self.handle_count()
+            try:
+                with patch.object(c, "create_process", side_effect=AssertionError("must not create")) as create:
+                    with self.assertRaisesRegex(RuntimeError, "image-section-create"):
+                        c.ContainedProcess(target, [], folder, {}, sid)
+                    create.assert_not_called()
+                self.assertEqual(self.handle_count(), before)
+            finally:
+                c.local_free(sid)
+
+    def test_create_failure_closes_image_attributes_and_pipes(self):
+        with tempfile.TemporaryDirectory(prefix="m11-image-") as folder:
+            target = Path(folder) / "helper.exe"
+            shutil.copyfile(Path(os.environ["SystemRoot"]) / "System32/cmd.exe", target)
+            sid = c.profile_sid({"sidText": "S-1-15-2-1-2-3-4-5-6-7"})
+            before = self.handle_count()
+            try:
+                with patch.object(c, "create_process", return_value=False):
+                    with self.assertRaisesRegex(RuntimeError, "create-process"):
+                        c.ContainedProcess(target, [], folder, {}, sid)
+                self.assertEqual(self.handle_count(), before)
+                with target.open("r+b"):
+                    pass
+            finally:
+                c.local_free(sid)
 
 
 class WriterChecks(unittest.TestCase):
@@ -142,11 +207,21 @@ class HelperProcess:
     def __init__(self, *args, on_created=None):
         programs = {
             "capture": 'import sys; print("M11_CAPTURE_STDOUT_MARKER",flush=True); sys.stderr.write("M11_CAPTURE_STDERR_MARKER\\n"); sys.exit(7)',
-            "reply": 'import sys,json; r=json.loads(sys.stdin.buffer.readline()); print(json.dumps({"jsonrpc":"2.0","id":r["id"],"result":{"agentInfo":{"version":"helper"}}}),flush=True); sys.stderr.write("terminal marker\\n"); sys.stdin.buffer.read()',
+            "reply": 'import sys,json; r=json.loads(sys.stdin.buffer.readline()); print(json.dumps({"jsonrpc":"2.0","id":r["id"],"result":{"protocolVersion":1,"agentInfo":{"version":"helper"}}}),flush=True); sys.stderr.write("terminal marker\\n"); sys.stdin.buffer.read()',
+            "reply-session-new": 'import sys,json,uuid;\nfor line in sys.stdin.buffer:\n r=json.loads(line);\n if r["method"]=="initialize": print(json.dumps({"jsonrpc":"2.0","id":r["id"],"result":{"protocolVersion":1,"agentInfo":{"version":"helper"}}}),flush=True)\n elif r["method"]=="session/new": print(json.dumps({"jsonrpc":"2.0","id":r["id"],"result":{"sessionId":"123e4567-e89b-12d3-a456-426614174000","configOptions":[],"modes":{"availableModes":[],"currentModeId":"default"}}}),flush=True)',
             "no-reader": 'import time; time.sleep(30)',
             "silent": 'import time,sys; time.sleep(30); sys.stdin.buffer.read()',
             "native-no-reader": 'import time; time.sleep(30)',
         }
+        programs["invalid-session"] = programs["reply-session-new"].replace(
+            "123e4567-e89b-12d3-a456-426614174000", "not-a-session")
+        programs["invalid-initialize"] = programs["reply-session-new"].replace('"protocolVersion":1', '"protocolVersion":999')
+        programs["error-initialize"] = programs["reply-session-new"].replace(
+            '"result":{"protocolVersion":1,"agentInfo":{"version":"helper"}}', '"error":{"code":-1}')
+        programs["invalid-session-shape"] = programs["reply-session-new"].replace(
+            ',"configOptions":[],"modes":{"availableModes":[],"currentModeId":"default"}', ',"configOptions":[]')
+        programs["wrong-session-response-id"] = programs["reply-session-new"].replace(
+            '"id":r["id"],"result":{"sessionId"', '"id":99,"result":{"sessionId"')
         command = [sys.executable, "-c", programs[self.mode]]
         if self.mode == "native-no-reader":
             command = [str(Path(os.environ["SystemRoot"]) / "System32" / "ping.exe"), "-n", "31", "127.0.0.1"]
@@ -161,6 +236,7 @@ class HelperProcess:
         self.child.stderr.close()
         self.info = types.SimpleNamespace(dwProcessId=self.child.pid)
         self.created_at_utc = c.utc_now()
+        self.creation_timings = [{"phase": "helper-fake", "elapsedMs": 0.0}]
         self.attestation = {"helperOnly": True}
         if on_created:
             on_created(self)
@@ -192,7 +268,7 @@ class ControllerChecks(unittest.TestCase):
         with self.assertRaises(ValueError):
             ControllerBudgets(protocol_seconds=70, watchdog_seconds=90).validate()
 
-    def run_helper(self, mode="reply", full=False, budget_overrides=None, creation_delay=0):
+    def run_helper(self, mode="reply", full=False, budget_overrides=None, creation_delay=0, session_new=False):
         with tempfile.TemporaryDirectory(prefix="m11-helper-") as folder:
             root = Path(folder)
             for name in ("private", "logs", "work"):
@@ -210,7 +286,7 @@ class ControllerChecks(unittest.TestCase):
                  patch.object(c, "profile_sid", return_value=None), \
                  patch.object(c, "sha256_file", return_value=c.PINNED_SHA256), \
                  contextlib.redirect_stdout(io.StringIO()):
-                c.actual(types.SimpleNamespace(root=str(root), helper_budgets=budgets))
+                c.actual(types.SimpleNamespace(root=str(root), helper_budgets=budgets, session_new=session_new))
             return json.loads((root / "private/actual.json").read_text(encoding="utf-8"))
 
     def test_watchdog_during_create_never_resumes_child(self):
@@ -222,6 +298,15 @@ class ControllerChecks(unittest.TestCase):
         self.assertIsNotNone(result["watchdog"]["terminationUtc"])
         self.assertFalse(result["timing"]["deadlineSatisfied"]["protocol"])
 
+    def test_slow_process_setup_is_counted_and_never_resumed(self):
+        result = self.run_helper("no-reader", creation_delay=.15,
+                                 budget_overrides={"setup_seconds": .05})
+        self.assertGreaterEqual(result["setupMs"], 150)
+        self.assertFalse(result["timing"]["deadlineSatisfied"]["setup"])
+        self.assertEqual(result["controllerError"], "setup-budget-exceeded-before-resume")
+        self.assertNotIn("resumedAtUtc", result)
+        self.assertEqual(result["protocolMs"], 0)
+
     def test_control_reads_response_before_flush_can_finish(self):
         start = time.monotonic()
         result = self.run_helper()
@@ -231,12 +316,57 @@ class ControllerChecks(unittest.TestCase):
         self.assertEqual(result["framesSent"], 1)
         self.assertEqual(result["framesReceived"], 1)
         self.assertTrue(result["requestResponseLinkage"][0]["matched"])
+        self.assertEqual(result["processCreationTimings"][0]["phase"], "helper-fake")
         for kind in ("stdout", "stderr"):
             self.assertTrue(result[kind + "Capture"]["eof"])
             self.assertTrue(result[kind + "Capture"]["complete"])
             self.assertEqual(result[kind + "Capture"]["pendingAtEof"], 0)
         self.assertNotIn("controllerDurationMs", result)
         self.assertGreater(result["totalMs"], result["setupMs"])
+
+    def test_session_new_is_sent_only_after_initialize_and_validated(self):
+        result = self.run_helper("reply-session-new", session_new=True)
+        self.assertTrue(result["initializeResponseReceived"])
+        self.assertTrue(result["sessionNewResponseReceived"])
+        self.assertEqual(result["sessionNewResponse"]["sessionId"], "123e4567-e89b-12d3-a456-426614174000")
+        self.assertEqual([item["requestId"] for item in result["requestResponseLinkage"]], [1, 2])
+        self.assertEqual(result["framesSent"], 2)
+        self.assertEqual(result["framesReceived"], 2)
+        self.assertEqual(result["protocolEndReason"], "session-new-response")
+
+    def test_session_new_accepts_pinned_acp_config_array_and_modes_object(self):
+        result = self.run_helper("reply-session-new", session_new=True)
+        self.assertTrue(result["sessionNewValid"])
+
+    def test_session_new_rejects_invalid_session_id(self):
+        result = self.run_helper("invalid-session", session_new=True)
+        self.assertTrue(result["sessionNewResponseReceived"])
+        self.assertFalse(result["sessionNewValid"])
+
+    def test_session_new_rejects_missing_contract_fields(self):
+        result = self.run_helper("invalid-session-shape", session_new=True)
+        self.assertTrue(result["sessionNewResponseReceived"])
+        self.assertFalse(result["sessionNewValid"])
+
+    def test_session_new_does_not_accept_an_unmatched_response_id(self):
+        result = self.run_helper("wrong-session-response-id", session_new=True)
+        self.assertFalse(result["sessionNewResponseReceived"])
+        self.assertFalse(result["sessionNewValid"])
+
+    def test_session_new_rejects_cwd_outside_owned_workdir(self):
+        with tempfile.TemporaryDirectory(prefix="m11-helper-cwd-") as folder:
+            root = Path(folder)
+            (root / "work").mkdir()
+            with self.assertRaisesRegex(RuntimeError, "session-new-cwd-outside-owned-workdir"):
+                c.owned_cwd(Path(folder).parent, {"workDirectory": str(root / "work")})
+
+    def test_invalid_initialize_never_sends_session_new(self):
+        for mode in ("invalid-initialize", "error-initialize"):
+            with self.subTest(mode=mode):
+                result = self.run_helper(mode, session_new=True)
+                self.assertEqual(result["framesSent"], 1)
+                self.assertIsNone(result["sessionNewIo"])
+                self.assertFalse(result["sessionNewResponseReceived"])
 
     def test_no_reader_keeps_controller_live_after_flush_timeout(self):
         result = self.run_helper("no-reader")
@@ -286,6 +416,15 @@ class SelfTestChecks(unittest.TestCase):
                 self.assertEqual(result[name + "Capture"]["bytes"], len(raw))
                 self.assertEqual(result[name + "Capture"]["sha256"], hashlib.sha256(raw).hexdigest())
                 self.assertTrue(result[name + "Capture"]["complete"])
+
+    def test_helper_records_process_creation_timing(self):
+        with tempfile.TemporaryDirectory(prefix="m11-timing-") as folder:
+            root = Path(folder)
+            HelperProcess.mode = "capture"
+            with patch.object(c, "ContainedProcess", HelperProcess), patch.object(c, "profile_sid", return_value=None):
+                result = c.run_helper({"workDirectory": str(root)}, "HELPER-ONLY", [],
+                    root / "stdout.log", root / "stderr.log", expected_exit=7)
+            self.assertEqual(result["creationTimings"][0]["phase"], "helper-fake")
 
 class FullBudgetChecks(unittest.TestCase):
     def test_production_timeouts_with_child_not_reading_stdin(self):
@@ -368,6 +507,31 @@ class EtwLifetimeChecks(unittest.TestCase):
         self.assertEqual(records[0]["createTimeUtc"], life["createTimeUtc"])
         self.assertEqual(excluded, 2)
 
+    def test_normalize_tracerpt_clock_against_process_creation_time(self):
+        process_events = [
+            self.event(1, "2026-10-23T12:00:10.100000000+04:59", {
+                "ProcessID": "42", "CreateTime": self.filetime("2026-10-23T07:00:10.100000Z"),
+                "ProcessSequenceNumber": "5", "ImageName": "helper.exe",
+            }),
+            self.event(2, "2026-10-23T12:00:20.100000000+04:59", {
+                "ProcessID": "42", "CreateTime": self.filetime("2026-10-23T07:00:10.100000Z"),
+                "ExitTime": self.filetime("2026-10-23T07:00:20.100000Z"),
+                "ExitCode": "7", "ProcessSequenceNumber": "5",
+            }),
+        ]
+        network_events = [self.event(1034, "2026-10-23T12:00:15.100000000+04:59", {
+            "ProcessId": "42", "Status": "0xC0000022",
+        })]
+        metadata = etw.normalize_event_timestamps({"Process": process_events, "Transport": network_events})
+        self.assertEqual(metadata["status"], "calibrated")
+        self.assertAlmostEqual(metadata["offsetSeconds"], 60.0, places=3)
+        self.assertEqual(network_events[0]["timeUtc"], "2026-10-23T07:00:15.100000Z")
+        lives = etw.lifetimes(process_events)
+        records, excluded = etw.network_events({"TCPIP": network_events}, lives)
+        self.assertEqual(excluded, 0)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["pid"], 42)
+
     def test_wfp_image_only_event_requires_one_matching_live_identity(self):
         lives = [{"pid": pid, "createTimeUtc": "2026-10-22T01:00:10Z",
                   "exitTimeUtc": "2026-10-22T01:00:20Z", "imageRaw": "helper.exe"} for pid in (42, 43)]
@@ -397,7 +561,7 @@ if __name__ == "__main__":
     full = "--full" in sys.argv
     if full:
         sys.argv.remove("--full")
-    classes = ("WriterChecks", "ControllerChecks", "SelfTestChecks", "EtwLifetimeChecks") + (("FullBudgetChecks",) if full else ())
+    classes = ("ImageSetupChecks", "WriterChecks", "ControllerChecks", "SelfTestChecks", "EtwLifetimeChecks") + (("FullBudgetChecks",) if full else ())
     program = unittest.main(verbosity=2, defaultTest=classes, exit=False)
     if report:
         paths = list(Path(__file__).parent.glob("*.py")) + list(Path(__file__).parent.glob("*.mjs")) + list(Path(__file__).parent.glob("*.ps1")) + [Path(__file__).parents[1] / "m11_a1d_io.py"]

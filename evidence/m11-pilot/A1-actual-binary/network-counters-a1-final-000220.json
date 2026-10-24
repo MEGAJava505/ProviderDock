@@ -1,0 +1,1261 @@
+{
+  "artifactLocations": [
+    "authorization-a1-final-000214.json",
+    "controller-a1-final-000215.json",
+    "config-a1-final-000216.json",
+    "self-test-a1-final-000217.json",
+    "preflight-a1-final-000218.json",
+    "process-tree-a1-final-000219.json",
+    "network-counters-a1-final-000220.json",
+    "stdout-a1-final-000221.log",
+    "stderr-a1-final-000222.log",
+    "acp-session-000223.json",
+    "run-log-a1-final-000224.txt",
+    "side-effects-a1-final-000225.json",
+    "summary-a1-final-000226.json",
+    "integrity-hashes-a1-final-000227.txt"
+  ],
+  "authorizationRef": "authorization-a1-final-000214.json",
+  "counters": {
+    "connectAcceptEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "KernelNetwork",
+      "unit": "events"
+    },
+    "dnsEvents": {
+      "baseline": 0,
+      "delta": 4,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 4,
+      "reason": null,
+      "source": "DNS",
+      "unit": "events"
+    },
+    "providerRequests": {
+      "baseline": null,
+      "delta": null,
+      "final": null,
+      "reason": "not-observed; permission budget is zero",
+      "source": "ETW does not decode HTTP",
+      "unit": "requests"
+    },
+    "receivedBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "KernelNetwork",
+      "unit": "bytes"
+    },
+    "sentBytes": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "KernelNetwork",
+      "unit": "bytes"
+    },
+    "transportAllowedEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "TCPIP",
+      "unit": "events"
+    },
+    "transportAttemptEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "TCPIP",
+      "unit": "events"
+    },
+    "transportDeniedEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "TCPIP",
+      "unit": "events"
+    },
+    "wfpDropEvents": {
+      "baseline": 0,
+      "delta": 0,
+      "filter": "PID plus creation-to-exit lifetime; unique exact AppId lifetime only for WFP without payload PID",
+      "final": 0,
+      "reason": null,
+      "source": "WFP",
+      "unit": "events"
+    }
+  },
+  "events": [
+    {
+      "correlation": "payload PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 1013,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "TCPIP",
+      "status": "0x0",
+      "timestampAsDecoded": "2026-10-24T16:20:51.140239Z",
+      "version": 2
+    },
+    {
+      "correlation": "payload PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 1001,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "TCPIP",
+      "status": "0x0",
+      "timestampAsDecoded": "2026-10-24T16:20:51.140240Z",
+      "version": 0
+    },
+    {
+      "correlation": "payload PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 1013,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "TCPIP",
+      "status": "0x0",
+      "timestampAsDecoded": "2026-10-24T16:20:51.142328Z",
+      "version": 2
+    },
+    {
+      "correlation": "payload PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 1001,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "TCPIP",
+      "status": "0x0",
+      "timestampAsDecoded": "2026-10-24T16:20:51.142328Z",
+      "version": 0
+    },
+    {
+      "correlation": "payload PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 1391,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "TCPIP",
+      "status": "0x0",
+      "timestampAsDecoded": "2026-10-24T16:20:51.142395Z",
+      "version": 1
+    },
+    {
+      "correlation": "payload PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 1391,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "TCPIP",
+      "status": "0x0",
+      "timestampAsDecoded": "2026-10-24T16:20:51.142432Z",
+      "version": 1
+    },
+    {
+      "correlation": "DNS execution PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 3006,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "DNS",
+      "status": null,
+      "timestampAsDecoded": "2026-10-24T16:20:51.144398Z",
+      "version": 0
+    },
+    {
+      "correlation": "DNS execution PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 3008,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "DNS",
+      "status": null,
+      "timestampAsDecoded": "2026-10-24T16:20:51.144404Z",
+      "version": 0
+    },
+    {
+      "correlation": "DNS execution PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 3006,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "DNS",
+      "status": null,
+      "timestampAsDecoded": "2026-10-24T16:20:51.144996Z",
+      "version": 0
+    },
+    {
+      "correlation": "DNS execution PID and process lifetime",
+      "createTimeUtc": "2026-10-24T16:20:44.633837Z",
+      "denied": false,
+      "eventId": 3008,
+      "exitTimeUtc": "2026-10-24T16:20:51.205694Z",
+      "payloadBytes": null,
+      "pid": 25664,
+      "source": "DNS",
+      "status": null,
+      "timestampAsDecoded": "2026-10-24T16:20:51.148332Z",
+      "version": 0
+    }
+  ],
+  "eventsLostAllZero": true,
+  "evidenceId": "M11-FIX-000220",
+  "excludedNetworkEvents": 25362,
+  "filter": "PID and process lifetime; ambiguous AppId events excluded",
+  "finalLiveLoss": [
+    {
+      "atUtc": "2026-10-24T16:20:52.828372Z",
+      "buffersWritten": 23,
+      "eventsLost": 0,
+      "freeBuffers": 13,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+      "numberOfBuffers": 25,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T16:20:52.828436Z",
+      "buffersWritten": 7,
+      "eventsLost": 0,
+      "freeBuffers": 13,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+      "numberOfBuffers": 25,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T16:20:52.828471Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 23,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T16:20:52.828501Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T16:20:52.828531Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 18,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    }
+  ],
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "7cc7be82394daacc328de388aa849479f8110606ff32bc6607b0e815bc51c041"
+  },
+  "liveLossSnapshots": [
+    {
+      "atUtc": "2026-10-24T16:20:38.001069Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:38.000961Z",
+          "buffersWritten": 4,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:38.001002Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:38.001026Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:38.001045Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:38.001063Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:44.664214Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:44.664015Z",
+          "buffersWritten": 10,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:44.664133Z",
+          "buffersWritten": 3,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:44.664166Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:44.664190Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:44.664208Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 20,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:45.171316Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:45.171141Z",
+          "buffersWritten": 10,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.171205Z",
+          "buffersWritten": 3,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.171242Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.171274Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.171304Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 20,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:45.676483Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:45.676381Z",
+          "buffersWritten": 12,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.676421Z",
+          "buffersWritten": 3,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.676442Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.676460Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:45.676477Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 20,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:46.180797Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:46.180677Z",
+          "buffersWritten": 12,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.180715Z",
+          "buffersWritten": 3,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.180735Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.180753Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.180789Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 20,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:46.685528Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:46.685313Z",
+          "buffersWritten": 12,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.685389Z",
+          "buffersWritten": 3,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.685454Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.685491Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:46.685519Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 20,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:47.186595Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:47.186488Z",
+          "buffersWritten": 12,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.186531Z",
+          "buffersWritten": 3,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.186554Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.186572Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.186590Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:47.688951Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:47.688826Z",
+          "buffersWritten": 14,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.688873Z",
+          "buffersWritten": 5,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.688898Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.688921Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:47.688943Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:48.190858Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:48.190729Z",
+          "buffersWritten": 14,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.190776Z",
+          "buffersWritten": 7,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.190804Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.190829Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.190850Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:48.693132Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:48.693023Z",
+          "buffersWritten": 18,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.693063Z",
+          "buffersWritten": 7,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.693088Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.693107Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:48.693124Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:49.198217Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:49.198119Z",
+          "buffersWritten": 19,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.198157Z",
+          "buffersWritten": 7,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.198177Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.198195Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.198212Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:49.699995Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:49.699862Z",
+          "buffersWritten": 19,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.699910Z",
+          "buffersWritten": 7,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.699938Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.699964Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:49.699987Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:50.203044Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:50.202803Z",
+          "buffersWritten": 20,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.202911Z",
+          "buffersWritten": 7,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.202973Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.203005Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.203034Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    },
+    {
+      "atUtc": "2026-10-24T16:20:50.705887Z",
+      "sessions": [
+        {
+          "atUtc": "2026-10-24T16:20:50.705782Z",
+          "buffersWritten": 21,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Process",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.705826Z",
+          "buffersWritten": 7,
+          "eventsLost": 0,
+          "freeBuffers": 13,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-Transport",
+          "numberOfBuffers": 25,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.705846Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 23,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-WFP",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.705864Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 12,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-KernelNetwork",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        },
+        {
+          "atUtc": "2026-10-24T16:20:50.705881Z",
+          "buffersWritten": 1,
+          "eventsLost": 0,
+          "freeBuffers": 19,
+          "logBuffersLost": 0,
+          "logFileMode": 4194306,
+          "name": "PD-M11FIX-ef794c26de704252ad46a2ac25f5b2ae-DNS",
+          "numberOfBuffers": 24,
+          "queryResult": 0,
+          "realTimeBuffersLost": 0
+        }
+      ]
+    }
+  ],
+  "phase": "A1-F-final",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T16:21:06.388Z",
+  "runId": "M11-A1D-FIX-ef794c26de704252ad46a2ac25f5b2ae",
+  "sources": [
+    {
+      "buffersLost": 0,
+      "etlSha256": "537db28ca8bdbd59061b8c7772f642feff39dfa9ff68ef696fac9ba2dbd4b5c6",
+      "eventsLost": 0,
+      "kind": "Process",
+      "xmlSha256": "74f08e6c941a1f37305b9c6316424d1ce38c2661d527ff08567e47f8c6a4c168"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "777a4056c6a22d916f7d242a1a62822a83666587a37eed0bfa888080f8c0339d",
+      "eventsLost": 0,
+      "kind": "Transport",
+      "xmlSha256": "9881008a5b8ab7412f050df617660770ae7eb9108f685b843fcdfca372481f24"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "0ac01f14d9704028ad04d299c541e1553d250d768704804a75c5d5593a38e52a",
+      "eventsLost": 0,
+      "kind": "WFP",
+      "xmlSha256": "6b613bd010884742d6d45e8ab281fe782e2e1a99419677fc8ed35fb6f785e5a0"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "7072b35b68536ef4c08fa7a2c34fef1a3e51ae7842184f6ebc1e4f6009c2e75b",
+      "eventsLost": 0,
+      "kind": "KernelNetwork",
+      "xmlSha256": "20f055f9cb8a74d75e7b5ad8b229e0ed3e5752861808d2de104e5abac485c7b1"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "b3689b717d53b8ff93163bd7be73728bf10e34b399c78b64c119b5bffec86d08",
+      "eventsLost": 0,
+      "kind": "DNS",
+      "xmlSha256": "8991da9a7eb598b5ef93b2696825418e5c4544df45d5b14e11ddb269b0540b83"
+    }
+  ],
+  "status": "OBSERVED"
+}

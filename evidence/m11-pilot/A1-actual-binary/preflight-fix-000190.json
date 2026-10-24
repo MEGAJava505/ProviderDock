@@ -1,0 +1,136 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000186.json",
+    "controller-fix-audit-000187.json",
+    "config-fix-000188.json",
+    "self-test-linked-000189.json",
+    "preflight-fix-000190.json",
+    "process-tree-fix-000191.json",
+    "network-counters-fix-000192.json",
+    "stdout-fix-000193.log",
+    "stderr-fix-000194.log",
+    "acp-handshake-fix-000195.json",
+    "run-log-fix-000196.txt",
+    "side-effects-fix-000197.json",
+    "summary-fix-000198.json",
+    "integrity-hashes-fix-000199.txt"
+  ],
+  "authorizationRef": "authorization-fix-000186.json",
+  "binary": {
+    "copiedSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "packageVersion": "18.0.4",
+    "sha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+    "versionInfo": {
+      "FileDescription": "Bun",
+      "FileVersion": "1.4.0",
+      "ProductName": "Bun",
+      "ProductVersion": "1.4.0"
+    },
+    "versionInfoMeaning": "PE version is Bun runtime, not OMP package version"
+  },
+  "elevation": {
+    "isAdmin": true,
+    "pid": 13776,
+    "systemProfileEnabled": true
+  },
+  "environment": {
+    "capabilityCount": 0,
+    "configSha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+    "liveCredentialCount": 0,
+    "modelsSha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+    "processAttestation": {
+      "activeProcessLimit": 1,
+      "capabilityCount": 0,
+      "childProcessCreationDenied": false,
+      "inheritedHandlesRestrictedToStdio": true,
+      "integrityRid": 4096,
+      "isAppContainer": true,
+      "jobKillOnClose": true,
+      "packageIdentityMatches": true
+    },
+    "profileIdentitySha256": "2dfaf96461099f92a1d28ff44389454a6b79a58ee7ac45a612356d66729ff436"
+  },
+  "etwLossAfterSelfTest": [
+    {
+      "atUtc": "2026-10-24T09:40:54.359706Z",
+      "buffersWritten": 2,
+      "eventsLost": 0,
+      "freeBuffers": 13,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Process",
+      "numberOfBuffers": 25,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T09:40:54.359746Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Transport",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T09:40:54.359769Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 23,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-WFP",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T09:40:54.359788Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 12,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-KernelNetwork",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    },
+    {
+      "atUtc": "2026-10-24T09:40:54.359806Z",
+      "buffersWritten": 1,
+      "eventsLost": 0,
+      "freeBuffers": 23,
+      "logBuffersLost": 0,
+      "logFileMode": 4194306,
+      "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-DNS",
+      "numberOfBuffers": 24,
+      "queryResult": 0,
+      "realTimeBuffersLost": 0
+    }
+  ],
+  "evidenceId": "M11-FIX-000190",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "d4fbf3bf5a99f548380b0f7af6e01c3ea273ce89b0b3496526cca0e3c080fd4f"
+  },
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T09:41:33.866Z",
+  "runId": "M11-A1D-FIX-716b19f18fdb4cb89340f93c96d69a13",
+  "selfTestRef": "self-test-linked-000189.json",
+  "sourceHashes": {
+    "scripts/m11_a1d_io.py": "64313d858855f487fce644960379cf63e8c1e6f279b13125e48bc3a34bf94b30",
+    "scripts/m11/a1d_controller.py": "33b0720444f0f35be166a75d07bf0dfe202367853742541e028eb6e9da64c952",
+    "scripts/m11/parse_etw.py": "10262e1c8cf5de4ea390242bee1479fe425d1594016501967a925e013df88397",
+    "scripts/m11/test_controller.py": "ea5c5e6cf801e807fa633caca47ff2c0f839f4640c8b01f18832a3e9a7d6f055"
+  },
+  "status": "OBSERVED"
+}

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { OmpRuntime, type OmpRuntimeSelection } from "../src/clients/omp/omp-runtime.js";
+import { createOmpPilotPolicy, OmpRuntime, type OmpRuntimeSelection } from "../src/clients/omp/omp-runtime.js";
 import { parseProviderProfile } from "../src/core/providers/provider-profile.js";
 import { ompConfigSchemaCommit } from "../src/clients/omp/omp-config-compiler.js";
 import { createOmpRuntimePaths } from "../src/clients/omp/omp-runtime-paths.js";
@@ -52,6 +52,12 @@ async function fixture() {
 }
 
 describe("managed OMP runtime preflight and preparation", () => {
+  it("disables keyless built-in catalog discovery in the isolated pilot", () => {
+    expect(createOmpPilotPolicy().disabledProviders).toEqual(
+      expect.arrayContaining(["google-vertex", "lm-studio", "ollama", "zenmux"]),
+    );
+  });
+
   it("rejects a route whose active profile binding changed after selection", async () => {
     const f = await fixture();
     const expectedProfileSha256 = fingerprintOmpProviderProfile(f.selection.route.profile);

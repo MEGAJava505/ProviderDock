@@ -1,0 +1,192 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000200.json",
+    "controller-fix-audit-000201.json",
+    "config-fix-000202.json",
+    "self-test-linked-000203.json",
+    "preflight-fix-000204.json",
+    "process-tree-fix-000205.json",
+    "network-counters-fix-000206.json",
+    "stdout-fix-000207.log",
+    "stderr-fix-000208.log",
+    "acp-handshake-fix-000209.json",
+    "run-log-fix-000210.txt",
+    "side-effects-fix-000211.json",
+    "summary-fix-000212.json",
+    "integrity-hashes-fix-000213.txt"
+  ],
+  "authorizationRef": "authorization-fix-000200.json",
+  "controller": {
+    "createTimeUtc": "2026-10-24T11:00:19.769639Z",
+    "eventId": 1,
+    "exactDevicePathMatched": true,
+    "exitCode": 0,
+    "exitTimeUtc": "2026-10-24T11:00:53.081622Z",
+    "imageAlias": "ACTUAL_PYTHON_CONTROLLER",
+    "imageHashReason": null,
+    "imageSha256": "85b71d8c6ec1905935f74be0c9869aae198d00e98f39df699ec66f9c5a84cecd",
+    "parentPid": 24120,
+    "parentProcessSequenceNumber": "3696",
+    "pid": 25580,
+    "processSequenceNumber": "3758",
+    "rawImagePathSha256": "e92c9cad5adc4093fb2acab69a56b36187b0e7d25a2cc999afd443e1d0846e2e",
+    "startEventTimeUtc": "2026-10-24T11:00:19.769637Z",
+    "stopEvent": {
+      "eventId": 2,
+      "version": 2
+    },
+    "version": 4
+  },
+  "controllerExit": {
+    "atUtc": "2026-10-24T11:00:53.066527Z",
+    "code": 0,
+    "source": "controller-return-code"
+  },
+  "declaredHelpers": [
+    "conhost.exe"
+  ],
+  "evidenceId": "M11-FIX-000205",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "ce9e10449ea764304e161315e5e2f9b870cacc1b0fa0cc1e33a988ec8a4d09e6"
+  },
+  "observedControllerExit": 0,
+  "ompExit": {
+    "atUtc": "2026-10-24T11:00:52.224205Z",
+    "code": 0,
+    "source": "GetExitCodeProcess"
+  },
+  "orphanCheck": {
+    "atUtc": "2026-10-24T11:01:09.1967253Z",
+    "identities": [],
+    "source": "ETW ProcessStop plus native PID and creation-time check after decode"
+  },
+  "orphanCount": 0,
+  "phase": "A1-D-controller-fix",
+  "processCreationTimings": [
+    {
+      "atUtc": "2026-10-24T11:00:20.951330Z",
+      "elapsedMs": 0.016,
+      "phase": "init-start"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:20.951410Z",
+      "elapsedMs": 0.09,
+      "phase": "pipes-created"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:20.951522Z",
+      "elapsedMs": 0.2,
+      "phase": "attributes-configured"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:20.951912Z",
+      "elapsedMs": 0.591,
+      "phase": "image-validation-begin"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.972145Z",
+      "elapsedMs": 6020.836,
+      "phase": "image-validated"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.972173Z",
+      "elapsedMs": 6020.849,
+      "phase": "create-process-begin"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.994774Z",
+      "elapsedMs": 6043.47,
+      "phase": "create-process-returned"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.994908Z",
+      "elapsedMs": 6043.584,
+      "phase": "process-creation-time-read"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.996002Z",
+      "elapsedMs": 6044.683,
+      "phase": "created-callback-complete"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.996071Z",
+      "elapsedMs": 6044.75,
+      "phase": "job-assigned"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.996214Z",
+      "elapsedMs": 6044.893,
+      "phase": "attestation-complete"
+    },
+    {
+      "atUtc": "2026-10-24T11:00:26.996231Z",
+      "elapsedMs": 6044.907,
+      "phase": "init-complete"
+    }
+  ],
+  "processes": [
+    {
+      "createTimeUtc": "2026-10-24T11:00:26.973344Z",
+      "eventId": 1,
+      "exactDevicePathMatched": true,
+      "exitCode": 0,
+      "exitTimeUtc": "2026-10-24T11:00:52.186238Z",
+      "imageAlias": "FRESH_PINNED_OMP_BINARY",
+      "imageHashReason": null,
+      "imageSha256": "1944c6e2a4f8e652f656e0d500b88a68a5f15f234258bef06a91a7aa6755d4ba",
+      "parentPid": 25580,
+      "parentProcessSequenceNumber": "3758",
+      "pid": 21464,
+      "processSequenceNumber": "3770",
+      "rawImagePathSha256": "e987df8f5f3e6e3186aa2fdd0601c7e9ea311ee2ea066125ad2de0b17643e3eb",
+      "startEventTimeUtc": "2026-10-24T11:00:26.973365Z",
+      "stopEvent": {
+        "eventId": 2,
+        "version": 2
+      },
+      "version": 4
+    },
+    {
+      "createTimeUtc": "2026-10-24T11:00:26.999653Z",
+      "eventId": 1,
+      "exactDevicePathMatched": true,
+      "exitCode": 0,
+      "exitTimeUtc": "2026-10-24T11:00:52.188970Z",
+      "imageAlias": "WINDOWS_CONSOLE_HOST",
+      "imageHashReason": null,
+      "imageSha256": "c86146188b78e484f32cc29e2331689659943b47689a85570342044f499938ac",
+      "parentPid": 21464,
+      "parentProcessSequenceNumber": "3770",
+      "pid": 20268,
+      "processSequenceNumber": "3771",
+      "rawImagePathSha256": "67ffa2ce71cf0a1daa57536d21dd5a0e29b55d2701c989c88d45c3d5df877431",
+      "startEventTimeUtc": "2026-10-24T11:00:26.999651Z",
+      "stopEvent": {
+        "eventId": 2,
+        "version": 2
+      },
+      "version": 4
+    }
+  ],
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T11:01:09.344Z",
+  "runId": "M11-A1D-FIX-7f99790c0c2e439e82d506d8bb5d6f83",
+  "scopedIdentities": [
+    {
+      "createTimeUtc": "2026-10-24T11:00:26.973344Z",
+      "exitTimeUtc": "2026-10-24T11:00:52.186238Z",
+      "pid": 21464
+    },
+    {
+      "createTimeUtc": "2026-10-24T11:00:26.999653Z",
+      "exitTimeUtc": "2026-10-24T11:00:52.188970Z",
+      "pid": 20268
+    }
+  ],
+  "status": "OBSERVED"
+}

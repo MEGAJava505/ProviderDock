@@ -1,0 +1,163 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000186.json",
+    "controller-fix-audit-000187.json",
+    "config-fix-000188.json",
+    "self-test-linked-000189.json",
+    "preflight-fix-000190.json",
+    "process-tree-fix-000191.json",
+    "network-counters-fix-000192.json",
+    "stdout-fix-000193.log",
+    "stderr-fix-000194.log",
+    "acp-handshake-fix-000195.json",
+    "run-log-fix-000196.txt",
+    "side-effects-fix-000197.json",
+    "summary-fix-000198.json",
+    "integrity-hashes-fix-000199.txt"
+  ],
+  "authorizationRef": "authorization-fix-000186.json",
+  "changes": {
+    "linkage": "Self-test and actual share run context, live sessions and decoded source hashes",
+    "timeouts": "write <=2s; flush <=5s; sticky abandonment; main loop continues polling frames",
+    "timing": "Monotonic setup, protocol and teardown budgets; independent >=90s watchdog",
+    "writer": "All pipe write/FlushFileBuffers operations are on a daemon worker"
+  },
+  "evidenceId": "M11-FIX-000187",
+  "helperChecks": {
+    "actualOmpLaunches": 0,
+    "atUtc": "2026-10-24T09:40:42.842852Z",
+    "scenarios": {
+      "noReaderProductionTimeouts": {
+        "childAliveAtTimeout": true,
+        "childExited": true,
+        "elapsedMs": 501.2001999984932,
+        "io": {
+          "abandoned": true,
+          "bytesAttempted": 4096,
+          "bytesWritten": 4096,
+          "completed": false,
+          "controllerBlockedMs": 501.191,
+          "encoding": "utf-8",
+          "flushBeginUtc": "2026-10-24T09:40:42.337448Z",
+          "flushEndUtc": null,
+          "flushError": null,
+          "flushMode": "bounded",
+          "flushResult": null,
+          "flushTimedOut": true,
+          "flushTimeoutMs": 500,
+          "framing": "newline-delimited-json",
+          "newline": false,
+          "partial": false,
+          "partialWrites": [
+            {
+              "atUtc": "2026-10-24T09:40:42.337433Z",
+              "bytes": 4096,
+              "offset": 0
+            }
+          ],
+          "payloadBytes": 4096,
+          "payloadSha256": "016e1ecb51650bef2394f52662bd7706375306efb5fba76b97983df9ee3568f9",
+          "requestId": null,
+          "writeBeginUtc": "2026-10-24T09:40:42.337403Z",
+          "writeEndUtc": "2026-10-24T09:40:42.337441Z",
+          "writeError": null,
+          "writeTimeout": false,
+          "writeTimeoutMs": 500
+        }
+      },
+      "silent30s": {
+        "io": {
+          "abandoned": true,
+          "bytesAttempted": 159,
+          "bytesWritten": 159,
+          "completed": true,
+          "controllerBlockedMs": 0,
+          "encoding": "utf-8",
+          "flushBeginUtc": "2026-10-24T09:39:42.059495Z",
+          "flushEndUtc": "2026-10-24T09:40:12.122729Z",
+          "flushError": null,
+          "flushMode": "bounded",
+          "flushResult": true,
+          "flushTimedOut": true,
+          "flushTimeoutMs": 5000,
+          "framing": "newline-delimited-json",
+          "newline": true,
+          "partial": false,
+          "partialWrites": [
+            {
+              "atUtc": "2026-10-24T09:39:42.059480Z",
+              "bytes": 159,
+              "offset": 0
+            }
+          ],
+          "payloadBytes": 159,
+          "payloadSha256": "c94d34657af3ecbaaf9ec18c70dea21a1367e3f7a31ec064adcb0ae57b99f49c",
+          "requestId": 1,
+          "writeBeginUtc": "2026-10-24T09:39:42.059458Z",
+          "writeEndUtc": "2026-10-24T09:39:42.059487Z",
+          "writeError": null,
+          "writeTimeout": false,
+          "writeTimeoutMs": 2000
+        },
+        "timing": {
+          "deadlineSatisfied": {
+            "protocol": true,
+            "setup": true,
+            "teardown": true,
+            "total": true
+          },
+          "protocolMs": 60006.645,
+          "setupMs": 11.722,
+          "teardownMs": 7.606,
+          "totalMs": 60025.972
+        },
+        "watchdog": {
+          "budgetSeconds": 120,
+          "fireUtc": null,
+          "reason": "total-watchdog",
+          "scheduledAtUtc": "2026-10-24T09:39:42.047504Z",
+          "scheduleUtc": "2026-10-24T09:41:42.047504Z",
+          "terminationUtc": null
+        }
+      }
+    },
+    "skipped": 0,
+    "sourceHashes": {
+      "m11_a1d_io.py": "64313d858855f487fce644960379cf63e8c1e6f279b13125e48bc3a34bf94b30",
+      "m11/a1d_controller.py": "33b0720444f0f35be166a75d07bf0dfe202367853742541e028eb6e9da64c952",
+      "m11/a1d_elevated.ps1": "6cb1f9bb7dc8c7f2f46a4b370a649af4740a5124f76a68a305dfa711d1a8abd8",
+      "m11/build-evidence.mjs": "d64abe78560a5bcb3efa594861a4a2b7be7eaf49b43bf1b2a59dc6b98efdd84c",
+      "m11/capture-probe.mjs": "ad8c548f03764d90a8823155a344f5b93abc96fba0e688b323c68bfaddd53766",
+      "m11/negative-network.mjs": "d9161b786f6cedfcb44e47b398111124e7d065f356608ddf7819bf283d38584e",
+      "m11/parse_etw.py": "10262e1c8cf5de4ea390242bee1479fe425d1594016501967a925e013df88397",
+      "m11/prepare-config.mjs": "2d6293e9572bd96058a4139afaa7024f22b4fbab95415d271ca3daf65648a9ce",
+      "m11/test_controller.py": "ea5c5e6cf801e807fa633caca47ff2c0f839f4640c8b01f18832a3e9a7d6f055",
+      "m11/test_evidence.mjs": "cff8cfb8af31c1668d0c3618dff08afe4d09c03a23e68eca4e21057a1adecd4d"
+    },
+    "status": "PASS",
+    "testsRun": 21
+  },
+  "helperReportSha256": "e7604054f54eebc4eca5792f1d1198d7f9862e7a51b2605dc9ec99ec2a5fd2b6",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "55a27b2229ed9ca58bf50658532d2b949d96f41122ea54296a9dd55ccf9fd1e5"
+  },
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T09:40:54.553Z",
+  "runId": "M11-A1D-FIX-716b19f18fdb4cb89340f93c96d69a13",
+  "sourceHashes": {
+    "scripts/m11_a1d_io.py": "64313d858855f487fce644960379cf63e8c1e6f279b13125e48bc3a34bf94b30",
+    "scripts/m11/a1d_controller.py": "33b0720444f0f35be166a75d07bf0dfe202367853742541e028eb6e9da64c952",
+    "scripts/m11/parse_etw.py": "10262e1c8cf5de4ea390242bee1479fe425d1594016501967a925e013df88397",
+    "scripts/m11/test_controller.py": "ea5c5e6cf801e807fa633caca47ff2c0f839f4640c8b01f18832a3e9a7d6f055"
+  },
+  "status": "HELPERS-PASS",
+  "versions": {
+    "node": "24.20.0"
+  }
+}

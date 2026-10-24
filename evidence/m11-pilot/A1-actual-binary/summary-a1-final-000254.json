@@ -1,0 +1,110 @@
+{
+  "a1": "PASS",
+  "actualLaunches": 1,
+  "artifactLocations": [
+    "authorization-a1-final-000242.json",
+    "controller-a1-final-000243.json",
+    "config-a1-final-000244.json",
+    "self-test-a1-final-000245.json",
+    "preflight-a1-final-000246.json",
+    "process-tree-a1-final-000247.json",
+    "network-counters-a1-final-000248.json",
+    "stdout-a1-final-000249.log",
+    "stderr-a1-final-000250.log",
+    "acp-session-000251.json",
+    "run-log-a1-final-000252.txt",
+    "side-effects-a1-final-000253.json",
+    "summary-a1-final-000254.json",
+    "integrity-hashes-a1-final-000255.txt"
+  ],
+  "authorizationRef": "authorization-a1-final-000242.json",
+  "checks": {
+    "boundedHelpers": true,
+    "deadlines": true,
+    "eventsLostAllZero": true,
+    "exitMapping": true,
+    "gracefulExit": true,
+    "initializeValid": true,
+    "noObservedEgress": true,
+    "noProtocolErrors": true,
+    "noUnexpectedChildren": true,
+    "orphanZero": true,
+    "processTreeComplete": true,
+    "requestResponseLinkage": true,
+    "selfTestLinkage": true,
+    "sessionNewValid": true,
+    "singleLaunch": true,
+    "streamsComplete": true,
+    "teardownComplete": true
+  },
+  "controllerExit": {
+    "atUtc": "2026-10-24T18:29:08.640723Z",
+    "code": 0,
+    "source": "controller-return-code"
+  },
+  "deadlineSatisfied": {
+    "protocol": true,
+    "setup": true,
+    "teardown": true,
+    "total": true
+  },
+  "evidenceId": "M11-FIX-000254",
+  "initializeResponseHasError": false,
+  "initializeResponseReceived": true,
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "66a7baeeabb9042efdf4c9a6a5d4b7d3faf05cadb7bfa8043ca4fc44f7e3a0e9"
+  },
+  "nextRequirement": "Independent acceptance of A1-F; A4 requires scoped route/model/caps and revocation.",
+  "ompExit": {
+    "atUtc": "2026-10-24T18:29:07.839710Z",
+    "code": 0,
+    "source": "GetExitCodeProcess"
+  },
+  "opensA4Gate": false,
+  "parentWatchdog": {
+    "budgetSeconds": 135,
+    "fireUtc": null,
+    "reason": "parent-watchdog",
+    "scheduledAtUtc": "2026-10-24T18:28:54.3699140Z",
+    "terminationUtc": null
+  },
+  "phase": "A1-F-final",
+  "postStopDecodeEndedAtUtc": "2026-10-24T18:29:19.9030504Z",
+  "postStopDecodeMs": 10047.669,
+  "postStopDecodeStartedAtUtc": "2026-10-24T18:29:09.8557888Z",
+  "project": "ProviderDock/omp-integration/M11",
+  "protocolMs": 6132.457,
+  "recordedAtUtc": "2026-10-24T18:29:20.088Z",
+  "retries": 0,
+  "reviewAcceptance": "pending",
+  "rootCause": "initialize-response-observed",
+  "runId": "M11-A1D-FIX-909f2e9abafc4f6f8ab6094b8c6fd1f2",
+  "runnerTeardownEndedAtUtc": "2026-10-24T18:29:09.8537909Z",
+  "runnerTeardownMs": 1121.4916,
+  "runnerTeardownStartedAtUtc": "2026-10-24T18:29:08.7327613Z",
+  "runtimeHeader": {
+    "reason": null,
+    "status": "observed",
+    "version": "18.0.4"
+  },
+  "sessionNewResponseReceived": true,
+  "sessionNewValid": true,
+  "setupMs": 7295.238,
+  "status": "PASS",
+  "teardownMs": 860.682,
+  "totalMs": 14288.376,
+  "underlyingOriginalExitOneCause": "not-established by this observation",
+  "watchdog": {
+    "budgetSeconds": 120,
+    "fireUtc": null,
+    "reason": "total-watchdog",
+    "scheduledAtUtc": "2026-10-24T18:28:54.352312Z",
+    "scheduleUtc": "2026-10-24T18:30:54.352312Z",
+    "terminationUtc": null
+  }
+}

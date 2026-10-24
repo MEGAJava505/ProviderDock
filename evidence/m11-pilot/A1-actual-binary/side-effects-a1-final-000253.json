@@ -1,0 +1,142 @@
+{
+  "artifactLocations": [
+    "authorization-a1-final-000242.json",
+    "controller-a1-final-000243.json",
+    "config-a1-final-000244.json",
+    "self-test-a1-final-000245.json",
+    "preflight-a1-final-000246.json",
+    "process-tree-a1-final-000247.json",
+    "network-counters-a1-final-000248.json",
+    "stdout-a1-final-000249.log",
+    "stderr-a1-final-000250.log",
+    "acp-session-000251.json",
+    "run-log-a1-final-000252.txt",
+    "side-effects-a1-final-000253.json",
+    "summary-a1-final-000254.json",
+    "integrity-hashes-a1-final-000255.txt"
+  ],
+  "authorizationRef": "authorization-a1-final-000242.json",
+  "cleanupErrors": [],
+  "dumpMetadata": [],
+  "evidenceId": "M11-FIX-000253",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "691f6162bf0b1fd92c88b6ff6c4a464c0dc3b47039a976a37777ae4a9021f014"
+  },
+  "inventory": [
+    {
+      "after": {
+        "sha256": "eaecf6d71e13ce94ae88bf93c36c2f44ff447467dc50c5bc278c4de3d328f45e",
+        "size": 902
+      },
+      "alias": "OWNED_FIXTURE_FILE_1",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "d4ff7596a8adb62a7da7749ab5e710bd195b5a32d1b570a72e6d9d88228cccab",
+        "size": 163840
+      },
+      "alias": "OWNED_FIXTURE_FILE_2",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "ab315ca39e3fccad4fc6347c4d0862e1a108ff6024cf6a46496d0b94385861f3",
+        "size": 32768
+      },
+      "alias": "OWNED_FIXTURE_FILE_3",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "alias": "OWNED_FIXTURE_FILE_4",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "870574f657a52f866f0b580309b0411cef26e74cef447c6e086432bc6908d753",
+        "size": 851
+      },
+      "alias": "OWNED_FIXTURE_FILE_5",
+      "before": {
+        "sha256": "870574f657a52f866f0b580309b0411cef26e74cef447c6e086432bc6908d753",
+        "size": 851
+      }
+    },
+    {
+      "after": {
+        "sha256": "cf986ebfdf418fd528590357396392ebca0f1385442e00fd7bc50fe80deb1c9c",
+        "size": 12288
+      },
+      "alias": "OWNED_FIXTURE_FILE_6",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      },
+      "alias": "OWNED_FIXTURE_FILE_7",
+      "before": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      }
+    },
+    {
+      "after": {
+        "sha256": "4b4cd83a76cf77974496abb2514b46851a127a7ecddd84e4f6929a89bb079c46",
+        "size": 16
+      },
+      "alias": "OWNED_FIXTURE_FILE_8",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "8b84b0f64d9517de6d8847058422d6754704cab5fd8e5c57fd3bd01546ce71ac",
+        "size": 923
+      },
+      "alias": "OWNED_FIXTURE_FILE_9",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "006640c91fa9a9f372d45545a01eb092b96041fb01d2e2ce791339d18b4c038a",
+        "size": 155
+      },
+      "alias": "OWNED_FIXTURE_FILE_10",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+        "size": 159689728
+      },
+      "alias": "OWNED_FIXTURE_FILE_11",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+        "size": 159689728
+      },
+      "alias": "OWNED_FIXTURE_FILE_12",
+      "before": null
+    }
+  ],
+  "phase": "A1-F-final",
+  "profileDeleted": true,
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T18:29:20.088Z",
+  "runId": "M11-A1D-FIX-909f2e9abafc4f6f8ab6094b8c6fd1f2",
+  "scope": "owned fixture inventory; no claim of host-wide filesystem observation",
+  "status": "OBSERVED",
+  "werRestored": true
+}

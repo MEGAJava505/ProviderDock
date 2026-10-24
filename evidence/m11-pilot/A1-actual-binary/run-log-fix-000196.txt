@@ -1,0 +1,3 @@
+2026-10-24T09:41:18.891650Z {"event":"stdin-eof-requested","atUtc":"2026-10-24T09:41:18.891650Z","elapsedMs":23942.924,"writerStillActive":false}
+2026-10-24T09:41:19.911622Z {"event":"process-exit","atUtc":"2026-10-24T09:41:19.911622Z","elapsedMs":24962.892,"exitCode":125}
+2026-10-24T09:41:19.911759Z {"event":"capture-ended","atUtc":"2026-10-24T09:41:19.911759Z","elapsedMs":24963.03,"complete":true,"eof":true}

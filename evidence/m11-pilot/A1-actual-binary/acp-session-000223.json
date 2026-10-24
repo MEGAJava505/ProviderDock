@@ -1,0 +1,278 @@
+{
+  "artifactLocations": [
+    "authorization-a1-final-000214.json",
+    "controller-a1-final-000215.json",
+    "config-a1-final-000216.json",
+    "self-test-a1-final-000217.json",
+    "preflight-a1-final-000218.json",
+    "process-tree-a1-final-000219.json",
+    "network-counters-a1-final-000220.json",
+    "stdout-a1-final-000221.log",
+    "stderr-a1-final-000222.log",
+    "acp-session-000223.json",
+    "run-log-a1-final-000224.txt",
+    "side-effects-a1-final-000225.json",
+    "summary-a1-final-000226.json",
+    "integrity-hashes-a1-final-000227.txt"
+  ],
+  "authorizationRef": "authorization-a1-final-000214.json",
+  "controllerExit": {
+    "atUtc": "2026-10-24T16:20:52.098253Z",
+    "code": 0,
+    "source": "controller-return-code"
+  },
+  "evidenceId": "M11-FIX-000223",
+  "frameBoundaries": [
+    {
+      "atUtc": "2026-10-24T16:20:44.664094Z",
+      "beginByte": 0,
+      "bytes": 159,
+      "direction": "sent",
+      "endByte": 159,
+      "requestId": 1
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.056852Z",
+      "beginByte": 0,
+      "bytes": 503,
+      "direction": "received",
+      "endByte": 503
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.061377Z",
+      "beginByte": 159,
+      "bytes": 215,
+      "direction": "sent",
+      "endByte": 374,
+      "requestId": 2
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.152215Z",
+      "beginByte": 503,
+      "bytes": 1361,
+      "direction": "received",
+      "endByte": 1864
+    }
+  ],
+  "framesReceived": 2,
+  "framesSent": 2,
+  "initializeIo": {
+    "abandoned": true,
+    "bytesAttempted": 159,
+    "bytesWritten": 159,
+    "completed": true,
+    "controllerBlockedMs": 0,
+    "encoding": "utf-8",
+    "flushBeginUtc": "2026-10-24T16:20:44.664114Z",
+    "flushEndUtc": "2026-10-24T16:20:51.055349Z",
+    "flushError": null,
+    "flushMode": "bounded",
+    "flushResult": true,
+    "flushTimedOut": true,
+    "flushTimeoutMs": 5000,
+    "framing": "newline-delimited-json",
+    "newline": true,
+    "partial": false,
+    "partialWrites": [
+      {
+        "atUtc": "2026-10-24T16:20:44.664086Z",
+        "bytes": 159,
+        "offset": 0
+      }
+    ],
+    "payloadBytes": 159,
+    "payloadSha256": "c94d34657af3ecbaaf9ec18c70dea21a1367e3f7a31ec064adcb0ae57b99f49c",
+    "requestId": 1,
+    "writeBeginUtc": "2026-10-24T16:20:44.664056Z",
+    "writeEndUtc": "2026-10-24T16:20:44.664094Z",
+    "writeError": null,
+    "writeTimeout": false,
+    "writeTimeoutMs": 2000
+  },
+  "initializeResponseHasError": false,
+  "initializeResponseReceived": true,
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "8f1ec0db522c803a3759793c32f3bf5f65fa944dfc902905a5a6ae2f278e7df8"
+  },
+  "ompExit": {
+    "atUtc": "2026-10-24T16:20:51.244794Z",
+    "code": 0,
+    "source": "GetExitCodeProcess"
+  },
+  "parentWatchdog": {
+    "budgetSeconds": 135,
+    "fireUtc": null,
+    "reason": "parent-watchdog",
+    "scheduledAtUtc": "2026-10-24T16:20:37.7404122Z",
+    "terminationUtc": null
+  },
+  "parseResults": [
+    {
+      "atUtc": "2026-10-24T16:20:51.056852Z",
+      "beginByte": 0,
+      "bytes": 503,
+      "endByte": 503,
+      "matchesRequest": true,
+      "status": "parsed"
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.152215Z",
+      "beginByte": 503,
+      "bytes": 1361,
+      "endByte": 1864,
+      "matchesRequest": true,
+      "status": "parsed"
+    }
+  ],
+  "phase": "A1-F-final",
+  "project": "ProviderDock/omp-integration/M11",
+  "protocolEndReason": "session-new-response",
+  "recordedAtUtc": "2026-10-24T16:21:06.388Z",
+  "requestResponseLinkage": [
+    {
+      "atUtc": "2026-10-24T16:20:51.056852Z",
+      "hasError": false,
+      "matched": true,
+      "requestId": 1,
+      "responseId": 1
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.152215Z",
+      "hasError": false,
+      "matched": true,
+      "requestId": 2,
+      "responseId": 2
+    }
+  ],
+  "runId": "M11-A1D-FIX-ef794c26de704252ad46a2ac25f5b2ae",
+  "runtimeHeader": {
+    "reason": null,
+    "status": "observed",
+    "version": "18.0.4"
+  },
+  "sessionNew": {
+    "hasError": false,
+    "responseReceived": true,
+    "sessionIdentitySha256": null,
+    "status": "NOT PROVEN"
+  },
+  "sessionNewIo": {
+    "abandoned": false,
+    "bytesAttempted": 215,
+    "bytesWritten": 215,
+    "completed": true,
+    "controllerBlockedMs": 0,
+    "encoding": "utf-8",
+    "flushBeginUtc": "2026-10-24T16:20:51.061389Z",
+    "flushEndUtc": "2026-10-24T16:20:51.061515Z",
+    "flushError": null,
+    "flushMode": "bounded",
+    "flushResult": true,
+    "flushTimedOut": false,
+    "flushTimeoutMs": 5000,
+    "framing": "newline-delimited-json",
+    "newline": true,
+    "partial": false,
+    "partialWrites": [
+      {
+        "atUtc": "2026-10-24T16:20:51.061366Z",
+        "bytes": 215,
+        "offset": 0
+      }
+    ],
+    "payloadBytes": 215,
+    "payloadSha256": "153807f8957afc26472462dd4bd71507a2e9a1b76fef618b5b849093d63f62fc",
+    "requestId": 2,
+    "writeBeginUtc": "2026-10-24T16:20:51.061328Z",
+    "writeEndUtc": "2026-10-24T16:20:51.061377Z",
+    "writeError": null,
+    "writeTimeout": false,
+    "writeTimeoutMs": 2000
+  },
+  "status": "OBSERVED",
+  "stderr": {
+    "artifact": "stderr-a1-final-000222.log",
+    "bytes": 0,
+    "complete": true,
+    "endedAtUtc": "2026-10-24T16:20:51.235476Z",
+    "eof": true,
+    "error": null,
+    "hashSource": "private original bytes",
+    "pendingAtEof": 0,
+    "pendingBytesAtEof": 0,
+    "publishedBytes": 0,
+    "publishedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "redactions": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "artifact": "stdout-a1-final-000221.log",
+    "bytes": 1864,
+    "complete": true,
+    "endedAtUtc": "2026-10-24T16:20:51.235757Z",
+    "eof": true,
+    "error": null,
+    "hashSource": "private original bytes",
+    "pendingAtEof": 0,
+    "pendingBytesAtEof": 0,
+    "publishedBytes": 1672,
+    "publishedSha256": "a671a2b8d40358cef5feb109441176e16a8d74be97a5869d4ff9f6fb757ed09b",
+    "redactions": 3,
+    "sha256": "950329f535c136166745f6e375df35a96800e9330a68877e68e3af3d7e1c2867"
+  },
+  "timeline": [
+    {
+      "atUtc": "2026-10-24T16:20:44.663677Z",
+      "elapsedMs": 6664.343,
+      "event": "ResumeThread"
+    },
+    {
+      "atUtc": "2026-10-24T16:20:44.663956Z",
+      "elapsedMs": 6664.625,
+      "event": "initialize-submitted",
+      "payloadBytes": 159,
+      "payloadSha256": "c94d34657af3ecbaaf9ec18c70dea21a1367e3f7a31ec064adcb0ae57b99f49c",
+      "requestId": 1
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.061272Z",
+      "elapsedMs": 13061.946,
+      "event": "session/new-submitted",
+      "payloadBytes": 215,
+      "payloadSha256": "153807f8957afc26472462dd4bd71507a2e9a1b76fef618b5b849093d63f62fc",
+      "requestId": 2
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.155047Z",
+      "elapsedMs": 13155.726,
+      "event": "stdin-eof-requested",
+      "writerStillActive": true
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.244867Z",
+      "elapsedMs": 13245.535,
+      "event": "process-exit",
+      "exitCode": 0
+    },
+    {
+      "atUtc": "2026-10-24T16:20:51.244928Z",
+      "complete": true,
+      "elapsedMs": 13245.595,
+      "eof": true,
+      "event": "capture-ended"
+    }
+  ],
+  "watchdog": {
+    "budgetSeconds": 120,
+    "fireUtc": null,
+    "reason": "total-watchdog",
+    "scheduledAtUtc": "2026-10-24T16:20:37.723092Z",
+    "scheduleUtc": "2026-10-24T16:22:37.723092Z",
+    "terminationUtc": null
+  }
+}

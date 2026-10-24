@@ -1,0 +1,142 @@
+{
+  "artifactLocations": [
+    "authorization-a1-final-000214.json",
+    "controller-a1-final-000215.json",
+    "config-a1-final-000216.json",
+    "self-test-a1-final-000217.json",
+    "preflight-a1-final-000218.json",
+    "process-tree-a1-final-000219.json",
+    "network-counters-a1-final-000220.json",
+    "stdout-a1-final-000221.log",
+    "stderr-a1-final-000222.log",
+    "acp-session-000223.json",
+    "run-log-a1-final-000224.txt",
+    "side-effects-a1-final-000225.json",
+    "summary-a1-final-000226.json",
+    "integrity-hashes-a1-final-000227.txt"
+  ],
+  "authorizationRef": "authorization-a1-final-000214.json",
+  "cleanupErrors": [],
+  "dumpMetadata": [],
+  "evidenceId": "M11-FIX-000225",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "630971da68e7531b3804206b145fa504f367f99fcaf660f788c0cc28794113c0"
+  },
+  "inventory": [
+    {
+      "after": {
+        "sha256": "934158142846a7457c725b40ca2df9474bb176d033207723f90b71550e3bef85",
+        "size": 902
+      },
+      "alias": "OWNED_FIXTURE_FILE_1",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "d4ff7596a8adb62a7da7749ab5e710bd195b5a32d1b570a72e6d9d88228cccab",
+        "size": 163840
+      },
+      "alias": "OWNED_FIXTURE_FILE_2",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "35f8f5ec8a37a572fe6191a68a6db93746614ace8d07a05e653869642214d050",
+        "size": 32768
+      },
+      "alias": "OWNED_FIXTURE_FILE_3",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "alias": "OWNED_FIXTURE_FILE_4",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+        "size": 816
+      },
+      "alias": "OWNED_FIXTURE_FILE_5",
+      "before": {
+        "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+        "size": 816
+      }
+    },
+    {
+      "after": {
+        "sha256": "f08d914d362c77032081ad898442f7c3b81aa17358b5251291feb7a15609a4a1",
+        "size": 110592
+      },
+      "alias": "OWNED_FIXTURE_FILE_6",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      },
+      "alias": "OWNED_FIXTURE_FILE_7",
+      "before": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      }
+    },
+    {
+      "after": {
+        "sha256": "4b4cd83a76cf77974496abb2514b46851a127a7ecddd84e4f6929a89bb079c46",
+        "size": 16
+      },
+      "alias": "OWNED_FIXTURE_FILE_8",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "772c37da6dcf6843a01650e39df24fe5649251566523adae15b54cebb1f46240",
+        "size": 923
+      },
+      "alias": "OWNED_FIXTURE_FILE_9",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "4ca8d3fc4f3bcc191521cd58ec88ca7bf352c38e7fe02aa73f997e24d470c832",
+        "size": 155
+      },
+      "alias": "OWNED_FIXTURE_FILE_10",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+        "size": 159689728
+      },
+      "alias": "OWNED_FIXTURE_FILE_11",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+        "size": 159689728
+      },
+      "alias": "OWNED_FIXTURE_FILE_12",
+      "before": null
+    }
+  ],
+  "phase": "A1-F-final",
+  "profileDeleted": true,
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T16:21:06.388Z",
+  "runId": "M11-A1D-FIX-ef794c26de704252ad46a2ac25f5b2ae",
+  "scope": "owned fixture inventory; no claim of host-wide filesystem observation",
+  "status": "OBSERVED",
+  "werRestored": true
+}

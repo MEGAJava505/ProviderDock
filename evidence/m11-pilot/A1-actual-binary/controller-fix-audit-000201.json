@@ -1,0 +1,165 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000200.json",
+    "controller-fix-audit-000201.json",
+    "config-fix-000202.json",
+    "self-test-linked-000203.json",
+    "preflight-fix-000204.json",
+    "process-tree-fix-000205.json",
+    "network-counters-fix-000206.json",
+    "stdout-fix-000207.log",
+    "stderr-fix-000208.log",
+    "acp-handshake-fix-000209.json",
+    "run-log-fix-000210.txt",
+    "side-effects-fix-000211.json",
+    "summary-fix-000212.json",
+    "integrity-hashes-fix-000213.txt"
+  ],
+  "authorizationRef": "authorization-fix-000200.json",
+  "changes": {
+    "linkage": "Self-test and actual share run context, live sessions and decoded source hashes",
+    "processCreation": "Read-only SEC_IMAGE retained through CreateProcessW; both operations measured within setup; no warm-up process",
+    "timeouts": "write <=2s; flush <=5s; sticky abandonment; main loop continues polling frames",
+    "timing": "Monotonic setup, protocol and teardown budgets; independent >=90s watchdog",
+    "writer": "All pipe write/FlushFileBuffers operations are on a daemon worker"
+  },
+  "evidenceId": "M11-FIX-000201",
+  "helperChecks": {
+    "actualOmpLaunches": 0,
+    "atUtc": "2026-10-24T11:00:08.759822Z",
+    "scenarios": {
+      "noReaderProductionTimeouts": {
+        "childAliveAtTimeout": true,
+        "childExited": true,
+        "elapsedMs": 501.1283999992884,
+        "io": {
+          "abandoned": true,
+          "bytesAttempted": 4096,
+          "bytesWritten": 4096,
+          "completed": false,
+          "controllerBlockedMs": 501.118,
+          "encoding": "utf-8",
+          "flushBeginUtc": "2026-10-24T11:00:08.254351Z",
+          "flushEndUtc": null,
+          "flushError": null,
+          "flushMode": "bounded",
+          "flushResult": null,
+          "flushTimedOut": true,
+          "flushTimeoutMs": 500,
+          "framing": "newline-delimited-json",
+          "newline": false,
+          "partial": false,
+          "partialWrites": [
+            {
+              "atUtc": "2026-10-24T11:00:08.254336Z",
+              "bytes": 4096,
+              "offset": 0
+            }
+          ],
+          "payloadBytes": 4096,
+          "payloadSha256": "016e1ecb51650bef2394f52662bd7706375306efb5fba76b97983df9ee3568f9",
+          "requestId": null,
+          "writeBeginUtc": "2026-10-24T11:00:08.254305Z",
+          "writeEndUtc": "2026-10-24T11:00:08.254343Z",
+          "writeError": null,
+          "writeTimeout": false,
+          "writeTimeoutMs": 500
+        }
+      },
+      "silent30s": {
+        "io": {
+          "abandoned": true,
+          "bytesAttempted": 159,
+          "bytesWritten": 159,
+          "completed": true,
+          "controllerBlockedMs": 0,
+          "encoding": "utf-8",
+          "flushBeginUtc": "2026-10-24T10:59:07.969290Z",
+          "flushEndUtc": "2026-10-24T10:59:38.032234Z",
+          "flushError": null,
+          "flushMode": "bounded",
+          "flushResult": true,
+          "flushTimedOut": true,
+          "flushTimeoutMs": 5000,
+          "framing": "newline-delimited-json",
+          "newline": true,
+          "partial": false,
+          "partialWrites": [
+            {
+              "atUtc": "2026-10-24T10:59:07.969274Z",
+              "bytes": 159,
+              "offset": 0
+            }
+          ],
+          "payloadBytes": 159,
+          "payloadSha256": "c94d34657af3ecbaaf9ec18c70dea21a1367e3f7a31ec064adcb0ae57b99f49c",
+          "requestId": 1,
+          "writeBeginUtc": "2026-10-24T10:59:07.969247Z",
+          "writeEndUtc": "2026-10-24T10:59:07.969281Z",
+          "writeError": null,
+          "writeTimeout": false,
+          "writeTimeoutMs": 2000
+        },
+        "timing": {
+          "deadlineSatisfied": {
+            "protocol": true,
+            "setup": true,
+            "teardown": true,
+            "total": true
+          },
+          "protocolMs": 60000.735,
+          "setupMs": 12.075,
+          "teardownMs": 10.433,
+          "totalMs": 60023.243
+        },
+        "watchdog": {
+          "budgetSeconds": 120,
+          "fireUtc": null,
+          "reason": "total-watchdog",
+          "scheduledAtUtc": "2026-10-24T10:59:07.956929Z",
+          "scheduleUtc": "2026-10-24T11:01:07.956929Z",
+          "terminationUtc": null
+        }
+      }
+    },
+    "skipped": 0,
+    "sourceHashes": {
+      "m11_a1d_io.py": "64313d858855f487fce644960379cf63e8c1e6f279b13125e48bc3a34bf94b30",
+      "m11/a1d_controller.py": "b7bdd8fcdc85f2d0904d23c7604773f73f73e23a7a0be8b772761dbd9c5cbbc2",
+      "m11/a1d_elevated.ps1": "6cb1f9bb7dc8c7f2f46a4b370a649af4740a5124f76a68a305dfa711d1a8abd8",
+      "m11/build-evidence.mjs": "322dcdb030d998c661e9951b871d7c4ebf175c9cb6b72b0bf7479469b0c1580e",
+      "m11/capture-probe.mjs": "ad8c548f03764d90a8823155a344f5b93abc96fba0e688b323c68bfaddd53766",
+      "m11/collect-startup-diagnostics.ps1": "86d92106cf92042f40820e10891bad07c9623b09db3c4532dcd83ee894d106a2",
+      "m11/negative-network.mjs": "d9161b786f6cedfcb44e47b398111124e7d065f356608ddf7819bf283d38584e",
+      "m11/parse_etw.py": "10262e1c8cf5de4ea390242bee1479fe425d1594016501967a925e013df88397",
+      "m11/prepare-config.mjs": "2d6293e9572bd96058a4139afaa7024f22b4fbab95415d271ca3daf65648a9ce",
+      "m11/test_controller.py": "5a345d8709790387f50affad11aac42b9cbb9dbdce0fe9477ab5924373960577",
+      "m11/test_evidence.mjs": "cff8cfb8af31c1668d0c3618dff08afe4d09c03a23e68eca4e21057a1adecd4d"
+    },
+    "status": "PASS",
+    "testsRun": 25
+  },
+  "helperReportSha256": "da916e0dcc1bd8d0a5239d31a8810b4a4332eda0ae87182dd0649f29a2885e30",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "99e62fbbf1e273d227f0dbec8d49232507d664f4e2a97812116816f778b47d29"
+  },
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T11:00:19.547Z",
+  "runId": "M11-A1D-FIX-7f99790c0c2e439e82d506d8bb5d6f83",
+  "sourceHashes": {
+    "scripts/m11_a1d_io.py": "64313d858855f487fce644960379cf63e8c1e6f279b13125e48bc3a34bf94b30",
+    "scripts/m11/a1d_controller.py": "b7bdd8fcdc85f2d0904d23c7604773f73f73e23a7a0be8b772761dbd9c5cbbc2",
+    "scripts/m11/parse_etw.py": "10262e1c8cf5de4ea390242bee1479fe425d1594016501967a925e013df88397",
+    "scripts/m11/test_controller.py": "5a345d8709790387f50affad11aac42b9cbb9dbdce0fe9477ab5924373960577"
+  },
+  "status": "HELPERS-PASS",
+  "versions": {
+    "node": "24.20.0"
+  }
+}

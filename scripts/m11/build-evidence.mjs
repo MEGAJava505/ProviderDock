@@ -4,11 +4,32 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const files = [
-  "authorization-fix-000172.json", "controller-fix-audit-000173.json", "config-fix-000174.json",
-  "self-test-linked-000175.json", "preflight-fix-000176.json", "process-tree-fix-000177.json",
-  "network-counters-fix-000178.json", "stdout-fix-000179.log", "stderr-fix-000180.log",
-  "acp-handshake-fix-000181.json", "run-log-fix-000182.txt", "side-effects-fix-000183.json",
-  "summary-fix-000184.json", "integrity-hashes-fix-000185.txt",
+  "authorization-fix-000200.json", "controller-fix-audit-000201.json", "config-fix-000202.json",
+  "self-test-linked-000203.json", "preflight-fix-000204.json", "process-tree-fix-000205.json",
+  "network-counters-fix-000206.json", "stdout-fix-000207.log", "stderr-fix-000208.log",
+  "acp-handshake-fix-000209.json", "run-log-fix-000210.txt", "side-effects-fix-000211.json",
+  "summary-fix-000212.json", "integrity-hashes-fix-000213.txt",
+];
+export const finalFiles = [
+  "authorization-a1-final-000214.json", "controller-a1-final-000215.json", "config-a1-final-000216.json",
+  "self-test-a1-final-000217.json", "preflight-a1-final-000218.json", "process-tree-a1-final-000219.json",
+  "network-counters-a1-final-000220.json", "stdout-a1-final-000221.log", "stderr-a1-final-000222.log",
+  "acp-session-000223.json", "run-log-a1-final-000224.txt", "side-effects-a1-final-000225.json",
+  "summary-a1-final-000226.json", "integrity-hashes-a1-final-000227.txt",
+];
+export const priorFinalFiles = [
+  "authorization-a1-final-000228.json", "controller-a1-final-000229.json", "config-a1-final-000230.json",
+  "self-test-a1-final-000231.json", "preflight-a1-final-000232.json", "process-tree-a1-final-000233.json",
+  "network-counters-a1-final-000234.json", "stdout-a1-final-000235.log", "stderr-a1-final-000236.log",
+  "acp-session-000237.json", "run-log-a1-final-000238.txt", "side-effects-a1-final-000239.json",
+  "summary-a1-final-000240.json", "integrity-hashes-a1-final-000241.txt",
+];
+export const nextFinalFiles = [
+  "authorization-a1-final-000242.json", "controller-a1-final-000243.json", "config-a1-final-000244.json",
+  "self-test-a1-final-000245.json", "preflight-a1-final-000246.json", "process-tree-a1-final-000247.json",
+  "network-counters-a1-final-000248.json", "stdout-a1-final-000249.log", "stderr-a1-final-000250.log",
+  "acp-session-000251.json", "run-log-a1-final-000252.txt", "side-effects-a1-final-000253.json",
+  "summary-a1-final-000254.json", "integrity-hashes-a1-final-000255.txt",
 ];
 export const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const sorted = value => Array.isArray(value) ? value.map(sorted) : value !== null && typeof value === "object"
@@ -23,8 +44,8 @@ export function seal(value) {
     canonicalization: "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
     exclude: ["top-level integrityHash"], value: sha(canonical(value)) } });
 }
-export async function checkIds(evidence) {
-  const reserved = new Set(files.map(name => name.match(/-(\d{6})\./)[1]));
+export async function checkIds(evidence, artifacts = files) {
+  const reserved = new Set(artifacts.map(name => name.match(/-(\d{6})\./)[1]));
   for (const name of await readdir(evidence)) {
     const id = name.match(/-(\d{6})\./)?.[1];
     if (reserved.has(id)) throw new Error(`Evidence ID collision: ${name}`);
@@ -47,9 +68,10 @@ export function redact(raw, knownPaths) {
   return { bytes: redactions ? Buffer.from(text) : raw, redactions };
 }
 
-async function verify(evidence) {
+export async function verifyEvidence(evidence, files = exportedDiagnosticFiles, allowedUncovered = []) {
   const manifest = await readFile(join(evidence, files[13]), "utf8");
   const covered = new Set();
+  const allowed = new Set(allowedUncovered);
   for (const line of manifest.trimEnd().split("\n")) {
     const match = line.match(/^([a-f0-9]{64})  ([A-Za-z0-9_.-]+)$/);
     if (!match || covered.has(match[2])) throw new Error("Malformed or duplicate manifest entry");
@@ -57,7 +79,9 @@ async function verify(evidence) {
     covered.add(match[2]);
   }
   for (const entry of await readdir(evidence, { withFileTypes: true })) {
-    if (entry.isFile() && entry.name !== files[13] && !covered.has(entry.name)) throw new Error(`Manifest omission: ${entry.name}`);
+    if (entry.isFile() && entry.name !== files[13] && !covered.has(entry.name) && !allowed.has(entry.name)) {
+      throw new Error(`Manifest omission: ${entry.name}`);
+    }
   }
   if (!covered.has("integrity-correction-backfill-000145.json")) throw new Error("Backfill 000145 is not covered");
   for (const name of files.filter(name => name.endsWith(".json"))) {
@@ -67,25 +91,38 @@ async function verify(evidence) {
   console.log(JSON.stringify({ status: "PASS", filesCovered: covered.size, manifestSha256: sha(manifest) }));
 }
 
-async function build(mode, root, evidence) {
+const exportedDiagnosticFiles = files;
+async function build(mode, root, evidence, a1Final = false, next = false) {
+  const files = a1Final ? (next ? nextFinalFiles : finalFiles) : exportedDiagnosticFiles;
   const json = async name => JSON.parse(await readFile(join(root, "private", name), "utf8"));
   const context = await json("run-context.json"), state = await json("state.json"), preflight = await json("preflight.json");
   const helper = await json("helper-report.json"), owner = await json("owner-authorization.json");
-  const common = { project: "ProviderDock/omp-integration/M11", phase: "A1-D-controller-fix",
+  if (a1Final !== (context.protocolMode === "a1-final")) throw new Error("Protocol mode mismatch");
+  const common = { project: "ProviderDock/omp-integration/M11", phase: a1Final ? "A1-F-final" : "A1-D-controller-fix",
     runId: context.runId, authorizationRef: files[0], artifactLocations: files, recordedAtUtc: new Date().toISOString() };
   const pending = new Map();
   const put = (index, value) => pending.set(files[index], Buffer.from(JSON.stringify(seal({ ...common,
     evidenceId: `M11-FIX-${files[index].match(/-(\d{6})\./)[1]}`, ...value }), null, 2) + "\n"));
   if (mode === "preflight") {
-    await checkIds(evidence);
+    await checkIds(evidence, files);
     if (helper.status !== "PASS" || helper.actualOmpLaunches !== 0 || !helper.scenarios.silent30s || !helper.scenarios.noReaderProductionTimeouts) {
       throw new Error("Full no-OMP helpers have not passed");
     }
     if (!owner.ownerApproved || owner.launchCount !== 1 || owner.retries !== 0 || Date.parse(owner.expiresAtUtc) <= Date.now()) {
       throw new Error("Separate diagnostic authorization is missing or expired");
     }
+    if (a1Final) {
+      if (owner.sessionNewApproved !== true) throw new Error("A1-F session/new scope missing");
+      await verifyEvidence(evidence, finalFiles, priorFinalFiles);
+      const diagnostic = JSON.parse(await readFile(join(evidence, "summary-fix-000212.json"), "utf8"));
+      if (!Object.values(diagnostic.checks).every(v => v === true) || !diagnostic.initializeResponseReceived
+          || diagnostic.initializeResponseHasError || diagnostic.runtimeHeader?.version !== "18.0.4") {
+        throw new Error("Diagnostic acceptance gate is not satisfied");
+      }
+    }
     put(0, { status: "AUTHORIZED", utcTimeWindow: { start: owner.approvedAtUtc, end: owner.expiresAtUtc },
-      scope: "One pinned OMP 18.0.4 diagnostic initialize; inert fixture; no provider, credentials, inference or session/new",
+      scope: a1Final ? "One pinned OMP 18.0.4 initialize + session/new + EOF; inert fixture; no provider, credentials or inference"
+        : "One pinned OMP 18.0.4 diagnostic initialize; inert fixture; no provider, credentials, inference or session/new",
       authorizationBasis: owner.basis, responsible: "gateway-owner-MEGAJava505", operator: "codex-executing-assistant",
       launchCount: 1, retries: 0, providerRequestsPermitted: 0, costLimitUsd: 0,
       stopRules: ["helper failure", "pin mismatch", "ETW loss", "unexpected child or egress", "budget breach", "side effect outside fixture"],
@@ -94,6 +131,7 @@ async function build(mode, root, evidence) {
     put(1, { status: "HELPERS-PASS", changes: { writer: "All pipe write/FlushFileBuffers operations are on a daemon worker",
       timeouts: "write <=2s; flush <=5s; sticky abandonment; main loop continues polling frames",
       timing: "Monotonic setup, protocol and teardown budgets; independent >=90s watchdog",
+      processCreation: "Read-only SEC_IMAGE retained through CreateProcessW; both operations measured within setup; no warm-up process",
       linkage: "Self-test and actual share run context, live sessions and decoded source hashes" },
       sourceHashes: context.sourceHashes, helperReportSha256: sha(await readFile(join(root, "private/helper-report.json"))),
       helperChecks: helper, versions: { python: preflight.pythonVersion, node: process.versions.node } });
@@ -102,7 +140,8 @@ async function build(mode, root, evidence) {
       declaredHelpers: ["conhost.exe"], redirects: { stdout: "OWNED/logs/omp-stdout.raw.log", stderr: "OWNED/logs/omp-stderr.raw.log" },
       wer: { dumpType: 1, dumpFolderAlias: "OWNED/dumps", exactRestoreRequired: true, beforeState: preflight.werBeforeState },
       isolation: { mechanism: "fresh zero-capability AppContainer and kill-on-close Job", activeProcessLimit: 1 },
-      protocol: { method: "initialize", framing: "newline-delimited-json", encoding: "utf-8", sessionNew: "not-used; separate A1-F authorization required" } });
+      protocol: { method: "initialize", framing: "newline-delimited-json", encoding: "utf-8",
+        sessionNew: a1Final ? "after valid initialize; owned absolute cwd; empty mcpServers" : "not-used; separate A1-F authorization required" } });
   } else {
     for (const name of files.slice(0, 3)) {
       const value = JSON.parse(await readFile(join(evidence, name), "utf8"));
@@ -112,7 +151,7 @@ async function build(mode, root, evidence) {
     const result = await json("runner-result.json"), cleanup = await json("profile-cleanup.json");
     const effects = await json("fixture-effects.json");
     if (etw.runId !== context.runId || actual.runId !== context.runId) throw new Error("Run linkage mismatch");
-    const known = [root, state.workDirectory, state.pinnedSource, process.env.USERPROFILE];
+    const known = [root, state.workDirectory, state.pinnedSource, process.env.USERPROFILE, actual.sessionNewResponse?.sessionId];
     const capture = {};
     for (const [name, index] of [["stdout", 7], ["stderr", 8]]) {
       const raw = await readFile(join(root, "logs", `omp-${name}.raw.log`));
@@ -140,6 +179,7 @@ async function build(mode, root, evidence) {
     const orphanCount = result.orphanIdentities?.length ?? null;
     put(5, { status: etw.processTreeComplete && orphanCount === 0 ? "OBSERVED" : "NOT PROVEN", controller: etw.controller,
       processes: etw.processes, scopedIdentities: etw.scopedIdentities, declaredHelpers: ["conhost.exe"],
+      processCreationTimings: actual.processCreationTimings ?? [],
       orphanCount, orphanCheck: { source: "ETW ProcessStop plus native PID and creation-time check after decode", atUtc: result.orphanCheckAtUtc,
         identities: result.orphanIdentities }, controllerExit: actual.controllerExit, observedControllerExit: result.controllerExitCode, ompExit: actual.ompExit });
     put(6, { status: lossZero ? "OBSERVED" : "NOT PROVEN", counters: etw.networkCounters, events: etw.networkEvents,
@@ -151,7 +191,11 @@ async function build(mode, root, evidence) {
       initializeResponseReceived: actual.initializeResponseReceived, initializeResponseHasError: actual.initializeResponseHasError,
       protocolEndReason: actual.protocolEndReason, controllerExit: actual.controllerExit, ompExit: actual.ompExit,
       parentWatchdog: result.parentWatchdog,
-      sessionNew: { status: "not-used", reason: "diagnostic initialize only; requires separate A1-F acceptance and authorization" },
+      sessionNewIo: actual.sessionNewIo ?? null,
+      sessionNew: a1Final ? {status: actual.sessionNewValid ? "OBSERVED" : "NOT PROVEN",
+        responseReceived: actual.sessionNewResponseReceived, hasError: actual.sessionNewResponseHasError,
+        sessionIdentitySha256: actual.sessionNewResponse?.sessionId ? sha(actual.sessionNewResponse.sessionId) : null}
+        : { status: "not-used", reason: "diagnostic initialize only; requires separate A1-F acceptance and authorization" },
       timeline: actual.handshakeTimeline });
     pending.set(files[10], Buffer.from([...(result.timeline ?? []), ...actual.handshakeTimeline].sort((a, b) => a.atUtc.localeCompare(b.atUtc))
       .map(e => `${e.atUtc} ${JSON.stringify(e)}`).join("\n") + "\n"));
@@ -179,14 +223,32 @@ async function build(mode, root, evidence) {
       noUnexpectedChildren: unexpectedChildren.length === 0, noObservedEgress: noEgress,
       exitMapping: actual.exitCode === etw.processes.find(p => p.pid === actual.pid)?.exitCode && result.controllerExitCode === actual.controllerExit.code,
       singleLaunch: actual.actualLaunches === 1 && actual.retries === 0 };
-    put(12, { status: Object.values(checks).every(Boolean) ? "OBSERVED" : "NOT PROVEN", a1: "NOT PROVEN", opensA4Gate: false,
+    if (a1Final) Object.assign(checks, {
+      initializeValid: actual.initializeResponseReceived && !actual.initializeResponseHasError
+        && actual.initializeResponseProtocolVersion === 1 && actual.runtimeHeader.version === "18.0.4",
+      sessionNewValid: actual.protocolEndReason === "session-new-response" && actual.sessionNewResponseReceived
+        && !actual.sessionNewResponseHasError && actual.sessionNewValid,
+      gracefulExit: actual.exitCode === 0 && actual.controllerExit.code === 0 && !actual.forcedTeardown,
+      requestResponseLinkage: actual.requestResponseLinkage.length === 2
+        && actual.requestResponseLinkage.every(link => link.matched && [1, 2].includes(link.requestId)
+          && link.requestId === link.responseId && !link.hasError),
+      noProtocolErrors: actual.parseErrors.length === 0 && actual.framesSent === 2
+        && actual.requestResponseLinkage.length === 2,
+    });
+    const passed = Object.values(checks).every(v => v === true);
+    put(12, { status: passed ? (a1Final ? "PASS" : "OBSERVED") : "NOT PROVEN",
+      a1: a1Final && passed ? "PASS" : "NOT PROVEN", reviewAcceptance: "pending", opensA4Gate: false,
       actualLaunches: actual.actualLaunches, retries: actual.retries, checks, ...actual.timing,
       initializeResponseReceived: actual.initializeResponseReceived, initializeResponseHasError: actual.initializeResponseHasError,
       runtimeHeader: actual.runtimeHeader, watchdog: actual.watchdog, controllerExit: actual.controllerExit, ompExit: actual.ompExit,
       rootCause: actual.normalizedCause, underlyingOriginalExitOneCause: "not-established by this observation",
-      nextRequirement: "Independent acceptance; separate A1-F authorization only after valid initialize response. No automatic retry.",
+      sessionNewResponseReceived: actual.sessionNewResponseReceived ?? false, sessionNewValid: actual.sessionNewValid ?? false,
+      nextRequirement: a1Final ? "Independent acceptance of A1-F; A4 requires scoped route/model/caps and revocation."
+        : "Independent acceptance; separate A1-F authorization only after valid initialize response. No automatic retry.",
       runnerTeardownStartedAtUtc: result.runnerTeardownStartedAtUtc, runnerTeardownEndedAtUtc: result.runnerTeardownEndedAtUtc,
-      runnerTeardownMs: result.runnerTeardownMs, parentWatchdog: result.parentWatchdog });
+      runnerTeardownMs: result.runnerTeardownMs, postStopDecodeStartedAtUtc: result.postStopDecodeStartedAtUtc,
+      postStopDecodeEndedAtUtc: result.postStopDecodeEndedAtUtc, postStopDecodeMs: result.postStopDecodeMs,
+      parentWatchdog: result.parentWatchdog });
   }
   for (const [name, bytes] of pending) await writeFile(join(evidence, name), bytes, { flag: "wx" });
   if (mode === "final") {
@@ -196,17 +258,23 @@ async function build(mode, root, evidence) {
     }
     if (!lines.some(line => line.endsWith("  integrity-correction-backfill-000145.json"))) throw new Error("Required backfill is missing");
     await writeFile(join(evidence, files[13]), lines.join("\n") + "\n", { flag: "wx" });
-    await verify(evidence);
+    await verifyEvidence(evidence, files);
   } else console.log(JSON.stringify({ status: "PASS", filesWritten: pending.size }));
 }
 
 async function main() {
-  const [mode, owned, target] = process.argv.slice(2);
+  let [mode, owned, target] = process.argv.slice(2);
+  const next = mode?.endsWith("-a1-final-next");
+  const a1Final = next || mode?.endsWith("-a1-final");
+  if (next) mode = mode.slice(0, -14);
+  else if (a1Final) mode = mode.slice(0, -9);
   const evidence = resolve(target ?? join(dirname(fileURLToPath(import.meta.url)), "../../evidence/m11-pilot/A1-actual-binary"));
-  if (mode === "check-ids") return checkIds(evidence);
-  if (mode === "verify") return verify(evidence);
+  if (mode === "check-ids") return checkIds(evidence, a1Final ? (next ? nextFinalFiles : finalFiles) : files);
+  if (mode === "verify") return verifyEvidence(evidence,
+    a1Final ? (next ? nextFinalFiles : finalFiles) : files,
+    a1Final && !next ? priorFinalFiles : []);
   if (!["preflight", "final"].includes(mode) || !owned) throw new Error("Usage: build-evidence.mjs preflight|final OWNED EVIDENCE, or check-ids|verify UNUSED EVIDENCE");
-  await build(mode, resolve(owned), evidence);
+  await build(mode, resolve(owned), evidence, a1Final, next);
 }
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   main().catch(error => { console.error(error.message); process.exitCode = 1; });

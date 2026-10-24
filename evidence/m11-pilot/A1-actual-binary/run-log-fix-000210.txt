@@ -1,0 +1,5 @@
+2026-10-24T11:00:26.996779Z {"event":"ResumeThread","atUtc":"2026-10-24T11:00:26.996779Z","elapsedMs":7042.634}
+2026-10-24T11:00:26.997044Z {"event":"initialize-submitted","atUtc":"2026-10-24T11:00:26.997044Z","elapsedMs":7042.904,"payloadBytes":159,"payloadSha256":"c94d34657af3ecbaaf9ec18c70dea21a1367e3f7a31ec064adcb0ae57b99f49c"}
+2026-10-24T11:00:52.095092Z {"event":"stdin-eof-requested","atUtc":"2026-10-24T11:00:52.095092Z","elapsedMs":32140.957,"writerStillActive":true}
+2026-10-24T11:00:52.226993Z {"event":"process-exit","atUtc":"2026-10-24T11:00:52.226993Z","elapsedMs":32272.853,"exitCode":0}
+2026-10-24T11:00:52.227170Z {"event":"capture-ended","atUtc":"2026-10-24T11:00:52.227170Z","elapsedMs":32273.032,"complete":true,"eof":true}

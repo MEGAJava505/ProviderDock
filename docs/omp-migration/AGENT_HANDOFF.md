@@ -1,6 +1,88 @@
 # Текущий статус M11
 
-**A1 NOT PROVEN; A4 BLOCKED; M11 BLOCKED на приёмке.** Пакет A1-D `121aa3e` опубликован и **принят как честная диагностическая запись**. A1 PASS не выдан: `initialize` не ответил, причина исходного exit 1 не установлена. A1-F (§3 `M11_FULL_EXECUTION_TASK.md`) требует отдельного разрешения владельца.
+## Текущий статус A1 — 24 октября 2026, пакет 000242–000255
+
+**A1 PASS по A1-F; A4 BLOCKED; весь M11 ещё не завершён.** Единственный запуск
+`M11-A1D-FIX-909f2e9abafc4f6f8ab6094b8c6fd1f2`: `actualLaunches=1`, `retries=0`,
+OMP и controller завершились с кодом 0. Валидные ответы `initialize` и `session/new`
+получены; runtime header — 18.0.4. Все 17 проверок summary и все четыре deadline
+пройдены: setup 7295.238 ms, protocol 6132.457 ms, teardown 860.682 ms, total
+14288.376 ms.
+
+Self-test связан с этим же runId, ETW-сессиями и PID/creation time. Все пять источников
+ETW завершились с `eventsLost=0` и `buffersLost=0`; exit-коды self-test совпали с
+ожидаемыми, loopback передал 64 байта в каждом направлении, negative TCP probe был
+запрещён. Summary фиксирует нулевой наблюдаемый egress, полный process tree,
+`orphan=0` и завершённый teardown. Независимое read-only ревьюерское заключение:
+**PASS**, блокеров приёмки не найдено. В network summary исключены 26 912 host ETW
+событий вне PID/lifetime scope; ни одно из них не было приписано OMP.
+
+Проверка manifest `integrity-hashes-a1-final-000255.txt` прошла: 168 файлов покрыты,
+SHA-256 `b6cd1e2a73a3094738cd26a38ba83ecd5d05e0e62aa7b01137d7115ba4607969`.
+Независимая приёмка A1-F фиксирует этот пакет как **PASS**. Значение
+`reviewAcceptance=pending` в immutable summary отражает состояние на момент его
+создания; настоящий вердикт зафиксирован здесь. Это не открывает A4: для него отдельно
+нужны утверждённые route/model/caps и план отзыва credential. Старые NOT PROVEN записи
+ниже сохранены как история и этим результатом superseded.
+
+## Продолжение диагностики — 24 октября 2026, локальные изменения
+
+Новый A1-D run `M11-A1D-FIX-7f99790c0c2e439e82d506d8bb5d6f83` прошёл все 12 checks:
+setup 7258.865ms (включает SEC_IMAGE 6020.245ms), CreateProcessW 22.621ms,
+initialize response/version 18.0.4, exit 0, ETW loss 0, orphan 0, cleanup complete.
+Protocol 25098.287ms завершился ответом; flush worker пережил 5s timeout, main loop продолжил работу.
+Evidence 000200–000213, manifest `9719b56990284f925616918ff996ae15ae2487d311d48d2ec437b58f8c56d1ec`.
+Это исполнительская проверка A1-D; A1 пока NOT PROVEN, independent review pending.
+
+Следующий шаг A1-F: 000214–000227, один launch initialize/session-new/EOF в fresh AppContainer,
+прежние бюджеты, пустой mcpServers, без inference. Контракт newSession статически подтверждён во встроенном
+JS pinned omp.exe (offset 121131379 приблизительно): absolute cwd, mcpServers; result.sessionId.
+Standing authorization владельца из чата действует; каждый runner пишет отдельную свежую запись scope/окна.
+
+### Результат A1-F — 24 октября 2026
+
+Единственный A1-F run `M11-A1D-FIX-ef794c26de704252ad46a2ac25f5b2ae` выполнен один раз,
+`actualLaunches=1`, `retries=0`, pinned hash совпал, setup 6940.563 ms, protocol 6491.330 ms,
+teardown 943.227 ms, total 14375.119 ms, OMP/controller exit 0, ETW loss 0, orphan 0,
+process tree и cleanup прошли. ACP фактически завершил оба запроса: initialize и `session/new`;
+ответ `session/new` содержит UUID `sessionId`, массив `configOptions` и объект `modes`.
+
+Пакет `000214–000227` оставлен append-only и проверяется: manifest SHA-256
+`b20287bf24074fc56ec9d7dab60a7e45da045a10e0fd0eecaac4cd3f2596f7b0`, 151 файлов покрыто.
+Итог пакета — **A1 NOT PROVEN** по двум наблюдаемым причинам. Во-первых, контроллер ожидал
+`configOptions` как объект, хотя pinned ACP вернул массив; это исправлено после запуска и покрыто
+helper regression-тестом, поэтому исходный пакет нельзя пересчитывать под новым кодом.
+Во-вторых, в lifetime OMP ETW зафиксировал четыре DNS-события для `zenmux.ai` (A/AAAA),
+включая `QueryStatus=5`; TCP/IP/WFP transmitted bytes и соединения равны нулю, но попытка DNS
+всё равно нарушает stop-правило unexpected egress. Неизвестные/запрещённые DNS-события не
+переклассифицируются в PASS. Повтор actual не выполняется в этой фазе.
+
+После run helper-код обновлён: валидатор принимает реальную ACP-форму `configOptions[]` +
+`modes.availableModes/currentModeId`, проверяет owned absolute `cwd`, а controller exit теперь
+fail-closed при protocol failure. Текущие source hashes: `a1d_controller.py`
+`dba363a12f2b0ee4c6ba13f6b5d98907d898580174d558b426c72d78693091e2`, `test_controller.py`
+`a7a6ceb4566efa643f311050876727bfeaedef7a608b25263e13fa925e34fdfc2`; они намеренно не
+подставляются в уже опубликованный A1-F пакет. A1 остаётся NOT PROVEN, A4 не открыт.
+
+Последний actual run `M11-A1D-FIX-716b19f18fdb4cb89340f93c96d69a13` сохранён в evidence 000186–000199:
+`setupMs=24155.209`, внутри `CreateProcessW=23029.785ms`; `ResumeThread` не вызван,
+`protocolMs=0`, `a1=NOT PROVEN`. Все проверки summary, кроме deadlines, прошли.
+Манифест 000199: `7476b4b117c14c8a64b6ec467c412ab2cdcc0b4aaf702edffe6bfc0f3132a934`.
+Эти артефакты не изменять; следующий диагностический пакет — 000200–000213.
+
+Проверка защитных журналов не установила виновный драйвер: Defender сейчас passive, MPLog не содержит OMP,
+Code Integrity сообщает о браузерах. Наблюдение на свежем Node-helper размером 190118912 байт:
+создание в AppContainer 14036.576ms; с удержанием предварительно созданного SEC_IMAGE — весь helper 7123.704ms,
+из них CreateProcessW 17.125ms. OMP в этих probes не запускался. Это обоснование проверяемой оптимизации,
+не доказательство устранения задержки actual OMP и не доказательство вины конкретного антивируса.
+
+Текущий план: (1) SEC_IMAGE внутри прежнего setup, закрытие handles при отказе;
+(2) regression tests, полный no-OMP suite и проверка diff;
+(3) один новый diagnostic run с прежними лимитами и fresh authorization record на основании разрешения владельца в чате;
+(4) проверить реальный setup/initialize, затем решать A1-F. Лимиты и точка старта setup не сдвигаются.
+Первый и второй пункты не открывают A1-F/A4 сами по себе. Старое состояние приёмки ниже сохранено как история.
+
+**Исторический статус после A1-D (20 октября): A1 NOT PROVEN; A4 BLOCKED; M11 BLOCKED на приёмке.** Пакет A1-D `121aa3e` опубликован и **принят как честная диагностическая запись**. На тот момент A1 PASS не выдан: `initialize` не ответил, причина исходного exit 1 не установлена. A1-F (§3 `M11_FULL_EXECUTION_TASK.md`) требовал отдельного разрешения владельца.
 
 Прежнее задание A1-D перенесено в [архив](archive/2026-10-20-a1d-acceptance-handoff-archive.md). [Полное задание M11](M11_FULL_EXECUTION_TASK.md) остаётся в силе; §3 не изменён.
 

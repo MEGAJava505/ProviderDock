@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import ctypes as C
 import os
 from datetime import datetime, timedelta, timezone
+from statistics import median
 
 def device_path(path):
     path = str(Path(path).resolve())
@@ -57,6 +58,42 @@ def parse_events(path):
         events.append(record)
         element.clear()
     return events
+
+
+def normalize_event_timestamps(sources):
+    """Calibrate tracerpt timestamps to ETW payload creation times.
+
+    On this host tracerpt emits a local offset of ``+04:59`` while the
+    process payloads carry UTC FILETIME values.  Using the payload as an
+    anchor keeps every provider on one clock without hard-coding a timezone.
+    """
+    deltas = []
+    for event in sources.get("Process", []):
+        if event.get("eventId") != 1:
+            continue
+        raw_created = event.get("data", {}).get("CreateTime")
+        event_time = as_time(event.get("timeUtc"))
+        created = as_time(creation_time(raw_created, None)) if raw_created else None
+        if event_time is None or created is None:
+            continue
+        delta = (event_time - created).total_seconds()
+        if abs(delta) <= 86400:
+            deltas.append(delta)
+    if not deltas:
+        return {"status": "not-calibrated", "reason": "process-create-time-anchor-missing", "sampleCount": 0}
+    offset = float(median(deltas))
+    spread = max(abs(delta - offset) for delta in deltas)
+    if spread > 0.5:
+        return {"status": "not-calibrated", "reason": "process-create-time-anchors-inconsistent",
+                "sampleCount": len(deltas), "offsetSeconds": offset, "maxDeviationSeconds": spread}
+    for events in sources.values():
+        for event in events:
+            parsed = as_time(event.get("timeUtc"))
+            if parsed is not None:
+                event["timeUtc"] = (parsed - timedelta(seconds=offset)).astimezone(timezone.utc).isoformat(
+                    timespec="microseconds").replace("+00:00", "Z")
+    return {"status": "calibrated", "sampleCount": len(deltas), "offsetSeconds": offset,
+            "maxDeviationSeconds": spread, "anchor": "Process.CreateTime"}
 
 
 def integer(value):
@@ -302,6 +339,7 @@ def main():
     if actual.get("runId") != context["runId"]:
         raise RuntimeError("actual-run-context-mismatch")
     sources = {s["kind"]: parse_events(private / (s["kind"] + ".xml")) for s in context["sessions"]}
+    time_normalization = normalize_event_timestamps(sources)
     hashes = source_hashes(root, sources)
     lives = lifetimes(sources["Process"])
     scoped = scope_lifetimes(lives, actual["pid"], actual["createdAtUtc"])
@@ -336,6 +374,7 @@ def main():
     summary = {
         "recordedAtUtc": datetime.now(timezone.utc).isoformat(), "runId": context["runId"],
         "decodedWhen": "decoded after stop", "sessionsStoppedAtUtc": stopped["atUtc"],
+        "timeNormalization": time_normalization,
         "ompPid": actual["pid"], "controller": controller, "processes": processes,
         "scopedIdentities": [{"pid": p["pid"], "createTimeUtc": p["createTimeUtc"], "exitTimeUtc": p["exitTimeUtc"]} for p in scoped],
         "processTreeComplete": tree_complete, "orphanCount": sum(p["stopEvent"] is None for p in processes),

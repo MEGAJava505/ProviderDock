@@ -1,0 +1,126 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000200.json",
+    "controller-fix-audit-000201.json",
+    "config-fix-000202.json",
+    "self-test-linked-000203.json",
+    "preflight-fix-000204.json",
+    "process-tree-fix-000205.json",
+    "network-counters-fix-000206.json",
+    "stdout-fix-000207.log",
+    "stderr-fix-000208.log",
+    "acp-handshake-fix-000209.json",
+    "run-log-fix-000210.txt",
+    "side-effects-fix-000211.json",
+    "summary-fix-000212.json",
+    "integrity-hashes-fix-000213.txt"
+  ],
+  "authorizationRef": "authorization-fix-000200.json",
+  "cleanupErrors": [],
+  "dumpMetadata": [],
+  "evidenceId": "M11-FIX-000211",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "dafc37c4b605a214d0e271c97ea8f0f619a228b4897b0d3f0e2bc2ff1a58928b"
+  },
+  "inventory": [
+    {
+      "after": {
+        "sha256": "d4ff7596a8adb62a7da7749ab5e710bd195b5a32d1b570a72e6d9d88228cccab",
+        "size": 163840
+      },
+      "alias": "OWNED_FIXTURE_FILE_1",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "68dbfdfed1d38d5694381028d8e5aed3feabd8fbd82ede44936c57ab2ba93f67",
+        "size": 32768
+      },
+      "alias": "OWNED_FIXTURE_FILE_2",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "alias": "OWNED_FIXTURE_FILE_3",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+        "size": 816
+      },
+      "alias": "OWNED_FIXTURE_FILE_4",
+      "before": {
+        "sha256": "dfb8710556108bac7b74903bc4705a5c49cc1968e53698cbb214bae3075fa7e3",
+        "size": 816
+      }
+    },
+    {
+      "after": {
+        "sha256": "cf986ebfdf418fd528590357396392ebca0f1385442e00fd7bc50fe80deb1c9c",
+        "size": 12288
+      },
+      "alias": "OWNED_FIXTURE_FILE_5",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      },
+      "alias": "OWNED_FIXTURE_FILE_6",
+      "before": {
+        "sha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+        "size": 399
+      }
+    },
+    {
+      "after": {
+        "sha256": "02842b41e501334e6c8d5dc70e3dc03b3799ace91b1687a6f811bd78bece9a9d",
+        "size": 923
+      },
+      "alias": "OWNED_FIXTURE_FILE_7",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "290e034183f7354e82638f6d4bd0eb4a28cc040cd6091773af137d4c3c12dc51",
+        "size": 155
+      },
+      "alias": "OWNED_FIXTURE_FILE_8",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+        "size": 159689728
+      },
+      "alias": "OWNED_FIXTURE_FILE_9",
+      "before": null
+    },
+    {
+      "after": {
+        "sha256": "76c41471f546f7d4818164e0d0c61aedc14a3bf6aa89ced2e38ab3a537ed1a90",
+        "size": 159689728
+      },
+      "alias": "OWNED_FIXTURE_FILE_10",
+      "before": null
+    }
+  ],
+  "phase": "A1-D-controller-fix",
+  "profileDeleted": true,
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T11:01:09.344Z",
+  "runId": "M11-A1D-FIX-7f99790c0c2e439e82d506d8bb5d6f83",
+  "scope": "owned fixture inventory; no claim of host-wide filesystem observation",
+  "status": "OBSERVED",
+  "werRestored": true
+}

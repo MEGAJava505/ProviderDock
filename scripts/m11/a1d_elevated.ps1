@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('helpers','diagnostic')][string]$Mode,
+  [Parameter(Mandatory=$true)][ValidateSet('helpers','diagnostic','a1-final')][string]$Mode,
   [string]$ReportPath,
   [string]$OwnedRoot,
   [string]$EvidenceRoot,
@@ -18,6 +18,8 @@ $testFile = Join-Path $PSScriptRoot 'test_controller.py'
 $evidenceBuilder = Join-Path $PSScriptRoot 'build-evidence.mjs'
 $runner = Join-Path $PSScriptRoot 'a1d_elevated.ps1'
 $budget = [ordered]@{ setupSeconds=15; protocolSeconds=60; teardownSeconds=15; controllerWatchdogSeconds=120; parentWatchdogSeconds=135 }
+$nextFinalEvidence = $Mode -eq 'a1-final' -and $env:M11_A1_FINAL_EVIDENCE_SET -eq '000242-000255'
+$evidenceSuffix = if ($nextFinalEvidence) { '-a1-final-next' } elseif ($Mode -eq 'a1-final') { '-a1-final' } else { '' }
 
 function Invoke-Python([string[]]$Arguments) {
   & $python -B @Arguments
@@ -51,10 +53,14 @@ $pinned = [IO.Path]::GetFullPath($PinnedOmpPath)
 $nodeProbe = [IO.Path]::GetFullPath($NodeProbePath)
 if (Test-Path -LiteralPath $owned) { throw 'Owned root already exists; no retry or cleanup of prior data' }
 if (-not (Test-Path -LiteralPath $evidence -PathType Container)) { throw 'Evidence directory is missing' }
-Invoke-Node @($evidenceBuilder, 'check-ids', 'unused', $evidence)
+Invoke-Node @($evidenceBuilder, ('check-ids' + $evidenceSuffix), 'unused', $evidence)
 
 $authorization = Get-Content -Encoding UTF8 -Raw -LiteralPath $authorizationPath | ConvertFrom-Json
 if (-not $authorization.ownerApproved -or $authorization.launchCount -ne 1 -or $authorization.retries -ne 0) { throw 'Separate one-launch owner authorization is invalid' }
+if ($Mode -eq 'a1-final') {
+  if (-not $authorization.PSObject.Properties['sessionNewApproved'] -or $authorization.sessionNewApproved -ne $true) { throw 'A1-F scope must explicitly authorize session/new' }
+  Invoke-Node @($evidenceBuilder, 'verify-a1-final', 'unused', $evidence)
+}
 $approvedAt = [DateTime]::Parse($authorization.approvedAtUtc).ToUniversalTime()
 $expiresAt = [DateTime]::Parse($authorization.expiresAtUtc).ToUniversalTime()
 $now = [DateTime]::UtcNow
@@ -129,6 +135,9 @@ $actualControllerOutput = $null
 $runnerTeardownStartedAtUtc = $null
 $runnerTeardownEndedAtUtc = $null
 $runnerTeardownClock = $null
+$postStopDecodeStartedAtUtc = $null
+$postStopDecodeEndedAtUtc = $null
+$postStopDecodeMs = $null
 $controllerExitCode = $null
 $parentWatchdog = [ordered]@{budgetSeconds=$budget.parentWatchdogSeconds;scheduledAtUtc=$null;fireUtc=$null;terminationUtc=$null;reason='parent-watchdog'}
 $finalEtwLoss = @()
@@ -164,7 +173,7 @@ try {
   }
   foreach ($session in $sessions) {
     $etl = Join-Path $owned ('etw\' + $session.file)
-    & "$env:SystemRoot\System32\logman.exe" create trace $session.name -p $session.provider '0xffffffffffffffff' '0xff' -bs 256 -nb 8 64 -max 64 -f bincirc -o $etl -ets | Out-Null
+    & "$env:SystemRoot\System32\logman.exe" create trace $session.name -p $session.provider '0xffffffffffffffff' '0xff' -bs 256 -nb 64 512 -max 512 -f bincirc -o $etl -ets | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "ETW session start failed: $($session.name)" }
     $ownedSessions.Add($session)
   }
@@ -179,6 +188,7 @@ try {
   foreach ($entry in $sourceFiles.GetEnumerator()) { $sourceHashes[$entry.Key]=(Get-FileHash -Algorithm SHA256 $entry.Value).Hash.ToLowerInvariant() }
   $controllerHash = $sourceHashes['scripts/m11/a1d_controller.py']
   $context = [ordered]@{runId=$runId;sessions=$sessions;controllerSha256=$controllerHash;sourceHashes=$sourceHashes;startedAtUtc=(UtcNow)}
+  $context.protocolMode = $Mode
   Write-NewJson (Join-Path $owned 'private\run-context.json') $context
 
   Invoke-Python @($controller, 'selftest', '--root', $owned)
@@ -208,7 +218,7 @@ try {
   $version = (Get-Item -LiteralPath $pinned).VersionInfo | Select-Object FileVersion,ProductVersion,FileDescription,ProductName
   $preflight = [ordered]@{runId=$runId;recordedAtUtc=(UtcNow);binaryVersion=$version;token=[ordered]@{pid=$PID;isAdmin=$true;systemProfileEnabled=$true};providerMetadata=@($providerMetadata);etwSessions=$sessions;etwLossAfterSelfTest=$afterSelfTest.sessions;werBeforeState=[ordered]@{existed=$werExisted;backupSha256=$werBackupSha;values=$werValuesBefore};budgets=$budget;helperReportSha256=(Get-FileHash -Algorithm SHA256 $helperReportPath).Hash.ToLowerInvariant();sourceHashes=$sourceHashes}
   Write-NewJson (Join-Path $owned 'private\preflight.json') $preflight
-  Invoke-Node @($evidenceBuilder, 'preflight', $owned, $evidence)
+  Invoke-Node @($evidenceBuilder, ('preflight' + $evidenceSuffix), $owned, $evidence)
 
   Invoke-Python @($controller, 'mark-setup-start', '--root', $owned)
   $actualStarted = $true
@@ -222,7 +232,9 @@ try {
   $startInfo.RedirectStandardOutput = $true
   $startInfo.RedirectStandardError = $true
   $quote = { param($value) '"' + ([string]$value).Replace('"','\"') + '"' }
-  $startInfo.Arguments = (@('-B',$controller,'actual','--root',$owned) | ForEach-Object { & $quote $_ }) -join ' '
+  $controllerArgs = @('-B',$controller,'actual','--root',$owned)
+  if ($Mode -eq 'a1-final') { $controllerArgs += '--session-new' }
+  $startInfo.Arguments = ($controllerArgs | ForEach-Object { & $quote $_ }) -join ' '
   $controllerProcess = [Diagnostics.Process]::Start($startInfo)
   $stdoutTask = $controllerProcess.StandardOutput.ReadToEndAsync()
   $stderrTask = $controllerProcess.StandardError.ReadToEndAsync()
@@ -268,14 +280,6 @@ finally {
     & "$env:SystemRoot\System32\logman.exe" stop $session.name -ets | Out-Null
     $sessionResults.Add([ordered]@{kind=$session.kind;name=$session.name;stopExit=$LASTEXITCODE})
   }
-  foreach ($session in $ownedSessions) {
-    $etl = Join-Path $owned ('etw\' + $session.file)
-    $xml = Join-Path $owned ('private\' + $session.kind + '.xml')
-    if (Test-Path -LiteralPath $etl) {
-      & "$env:SystemRoot\System32\tracerpt.exe" $etl -of XML -o $xml -lr -gmt -y | Out-Null
-      $sessionResults.Add([ordered]@{kind=$session.kind;decodeExit=$LASTEXITCODE})
-    }
-  }
   $stopped = [ordered]@{atUtc=(UtcNow);sessions=@($sessionResults | Where-Object { $_.Contains('stopExit') })}
   if (Test-Path -LiteralPath (Join-Path $owned 'private')) { Write-NewJson (Join-Path $owned 'private\session-stop.json') $stopped }
   if ($werTouched) {
@@ -300,15 +304,33 @@ finally {
       $werRestored = -not (Test-Path -LiteralPath $werKey) -or $werExisted
     } catch { $werRestored=$false; $cleanupErrors.Add('wer-restore-failed') }
   }
+  if (Test-Path -LiteralPath (Join-Path $owned 'private\state.json')) {
+    try { Invoke-Python @($controller, 'cleanup', '--root', $owned) } catch { $cleanupErrors.Add('profile-cleanup-failed'); $status='NOT PROVEN' }
+  }
+  $runnerTeardownEndedAtUtc = UtcNow
+  $runnerTeardownMs = $runnerTeardownClock.Elapsed.TotalMilliseconds
+  if ($runnerTeardownMs -gt 15000) {
+    $cleanupErrors.Add('teardown-budget-exceeded')
+    if ($status -eq 'OBSERVED') { $status = 'NOT PROVEN' }
+  }
+  $postStopDecodeStartedAtUtc = UtcNow
+  $postStopDecodeClock = [Diagnostics.Stopwatch]::StartNew()
+  foreach ($session in $ownedSessions) {
+    $etl = Join-Path $owned ('etw\' + $session.file)
+    $xml = Join-Path $owned ('private\' + $session.kind + '.xml')
+    if (Test-Path -LiteralPath $etl) {
+      & "$env:SystemRoot\System32\tracerpt.exe" $etl -of XML -o $xml -lr -gmt -y | Out-Null
+      $sessionResults.Add([ordered]@{kind=$session.kind;decodeExit=$LASTEXITCODE})
+    }
+  }
   if ($ownedSessions.Count -gt 0 -and (Test-Path -LiteralPath (Join-Path $owned 'private\actual.json'))) {
     try {
       Invoke-Python @((Join-Path $PSScriptRoot 'parse_etw.py'), '--root', $owned)
       $etwSummary = Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $owned 'private\etw-summary.json') | ConvertFrom-Json
     } catch { $cleanupErrors.Add('etw-decode-failed'); $status='NOT PROVEN' }
   }
-  if (Test-Path -LiteralPath (Join-Path $owned 'private\state.json')) {
-    try { Invoke-Python @($controller, 'cleanup', '--root', $owned) } catch { $cleanupErrors.Add('profile-cleanup-failed'); $status='NOT PROVEN' }
-  }
+  $postStopDecodeEndedAtUtc = UtcNow
+  $postStopDecodeMs = $postStopDecodeClock.Elapsed.TotalMilliseconds
   $orphanIdentities = @()
   if ($etwSummary) {
     foreach ($item in @($etwSummary.controller) + @($etwSummary.processes)) {
@@ -320,23 +342,20 @@ finally {
     }
   }
   if ($owned -and (Test-Path -LiteralPath (Join-Path $owned 'private'))) {
-    $runnerTeardownEndedAtUtc = UtcNow
-    $runnerTeardownMs = $runnerTeardownClock.Elapsed.TotalMilliseconds
-    if ($runnerTeardownMs -gt 15000) {
-      $cleanupErrors.Add('teardown-budget-exceeded')
-      if ($status -eq 'OBSERVED') { $status = 'NOT PROVEN' }
-    }
     $result = [ordered]@{status=$status;runId=$runId;actualStarted=$actualStarted;actualLaunches=if(Test-Path (Join-Path $owned 'private\state.json')){(Get-Content -Encoding UTF8 -Raw (Join-Path $owned 'private\state.json')|ConvertFrom-Json).actualLaunches}else{0};controllerExitCode=$controllerExitCode;actualStartedAtUtc=$actualStartedAtUtc;actualEndedAtUtc=$actualEndedAtUtc;actualWallMs=if($actualStartClock){$actualStartClock.Elapsed.TotalMilliseconds}else{$null};controllerOutput=$actualControllerOutput;parentWatchdog=$parentWatchdog;finalEtwLoss=$finalEtwLoss;liveLossSnapshots=@($lossSnapshots);sessionResults=@($sessionResults);orphanIdentities=$orphanIdentities;orphanCheckAtUtc=(UtcNow);werRestored=$werRestored;cleanupErrors=@($cleanupErrors);errorClass=$errorClass;errorMessage=$errorMessage}
     $result.runnerTeardownStartedAtUtc = $runnerTeardownStartedAtUtc
     $result.runnerTeardownEndedAtUtc = $runnerTeardownEndedAtUtc
     $result.runnerTeardownMs = $runnerTeardownMs
+    $result.postStopDecodeStartedAtUtc = $postStopDecodeStartedAtUtc
+    $result.postStopDecodeEndedAtUtc = $postStopDecodeEndedAtUtc
+    $result.postStopDecodeMs = $postStopDecodeMs
     Write-NewJson (Join-Path $owned 'private\runner-result.json') $result
   }
   if (Test-Path -LiteralPath $helperReportTemp) { Remove-Item -LiteralPath $helperReportTemp -Force -ErrorAction SilentlyContinue }
 }
 
 if (Test-Path -LiteralPath (Join-Path $owned 'private\actual.json')) {
-  Invoke-Node @($evidenceBuilder, 'final', $owned, $evidence)
+  Invoke-Node @($evidenceBuilder, ('final' + $evidenceSuffix), $owned, $evidence)
 } else {
   Write-Error "Diagnostic run ended $status. Review the private runner result; no retry was made."
   exit 2

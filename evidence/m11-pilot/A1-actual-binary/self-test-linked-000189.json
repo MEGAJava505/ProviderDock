@@ -1,0 +1,580 @@
+{
+  "artifactLocations": [
+    "authorization-fix-000186.json",
+    "controller-fix-audit-000187.json",
+    "config-fix-000188.json",
+    "self-test-linked-000189.json",
+    "preflight-fix-000190.json",
+    "process-tree-fix-000191.json",
+    "network-counters-fix-000192.json",
+    "stdout-fix-000193.log",
+    "stderr-fix-000194.log",
+    "acp-handshake-fix-000195.json",
+    "run-log-fix-000196.txt",
+    "side-effects-fix-000197.json",
+    "summary-fix-000198.json",
+    "integrity-hashes-fix-000199.txt"
+  ],
+  "authorizationRef": "authorization-fix-000186.json",
+  "decodedVerification": {
+    "decodedWhen": "decoded after stop",
+    "errors": [],
+    "loopback": {
+      "bytesPerDirection": 64,
+      "createdAtUtc": "2026-10-24T09:40:48.868162Z",
+      "pid": 5044,
+      "port": 54740,
+      "receivedBytesBothEndpoints": 128,
+      "sentBytesBothEndpoints": 128
+    },
+    "negativeTransportEvents": [
+      {
+        "correlation": "payload PID and process lifetime",
+        "createTimeUtc": "2026-10-24T09:40:53.370756Z",
+        "denied": true,
+        "eventId": 1044,
+        "exitTimeUtc": "2026-10-24T09:40:53.528940Z",
+        "payloadBytes": null,
+        "pid": 868,
+        "source": "TCPIP",
+        "status": "0xC0000022",
+        "timestampAsDecoded": "2026-10-24T09:40:53.524357Z",
+        "version": 1
+      },
+      {
+        "correlation": "payload PID and process lifetime",
+        "createTimeUtc": "2026-10-24T09:40:53.370756Z",
+        "denied": true,
+        "eventId": 1034,
+        "exitTimeUtc": "2026-10-24T09:40:53.528940Z",
+        "payloadBytes": null,
+        "pid": 868,
+        "source": "TCPIP",
+        "status": "0xC0000022",
+        "timestampAsDecoded": "2026-10-24T09:40:53.524361Z",
+        "version": 1
+      }
+    ],
+    "processLifecycle": [
+      {
+        "createdAtUtc": "2026-10-24T09:40:49.035665Z",
+        "etwExitCode": 7,
+        "expectedExitCode": 7,
+        "kind": "cmdExitSeven",
+        "matched": true,
+        "nativeExitCode": 7,
+        "parentPid": 5044,
+        "pid": 24208
+      },
+      {
+        "createdAtUtc": "2026-10-24T09:40:53.190542Z",
+        "etwExitCode": 7,
+        "expectedExitCode": 7,
+        "kind": "captureFailurePath",
+        "matched": true,
+        "nativeExitCode": 7,
+        "parentPid": 5044,
+        "pid": 4076
+      },
+      {
+        "createdAtUtc": "2026-10-24T09:40:53.370756Z",
+        "etwExitCode": 0,
+        "expectedExitCode": 0,
+        "kind": "negativeDirectTcp",
+        "matched": true,
+        "nativeExitCode": 0,
+        "parentPid": 5044,
+        "pid": 868
+      }
+    ],
+    "runId": "M11-A1D-FIX-716b19f18fdb4cb89340f93c96d69a13",
+    "sessions": [
+      {
+        "file": "Process.etl",
+        "kind": "Process",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Process",
+        "provider": "Microsoft-Windows-Kernel-Process"
+      },
+      {
+        "file": "Transport.etl",
+        "kind": "Transport",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Transport",
+        "provider": "Microsoft-Windows-TCPIP"
+      },
+      {
+        "file": "WFP.etl",
+        "kind": "WFP",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-WFP",
+        "provider": "Microsoft-Windows-WFP"
+      },
+      {
+        "file": "KernelNetwork.etl",
+        "kind": "KernelNetwork",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-KernelNetwork",
+        "provider": "Microsoft-Windows-Kernel-Network"
+      },
+      {
+        "file": "DNS.etl",
+        "kind": "DNS",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-DNS",
+        "provider": "Microsoft-Windows-DNS-Client"
+      }
+    ],
+    "sources": [
+      {
+        "buffersLost": 0,
+        "etlSha256": "5bc7752f5ac5a39ed1f8621e47e16543f63e97f81da3dffa8009bd3e4f350b97",
+        "eventsLost": 0,
+        "kind": "Process",
+        "xmlSha256": "6390b081220bbd91f6e5b993941b58efcc94b45c48fae12315ffa33aa5380828"
+      },
+      {
+        "buffersLost": 0,
+        "etlSha256": "7ec090f831482bf05ef58587fc2241c31e5f7a784ac325034c9cbbaaae0d38ba",
+        "eventsLost": 0,
+        "kind": "Transport",
+        "xmlSha256": "aad50b278b91d95885e97e26392c31106450734caca99b945164005c71f433a0"
+      },
+      {
+        "buffersLost": 0,
+        "etlSha256": "84312d1c80206d1620afa75821b95917bbc83c23ed2f8891c10517fc456eab46",
+        "eventsLost": 0,
+        "kind": "WFP",
+        "xmlSha256": "50d42a5b5800602576ab7bb4f80942560b3212ac441d78fd43ce61c1f551eaca"
+      },
+      {
+        "buffersLost": 0,
+        "etlSha256": "a5ba65c3ef37ddf6c193901713ef23aedb27a184116210866290d784a583c16d",
+        "eventsLost": 0,
+        "kind": "KernelNetwork",
+        "xmlSha256": "0d874e7e2f06f5c1d7e42001fb4b76db7b9e93613aa5f351f47c3869ad75f7bd"
+      },
+      {
+        "buffersLost": 0,
+        "etlSha256": "1e55765fe26732a1dbcf23419e58d42991eb3a3a3d7aa85d5aaf2b3e725c51f3",
+        "eventsLost": 0,
+        "kind": "DNS",
+        "xmlSha256": "50c08f7a67a7d1f06a50577076a18bbd548eb8b37f921678aff0f1951868bd7a"
+      }
+    ],
+    "status": "PASS",
+    "wfpDropEvents": [
+      {
+        "correlation": "exact AppId and unique process lifetime",
+        "createTimeUtc": "2026-10-24T09:40:53.370756Z",
+        "denied": true,
+        "eventId": 1001,
+        "exitTimeUtc": "2026-10-24T09:40:53.528940Z",
+        "payloadBytes": null,
+        "pid": 868,
+        "source": "WFP",
+        "status": null,
+        "timestampAsDecoded": "2026-10-24T09:40:53.524343Z",
+        "version": 2
+      }
+    ]
+  },
+  "evidenceId": "M11-FIX-000189",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "607289b3c63f067c9b2e17400077d31609955e51ad8a82941fec45bd6eb84166"
+  },
+  "liveSources": [
+    {
+      "buffersLost": 0,
+      "etlSha256": "5bc7752f5ac5a39ed1f8621e47e16543f63e97f81da3dffa8009bd3e4f350b97",
+      "eventsLost": 0,
+      "kind": "Process",
+      "sessionName": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Process",
+      "xmlSha256": "6390b081220bbd91f6e5b993941b58efcc94b45c48fae12315ffa33aa5380828"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "7ec090f831482bf05ef58587fc2241c31e5f7a784ac325034c9cbbaaae0d38ba",
+      "eventsLost": 0,
+      "kind": "Transport",
+      "sessionName": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Transport",
+      "xmlSha256": "aad50b278b91d95885e97e26392c31106450734caca99b945164005c71f433a0"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "84312d1c80206d1620afa75821b95917bbc83c23ed2f8891c10517fc456eab46",
+      "eventsLost": 0,
+      "kind": "WFP",
+      "sessionName": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-WFP",
+      "xmlSha256": "50d42a5b5800602576ab7bb4f80942560b3212ac441d78fd43ce61c1f551eaca"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "a5ba65c3ef37ddf6c193901713ef23aedb27a184116210866290d784a583c16d",
+      "eventsLost": 0,
+      "kind": "KernelNetwork",
+      "sessionName": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-KernelNetwork",
+      "xmlSha256": "0d874e7e2f06f5c1d7e42001fb4b76db7b9e93613aa5f351f47c3869ad75f7bd"
+    },
+    {
+      "buffersLost": 0,
+      "etlSha256": "1e55765fe26732a1dbcf23419e58d42991eb3a3a3d7aa85d5aaf2b3e725c51f3",
+      "eventsLost": 0,
+      "kind": "DNS",
+      "sessionName": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-DNS",
+      "xmlSha256": "50c08f7a67a7d1f06a50577076a18bbd548eb8b37f921678aff0f1951868bd7a"
+    }
+  ],
+  "native": {
+    "actualLaunches": 0,
+    "captureFailurePath": {
+      "attestation": {
+        "activeProcessLimit": 1,
+        "capabilityCount": 0,
+        "childProcessCreationDenied": false,
+        "inheritedHandlesRestrictedToStdio": true,
+        "integrityRid": 4096,
+        "isAppContainer": true,
+        "jobKillOnClose": true,
+        "packageIdentityMatches": true
+      },
+      "captureComplete": true,
+      "createdAtUtc": "2026-10-24T09:40:53.190542Z",
+      "creationTimings": [
+        {
+          "atUtc": "2026-10-24T09:40:49.105012Z",
+          "elapsedMs": 0.006,
+          "phase": "init-start"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:49.105097Z",
+          "elapsedMs": 0.093,
+          "phase": "pipes-created"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:49.105225Z",
+          "elapsedMs": 0.22,
+          "phase": "attributes-configured"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:49.105436Z",
+          "elapsedMs": 0.429,
+          "phase": "create-process-begin"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.205788Z",
+          "elapsedMs": 4100.799,
+          "phase": "create-process-returned"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.205857Z",
+          "elapsedMs": 4100.85,
+          "phase": "process-creation-time-read"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.205862Z",
+          "elapsedMs": 4100.854,
+          "phase": "created-callback-complete"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.205915Z",
+          "elapsedMs": 4100.909,
+          "phase": "job-assigned"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.206068Z",
+          "elapsedMs": 4101.063,
+          "phase": "attestation-complete"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.206087Z",
+          "elapsedMs": 4101.08,
+          "phase": "init-complete"
+        }
+      ],
+      "exitCode": 7,
+      "exitMatched": true,
+      "exitObservedAtUtc": "2026-10-24T09:40:53.368810Z",
+      "expectedExitCode": 7,
+      "parentPid": 5044,
+      "pid": 4076,
+      "resumedAtUtc": "2026-10-24T09:40:53.207285Z",
+      "startedAtUtc": "2026-10-24T09:40:49.104987Z",
+      "stderrBytes": 26,
+      "stderrCapture": {
+        "bytes": 26,
+        "complete": true,
+        "endedAtUtc": "2026-10-24T09:40:53.368668Z",
+        "eof": true,
+        "error": null,
+        "pendingAtEof": 0,
+        "pendingBytesAtEof": 0,
+        "redactions": 0,
+        "sha256": "3617c49386f01da7a85fe953384e941679d05878db9abc495e2da73e22101e6a"
+      },
+      "stdoutBytes": 55,
+      "stdoutCapture": {
+        "bytes": 55,
+        "complete": true,
+        "endedAtUtc": "2026-10-24T09:40:53.339652Z",
+        "eof": true,
+        "error": null,
+        "pendingAtEof": 0,
+        "pendingBytesAtEof": 0,
+        "redactions": 0,
+        "sha256": "fe7d88cc4ccb2ff182dc21b2778ad68e31272e64e876d577fe00e4f6c5040959"
+      },
+      "watchdogFired": false
+    },
+    "captureMarkers": {
+      "stderr": true,
+      "stderrBytes": 26,
+      "stdout": true,
+      "stdoutBytes": 55
+    },
+    "cmdExitSeven": {
+      "createdAtUtc": "2026-10-24T09:40:49.035665Z",
+      "exitCode": 7,
+      "exitMatched": true,
+      "exitObservedAtUtc": "2026-10-24T09:40:54.167342Z",
+      "expectedExitCode": 7,
+      "handleCachedBeforeWait": true,
+      "parentPid": 5044,
+      "pid": 24208
+    },
+    "controllerCreatedAtUtc": "2026-10-24T09:40:48.868162Z",
+    "controllerPid": 5044,
+    "controllerSha256": "33b0720444f0f35be166a75d07bf0dfe202367853742541e028eb6e9da64c952",
+    "decodedVerification": {
+      "reason": "decoded after stop; same ETL sources required",
+      "status": "pending"
+    },
+    "liveLossBefore": [
+      {
+        "atUtc": "2026-10-24T09:40:49.034096Z",
+        "buffersWritten": 1,
+        "eventsLost": 0,
+        "freeBuffers": 12,
+        "logBuffersLost": 0,
+        "logFileMode": 4194306,
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Process",
+        "numberOfBuffers": 24,
+        "queryResult": 0,
+        "realTimeBuffersLost": 0
+      },
+      {
+        "atUtc": "2026-10-24T09:40:49.034140Z",
+        "buffersWritten": 1,
+        "eventsLost": 0,
+        "freeBuffers": 12,
+        "logBuffersLost": 0,
+        "logFileMode": 4194306,
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Transport",
+        "numberOfBuffers": 24,
+        "queryResult": 0,
+        "realTimeBuffersLost": 0
+      },
+      {
+        "atUtc": "2026-10-24T09:40:49.034165Z",
+        "buffersWritten": 1,
+        "eventsLost": 0,
+        "freeBuffers": 24,
+        "logBuffersLost": 0,
+        "logFileMode": 4194306,
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-WFP",
+        "numberOfBuffers": 24,
+        "queryResult": 0,
+        "realTimeBuffersLost": 0
+      },
+      {
+        "atUtc": "2026-10-24T09:40:49.034184Z",
+        "buffersWritten": 1,
+        "eventsLost": 0,
+        "freeBuffers": 14,
+        "logBuffersLost": 0,
+        "logFileMode": 4194306,
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-KernelNetwork",
+        "numberOfBuffers": 24,
+        "queryResult": 0,
+        "realTimeBuffersLost": 0
+      },
+      {
+        "atUtc": "2026-10-24T09:40:49.034203Z",
+        "buffersWritten": 1,
+        "eventsLost": 0,
+        "freeBuffers": 23,
+        "logBuffersLost": 0,
+        "logFileMode": 4194306,
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-DNS",
+        "numberOfBuffers": 24,
+        "queryResult": 0,
+        "realTimeBuffersLost": 0
+      }
+    ],
+    "loopback": {
+      "bytes": 64,
+      "clientReceivedBytes": 64,
+      "clientSentBytes": 64,
+      "createdAtUtc": "2026-10-24T09:40:48.868162Z",
+      "endedAtUtc": "2026-10-24T09:40:54.167257Z",
+      "errors": [],
+      "parentPid": 13776,
+      "pid": 5044,
+      "port": 54740,
+      "requests": 1,
+      "serverReceivedBytes": 64,
+      "serverSentBytes": 64,
+      "startedAtUtc": "2026-10-24T09:40:53.652268Z",
+      "status": "PASS"
+    },
+    "negativeDirectTcp": {
+      "attestation": {
+        "activeProcessLimit": 1,
+        "capabilityCount": 0,
+        "childProcessCreationDenied": false,
+        "inheritedHandlesRestrictedToStdio": true,
+        "integrityRid": 4096,
+        "isAppContainer": true,
+        "jobKillOnClose": true,
+        "packageIdentityMatches": true
+      },
+      "captureComplete": true,
+      "createdAtUtc": "2026-10-24T09:40:53.370756Z",
+      "creationTimings": [
+        {
+          "atUtc": "2026-10-24T09:40:53.369687Z",
+          "elapsedMs": 0.005,
+          "phase": "init-start"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.369737Z",
+          "elapsedMs": 0.056,
+          "phase": "pipes-created"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.369777Z",
+          "elapsedMs": 0.096,
+          "phase": "attributes-configured"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.369958Z",
+          "elapsedMs": 0.276,
+          "phase": "create-process-begin"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.381807Z",
+          "elapsedMs": 12.147,
+          "phase": "create-process-returned"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.381885Z",
+          "elapsedMs": 12.204,
+          "phase": "process-creation-time-read"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.381891Z",
+          "elapsedMs": 12.21,
+          "phase": "created-callback-complete"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.381956Z",
+          "elapsedMs": 12.278,
+          "phase": "job-assigned"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.382053Z",
+          "elapsedMs": 12.375,
+          "phase": "attestation-complete"
+        },
+        {
+          "atUtc": "2026-10-24T09:40:53.382076Z",
+          "elapsedMs": 12.396,
+          "phase": "init-complete"
+        }
+      ],
+      "exitCode": 0,
+      "exitMatched": true,
+      "exitObservedAtUtc": "2026-10-24T09:40:53.650807Z",
+      "expectedExitCode": 0,
+      "parentPid": 5044,
+      "pid": 868,
+      "probe": {
+        "attempts": 1,
+        "code": "EACCES",
+        "endedAtUtc": "2026-10-24T09:40:53.525Z",
+        "errno": -4092,
+        "startedAtUtc": "2026-10-24T09:40:53.464Z",
+        "status": "PASS"
+      },
+      "resumedAtUtc": "2026-10-24T09:40:53.382661Z",
+      "startedAtUtc": "2026-10-24T09:40:53.369668Z",
+      "stderrBytes": 0,
+      "stderrCapture": {
+        "bytes": 0,
+        "complete": true,
+        "endedAtUtc": "2026-10-24T09:40:53.568346Z",
+        "eof": true,
+        "error": null,
+        "pendingAtEof": 0,
+        "pendingBytesAtEof": 0,
+        "redactions": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdoutBytes": 143,
+      "stdoutCapture": {
+        "bytes": 143,
+        "complete": true,
+        "endedAtUtc": "2026-10-24T09:40:53.650653Z",
+        "eof": true,
+        "error": null,
+        "pendingAtEof": 0,
+        "pendingBytesAtEof": 0,
+        "redactions": 0,
+        "sha256": "c4b74531f3399c1461bc2c547860da444927fc78bb5a3522462ac3b4526cab46"
+      },
+      "targetClass": "TEST-NET-1:443",
+      "watchdogFired": false
+    },
+    "recordedAtUtc": "2026-10-24T09:40:54.167294Z",
+    "runId": "M11-A1D-FIX-716b19f18fdb4cb89340f93c96d69a13",
+    "sessions": [
+      {
+        "file": "Process.etl",
+        "kind": "Process",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Process",
+        "provider": "Microsoft-Windows-Kernel-Process"
+      },
+      {
+        "file": "Transport.etl",
+        "kind": "Transport",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-Transport",
+        "provider": "Microsoft-Windows-TCPIP"
+      },
+      {
+        "file": "WFP.etl",
+        "kind": "WFP",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-WFP",
+        "provider": "Microsoft-Windows-WFP"
+      },
+      {
+        "file": "KernelNetwork.etl",
+        "kind": "KernelNetwork",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-KernelNetwork",
+        "provider": "Microsoft-Windows-Kernel-Network"
+      },
+      {
+        "file": "DNS.etl",
+        "kind": "DNS",
+        "name": "PD-M11FIX-716b19f18fdb4cb89340f93c96d69a13-DNS",
+        "provider": "Microsoft-Windows-DNS-Client"
+      }
+    ],
+    "status": "PASS"
+  },
+  "phase": "A1-D-controller-fix",
+  "project": "ProviderDock/omp-integration/M11",
+  "recordedAtUtc": "2026-10-24T09:41:33.866Z",
+  "runId": "M11-A1D-FIX-716b19f18fdb4cb89340f93c96d69a13",
+  "sameSourcesAsActual": true,
+  "status": "PASS"
+}

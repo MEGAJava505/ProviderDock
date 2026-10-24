@@ -1,0 +1,62 @@
+{
+  "artifactLocations": [
+    "authorization-a1-final-000228.json",
+    "controller-a1-final-000229.json",
+    "config-a1-final-000230.json",
+    "self-test-a1-final-000231.json",
+    "preflight-a1-final-000232.json",
+    "process-tree-a1-final-000233.json",
+    "network-counters-a1-final-000234.json",
+    "stdout-a1-final-000235.log",
+    "stderr-a1-final-000236.log",
+    "acp-session-000237.json",
+    "run-log-a1-final-000238.txt",
+    "side-effects-a1-final-000239.json",
+    "summary-a1-final-000240.json",
+    "integrity-hashes-a1-final-000241.txt"
+  ],
+  "authorizationBasis": "Explicit owner authorization in this conversation to continue to PASS; one fresh bounded A1-F launch after disabling keyless catalog discovery, with no provider credentials or inference.",
+  "authorizationRef": "authorization-a1-final-000228.json",
+  "configSha256": "870574f657a52f866f0b580309b0411cef26e74cef447c6e086432bc6908d753",
+  "controllerSha256": "dba363a12f2b0ee4c6ba13f6b5d98907d898580174d558b426c72d78693091e2",
+  "costLimitUsd": 0,
+  "evidenceId": "M11-FIX-000228",
+  "integrityHash": {
+    "algorithm": "SHA-256",
+    "canonicalization": "recursive-key-sort-localeCompare-en-arrays-preserved-pretty2-utf8-lf",
+    "exclude": [
+      "top-level integrityHash"
+    ],
+    "value": "287bdd967f1d310c7726f1f30062edc2536432ebaab2a608a3738184fb92761d"
+  },
+  "launchCount": 1,
+  "modelsSha256": "e465dc32a903d544664c2ac2b661d10163f4bcf1fff8b0ccf3139d0240965566",
+  "operator": "codex-executing-assistant",
+  "phase": "A1-F-final",
+  "project": "ProviderDock/omp-integration/M11",
+  "providerRequestsPermitted": 0,
+  "recordedAtUtc": "2026-10-24T18:01:51.143Z",
+  "responsible": "gateway-owner-MEGAJava505",
+  "retries": 0,
+  "runId": "M11-A1D-FIX-efe0c6449a234f748d53638904f98e32",
+  "scope": "One pinned OMP 18.0.4 initialize + session/new + EOF; inert fixture; no provider, credentials or inference",
+  "sourceHashes": {
+    "scripts/m11_a1d_io.py": "64313d858855f487fce644960379cf63e8c1e6f279b13125e48bc3a34bf94b30",
+    "scripts/m11/a1d_controller.py": "dba363a12f2b0ee4c6ba13f6b5d98907d898580174d558b426c72d78693091e2",
+    "scripts/m11/parse_etw.py": "10262e1c8cf5de4ea390242bee1479fe425d1594016501967a925e013df88397",
+    "scripts/m11/test_controller.py": "a7a6ceb4566efa643f311050876727bfeaedef7a608b25263e13fa925e34fdfc"
+  },
+  "status": "AUTHORIZED",
+  "stopRules": [
+    "helper failure",
+    "pin mismatch",
+    "ETW loss",
+    "unexpected child or egress",
+    "budget breach",
+    "side effect outside fixture"
+  ],
+  "utcTimeWindow": {
+    "end": "2026-10-24T18:05:28.4261006Z",
+    "start": "2026-10-24T18:00:28.4261006Z"
+  }
+}

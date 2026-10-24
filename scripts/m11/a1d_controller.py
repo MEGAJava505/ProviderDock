@@ -1,4 +1,5 @@
 import argparse
+from contextlib import contextmanager
 import ctypes as C
 from ctypes import wintypes as W
 from datetime import datetime, timedelta, timezone
@@ -110,6 +111,8 @@ initialize_attributes = signature(K, "InitializeProcThreadAttributeList", W.BOOL
 update_attribute = signature(K, "UpdateProcThreadAttribute", W.BOOL, [P, W.DWORD, SIZE, P, SIZE, P, P])
 delete_attributes = signature(K, "DeleteProcThreadAttributeList", None, [P])
 create_process = signature(K, "CreateProcessW", W.BOOL, [W.LPCWSTR, W.LPWSTR, P, P, W.BOOL, W.DWORD, P, W.LPCWSTR, P, C.POINTER(PROCESS_INFORMATION)])
+create_file = signature(K, "CreateFileW", W.HANDLE, [W.LPCWSTR, W.DWORD, W.DWORD, P, W.DWORD, W.DWORD, W.HANDLE])
+create_image_section = signature(K, "CreateFileMappingW", W.HANDLE, [W.HANDLE, P, W.DWORD, W.DWORD, W.DWORD, W.LPCWSTR])
 close_handle = signature(K, "CloseHandle", W.BOOL, [W.HANDLE])
 create_job = signature(K, "CreateJobObjectW", W.HANDLE, [P, W.LPCWSTR])
 set_job = signature(K, "SetInformationJobObject", W.BOOL, [W.HANDLE, C.c_int, P, W.DWORD])
@@ -208,12 +211,59 @@ def environment_block(values):
     return C.create_unicode_buffer("\0".join(f"{key}={clean[key]}" for key in sorted(clean)) + "\0\0")
 
 
+def owned_cwd(path, state):
+    candidate = Path(path).resolve()
+    work = Path(state["workDirectory"]).resolve()
+    try:
+        candidate.relative_to(work)
+    except ValueError as error:
+        raise RuntimeError("session-new-cwd-outside-owned-workdir") from error
+    if not candidate.is_dir():
+        raise RuntimeError("session-new-cwd-invalid")
+    return str(candidate)
+
+
+@contextmanager
+def executable_image(path):
+    """Hold a Windows image section through CreateProcess; do not map or run it.
+
+    Preparing and retaining SEC_IMAGE was faster than CreateProcess alone for
+    cold images on this host. Both operations stay inside the setup budget.
+    Deny writes/deletion and keep both handles private to this controller.
+    """
+    # GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING; no inheritable handle.
+    handle = create_file(str(path), 0x80000000, 1, None, 3, 0, None)
+    if handle == P(-1).value:
+        raise RuntimeError(f"image-open:win32={C.get_last_error()}")
+    section = None
+    try:
+        # PAGE_READONLY | SEC_IMAGE: Windows performs its normal image checks.
+        section = check(create_image_section(handle, None, 0x1000002, 0, 0, None), "image-section-create")
+        yield
+    finally:
+        if section:
+            close_handle(section)
+        close_handle(handle)
+
+
 class ContainedProcess:
     def __init__(self, executable, arguments, cwd, environment, sid, on_created=None):
+        timing_started = time.monotonic()
+        self.creation_timings = []
+
+        def mark(phase):
+            self.creation_timings.append({
+                "phase": phase,
+                "atUtc": utc_now(),
+                "elapsedMs": round((time.monotonic() - timing_started) * 1000, 3),
+            })
+
+        mark("init-start")
         self.in_read, self.in_write = os.pipe()
         self.out_read, self.out_write = os.pipe()
         self.err_read, self.err_write = os.pipe()
         self.child_fds = [self.in_read, self.out_write, self.err_write]
+        mark("pipes-created")
         child_handles = [msvcrt.get_osfhandle(fd) for fd in self.child_fds]
         for handle in child_handles:
             os.set_handle_inheritable(handle, True)
@@ -231,6 +281,7 @@ class ContainedProcess:
         check(update_attribute(self.attributes, 0, 0x20009, C.byref(capabilities), C.sizeof(capabilities), None, None), "attributes-security")
         check(update_attribute(self.attributes, 0, 0x2000E, C.byref(child_policy), C.sizeof(child_policy), None, None), "attributes-child-policy")
         check(update_attribute(self.attributes, 0, 0x20002, inherited, C.sizeof(inherited), None, None), "attributes-handles")
+        mark("attributes-configured")
         startup = STARTUPINFOEX()
         startup.StartupInfo.cb = C.sizeof(startup)
         startup.StartupInfo.dwFlags = 0x100 | 0x1
@@ -239,20 +290,28 @@ class ContainedProcess:
         startup.lpAttributeList = C.cast(self.attributes, P)
         env = environment_block(environment)
         command = C.create_unicode_buffer(subprocess.list2cmdline([str(executable)] + list(arguments)))
-        created_at = utc_now()
-        check(create_process(str(executable), command, None, None, True, 0x80000 | 0x400 | 0x4 | 0x08000000, env, str(cwd), C.byref(startup), C.byref(self.info)), "create-process")
         try:
+            mark("image-validation-begin")
+            with executable_image(executable):
+                mark("image-validated")
+                created_at = utc_now()
+                mark("create-process-begin")
+                check(create_process(str(executable), command, None, None, True, 0x80000 | 0x400 | 0x4 | 0x08000000, env, str(cwd), C.byref(startup), C.byref(self.info)), "create-process")
+                mark("create-process-returned")
             self.create_requested_at_utc = created_at
             self.created_at_utc = utc_now()
             self.created_at_utc = process_creation_utc(self.info.hProcess)
+            mark("process-creation-time-read")
             if on_created:
                 on_created(self)
+            mark("created-callback-complete")
             self.job = check(create_job(None, None), "job-create")
             limits = EXTENDED_LIMITS()
             limits.BasicLimitInformation.LimitFlags = 0x2000 | 0x8
             limits.BasicLimitInformation.ActiveProcessLimit = 1
             check(set_job(self.job, 9, C.byref(limits), C.sizeof(limits)), "job-limits")
             check(assign_job(self.job, self.info.hProcess), "job-assign")
+            mark("job-assigned")
             token = W.HANDLE()
             check(open_token(self.info.hProcess, 8, C.byref(token)), "process-token")
             try:
@@ -277,16 +336,19 @@ class ContainedProcess:
                 }
                 if not is_container or capability_count != 0 or not same_sid or integrity != 4096:
                     raise RuntimeError("process-attestation-rejected")
+                mark("attestation-complete")
             finally:
                 close_handle(token)
         except Exception:
-            terminate_process(self.info.hProcess, 1)
-            wait_process(self.info.hProcess, 3000)
+            if self.info.hProcess:
+                terminate_process(self.info.hProcess, 1)
+                wait_process(self.info.hProcess, 3000)
             self.close()
             raise
         for fd in self.child_fds:
             os.close(fd)
         self.child_fds = []
+        mark("init-complete")
 
     def resume(self):
         if resume_thread(self.info.hThread) == 0xFFFFFFFF:
@@ -485,7 +547,9 @@ def run_helper(state, executable, arguments, stdout_path, stderr_path, timeout_m
               "parentPid": os.getpid(), "expectedExitCode": expected_exit}
     try:
         process = ContainedProcess(executable, arguments, state["workDirectory"], helper_environment(state), sid)
-        result.update({"pid": process.info.dwProcessId, "createdAtUtc": process.created_at_utc, "attestation": process.attestation})
+        result.update({"pid": process.info.dwProcessId, "createdAtUtc": process.created_at_utc,
+                       "attestation": process.attestation,
+                       "creationTimings": getattr(process, "creation_timings", [])})
         out_result, err_result = {}, {}
         out_thread = threading.Thread(target=capture_stream, args=(process.out_read, stdout_path, out_result, "bytes"), daemon=True)
         err_thread = threading.Thread(target=capture_stream, args=(process.err_read, stderr_path, err_result, "bytes"), daemon=True)
@@ -626,6 +690,9 @@ def actual(args):
         raise RuntimeError("actual-launch-budget-already-consumed")
     write_json_new(root / "private/actual-attempt.lock", {"atUtc": utc_now(), "attemptLimit": 1})
     budgets = getattr(args, "helper_budgets", M11_BUDGETS)
+    session_new = bool(getattr(args, "session_new", False))
+    if context is not None and session_new != (context.get("protocolMode") == "a1-final"):
+        raise RuntimeError("protocol-mode-context-mismatch")
     started = time.monotonic()
     setup_marker = root / "private/setup-start.json"
     if setup_marker.is_file():
@@ -641,7 +708,10 @@ def actual(args):
     frames = queue.Queue()
     out_result, err_result = {}, {}
     timings, parse_results, boundaries, linkage = [], [], [], []
-    response = None
+    response = session_response = None
+    writers = []
+    sent_ids = set()
+    sent_bytes = 0
     before_inventory = None
     watchdog_lock = threading.Lock()
     watchdog_state = {"scheduledAtUtc": setup_record["atUtc"],
@@ -656,6 +726,39 @@ def actual(args):
            "watchdogFired": False, "initializeIo": None}
     obs["runId"] = context["runId"] if context else "NO-OMP-HELPER"
     obs["etwLiveLoss"] = []
+    obs.update(protocolMode="a1-final" if session_new else "diagnostic", sessionNewIo=None,
+               sessionNewResponseReceived=False, sessionNewResponseHasError=False, sessionNewValid=False)
+
+    def submit_request(request_id, method, params):
+        duplicate = os.dup(process.in_write)
+        request_writer = BoundedWriter(lambda data: os.write(duplicate, data),
+            lambda: bool(flush_file_buffers(W.HANDLE(msvcrt.get_osfhandle(duplicate)))),
+            write_timeout=budgets.write_seconds, flush_timeout=budgets.flush_seconds,
+            close_fn=lambda: os.close(duplicate))
+        payload = (json.dumps({"jsonrpc": "2.0", "id": request_id, "method": method,
+                               "params": params}, separators=(",", ":")) + "\n").encode("utf-8")
+        key = "initializeIo" if request_id == 1 else "sessionNewIo"
+        writers.append((request_id, key, request_writer, len(payload)))
+        sent_ids.add(request_id)
+        obs[key] = request_writer.submit(payload, request_id=request_id)
+        event(method + "-submitted", requestId=request_id, payloadBytes=len(payload),
+              payloadSha256=hashlib.sha256(payload).hexdigest())
+        return request_writer
+
+    def poll_writers():
+        nonlocal sent_bytes
+        for request_id, key, request_writer, size in writers:
+            io_state = request_writer.poll()
+            obs[key] = io_state
+            if io_state["bytesWritten"] == size and request_id not in completed_sends:
+                completed_sends.add(request_id)
+                obs["framesSent"] += 1
+                boundaries.append({"direction": "sent", "requestId": request_id,
+                    "beginByte": sent_bytes, "endByte": sent_bytes + size, "bytes": size,
+                    "atUtc": io_state["writeEndUtc"]})
+                sent_bytes += size
+
+    completed_sends = set()
 
     def inventory():
         return {str(p.relative_to(state["workDirectory"])): {"size": p.stat().st_size, "sha256": sha256_file(p)}
@@ -679,7 +782,7 @@ def actual(args):
                        "ompPid": child.info.dwProcessId, "createObservedAtUtc": child.created_at_utc})
 
     def consume(item):
-        nonlocal response
+        nonlocal response, session_response
         kind = item["type"]
         if kind in ("capture-error", "capture-ended"):
             event(kind, complete=item.get("complete"), eof=item.get("eof"))
@@ -691,11 +794,16 @@ def actual(args):
             parse_results.append({**boundary, "status": "invalid", "errorClass": item["class"]})
             return
         frame = item["value"]
-        matched = frame.get("jsonrpc") == "2.0" and frame.get("id") == 1 and ("result" in frame or "error" in frame)
+        request_id = frame.get("id")
+        matched = (frame.get("jsonrpc") == "2.0" and type(request_id) is int
+                   and request_id in sent_ids and (("result" in frame) != ("error" in frame)))
         parse_results.append({**boundary, "status": "parsed", "matchesRequest": matched})
         if matched:
-            response = frame
-            linkage.append({"requestId": 1, "responseId": 1, "matched": True, "hasError": "error" in frame, "atUtc": item["atUtc"]})
+            if request_id == 1:
+                response = frame
+            else:
+                session_response = frame
+            linkage.append({"requestId": request_id, "responseId": request_id, "matched": True, "hasError": "error" in frame, "atUtc": item["atUtc"]})
 
     def expire():
         with watchdog_lock:
@@ -727,7 +835,9 @@ def actual(args):
         sid = profile_sid(state)
         before_inventory = inventory()
         process = ContainedProcess(Path(prepared["executable"]), prepared["args"], prepared["cwd"], prepared["environment"], sid, on_created=created)
-        obs.update(pid=process.info.dwProcessId, createdAtUtc=process.created_at_utc, processAttestation=process.attestation)
+        obs.update(pid=process.info.dwProcessId, createdAtUtc=process.created_at_utc,
+                   processAttestation=process.attestation,
+                   processCreationTimings=getattr(process, "creation_timings", []))
         for attr, name, result, frame_queue in (("out_read", "stdout", out_result, frames), ("err_read", "stderr", err_result, None)):
             thread = threading.Thread(target=capture_stream, args=(getattr(process, attr), root / "logs" / f"omp-{name}.raw.log", result, "bytes", frame_queue, "ab"), daemon=True)
             setattr(process, attr, None)
@@ -741,15 +851,8 @@ def actual(args):
             obs["resumedAtUtc"] = process.resume()
             protocol_started = time.monotonic()
         event("ResumeThread")
-        duplicate = os.dup(process.in_write)
-        writer = BoundedWriter(lambda data: os.write(duplicate, data),
-                               lambda: bool(flush_file_buffers(W.HANDLE(msvcrt.get_osfhandle(duplicate)))),
-                               write_timeout=budgets.write_seconds, flush_timeout=budgets.flush_seconds,
-                               close_fn=lambda: os.close(duplicate))
-        payload = (json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
-            "protocolVersion": 1, "clientCapabilities": {}, "clientInfo": {"name": "m11-fix-diagnostic", "version": "1"}}}, separators=(",", ":")) + "\n").encode("utf-8")
-        obs["initializeIo"] = writer.submit(payload, request_id=1)
-        event("initialize-submitted", payloadBytes=len(payload), payloadSha256=hashlib.sha256(payload).hexdigest())
+        writer = submit_request(1, "initialize", {"protocolVersion": 1, "clientCapabilities": {},
+            "clientInfo": {"name": "m11-fix-diagnostic", "version": "1"}})
         deadline = protocol_started + budgets.protocol_seconds
         next_loss_query = protocol_started
         while True:
@@ -762,16 +865,20 @@ def actual(args):
                 if not loss_zero(snapshot):
                     raise RuntimeError("etw-loss-during-protocol")
                 next_loss_query = time.monotonic() + .5
-            io_state = writer.poll()
-            obs["initializeIo"] = io_state
-            if io_state["bytesWritten"] == len(payload) and obs["framesSent"] == 0:
-                obs["framesSent"] = 1
-                boundaries.append({"direction": "sent", "requestId": 1, "beginByte": 0, "endByte": len(payload), "bytes": len(payload), "atUtc": io_state["writeEndUtc"]})
+            poll_writers()
             while not frames.empty():
                 consume(frames.get_nowait())
             if response is not None:
-                obs["protocolEndReason"] = "initialize-response"
-                break
+                if not session_new or "error" in response:
+                    obs["protocolEndReason"] = "initialize-response"
+                    break
+                if not isinstance(response.get("result"), dict) or response["result"].get("protocolVersion") != 1:
+                    raise RuntimeError("invalid-initialize-response")
+                if 2 not in sent_ids:
+                    writer = submit_request(2, "session/new", {"cwd": owned_cwd(prepared["cwd"], state), "mcpServers": []})
+                if session_response is not None:
+                    obs["protocolEndReason"] = "session-new-response"
+                    break
             if out_result.get("error") or err_result.get("error"):
                 raise RuntimeError("stream-capture-failed")
             code = process.poll()
@@ -793,8 +900,8 @@ def actual(args):
         if protocol_started is not None and protocol_ended is None:
             protocol_ended = teardown_started
         teardown_deadline = teardown_started + budgets.teardown_seconds
-        if writer is not None:
-            writer.close()
+        for _, _, request_writer, _ in writers:
+            request_writer.close()
         if process is not None:
             try:
                 if process.in_write is not None:
@@ -810,9 +917,10 @@ def actual(args):
                 obs["exitObservedAtUtc"] = utc_now()
                 for thread in threads:
                     thread.join(max(0, min(2, teardown_deadline - time.monotonic())))
-                if writer is not None:
-                    obs["writerThreadFinished"] = writer.close(join_timeout=max(0, min(1, teardown_deadline - time.monotonic())))
-                    obs["initializeIo"] = writer.last_result
+                for _, key, request_writer, _ in writers:
+                    request_writer.close(join_timeout=max(0, min(.5, teardown_deadline - time.monotonic())))
+                    obs[key] = request_writer.last_result
+                obs["writerThreadFinished"] = all(not item[2].thread_alive for item in writers)
                 event("process-exit", exitCode=obs["exitCode"])
             except Exception as error:
                 obs["teardownError"] = type(error).__name__
@@ -827,8 +935,28 @@ def actual(args):
             local_free(sid)
         while not frames.empty():
             consume(frames.get_nowait())
+        poll_writers()
         obs["initializeResponseReceived"] = response is not None
         obs["initializeResponseHasError"] = bool(response and "error" in response)
+        initialize_result = response.get("result") if response and isinstance(response.get("result"), dict) else None
+        obs["initializeResponseProtocolVersion"] = initialize_result.get("protocolVersion") if initialize_result else None
+        obs["sessionNewResponseReceived"] = session_response is not None
+        obs["sessionNewResponseHasError"] = bool(session_response and "error" in session_response)
+        session_result = session_response.get("result") if session_response else None
+        if isinstance(session_result, dict):
+            session_id = session_result.get("sessionId")
+            try:
+                valid_id = isinstance(session_id, str) and str(uuid.UUID(session_id)) == session_id.lower()
+            except ValueError:
+                valid_id = False
+            config_options = session_result.get("configOptions")
+            modes = session_result.get("modes")
+            valid_contract = (valid_id and isinstance(config_options, list) and isinstance(modes, dict)
+                              and isinstance(modes.get("availableModes"), list)
+                              and isinstance(modes.get("currentModeId"), str))
+            obs["sessionNewValid"] = valid_contract
+            if valid_contract:
+                obs["sessionNewResponse"] = {"sessionId": session_id}
         agent_info = response.get("result", {}).get("agentInfo") if response and isinstance(response.get("result"), dict) else None
         version = agent_info.get("version") if isinstance(agent_info, dict) else None
         obs["runtimeHeader"] = {"status": "observed" if isinstance(version, str) else "not-observed",
@@ -868,7 +996,10 @@ def actual(args):
         obs["handshakeTimeline"] = timings
         obs["status"] = "OBSERVED" if obs.get("pid") and obs.get("exitCode") is not None else "NOT PROVEN"
         obs["normalizedCause"] = "initialize-response-observed" if response is not None else obs["protocolEndReason"] + "-underlying-cause-not-established"
-        obs["controllerExit"] = {"code": 1 if obs.get("controllerError") or obs.get("teardownError") else 0,
+        protocol_failed = (obs.get("controllerError") or obs.get("teardownError") or obs.get("watchdogFired")
+                           or obs.get("parseErrors") or (session_new and not obs.get("sessionNewValid"))
+                           or (session_new and obs.get("protocolEndReason") != "session-new-response"))
+        obs["controllerExit"] = {"code": 1 if protocol_failed else 0,
                                  "atUtc": obs["endedAtUtc"], "source": "controller-return-code"}
         write_json_new(observation_path, obs)
         print(json.dumps({"status": obs["status"], "actualLaunches": obs["actualLaunches"], "exitCode": obs.get("exitCode"), "timing": obs["timing"]}))
@@ -931,6 +1062,7 @@ def main():
     selftest_parser.add_argument("--root", required=True)
     actual_parser = subparsers.add_parser("actual")
     actual_parser.add_argument("--root", required=True)
+    actual_parser.add_argument("--session-new", action="store_true")
     query_parser = subparsers.add_parser("query-etw")
     query_parser.add_argument("--output", required=True)
     query_parser.add_argument("names", nargs="+")
