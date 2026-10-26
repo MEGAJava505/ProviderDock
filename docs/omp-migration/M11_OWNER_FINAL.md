@@ -15,7 +15,8 @@
 ## 2. Предусловие: DPAPI
 
 ```powershell
-cd $repo
+$repo = "C:\path\to\ProviderDock"
+Set-Location -LiteralPath $repo
 npx vitest run tests/dpapi-secret-vault.test.ts
 ```
 
@@ -93,6 +94,7 @@ try {
   Remove-Variable sec, ptr -ErrorAction SilentlyContinue
 }
 providerdock secrets list --json
+```
 
 Запрещено: `setx`, user/machine env, plaintext-файл, ключ в аргументах, transcript или debug dump.
 
@@ -155,17 +157,20 @@ providerdock secrets list --json
 ### 7.1 Snapshot
 
 ```powershell
+Set-Location -LiteralPath $repo
 $snap = Join-Path $owned "snapshots"
 New-Item -ItemType Directory -Force -Path $snap | Out-Null
 git bundle create (Join-Path $snap "m11-omp-integration.bundle") omp-integration
 Get-FileHash -Algorithm SHA256 (Join-Path $snap "m11-omp-integration.bundle")
-if (Test-Path ".provider-dock") { Copy-Item ".provider-dock" (Join-Path $snap "provider-dock") -Recurse -Force }
+$state = Join-Path $repo ".provider-dock"
+if (Test-Path -LiteralPath $state) { Copy-Item -LiteralPath $state (Join-Path $snap "provider-dock") -Recurse -Force }
 Get-FileHash -Algorithm SHA256 $omp
 ```
 
 ### 7.2 Восстановление и сверка
 
 ```powershell
+Set-Location -LiteralPath $repo
 $restore = Join-Path $owned "restore"
 git clone (Join-Path $snap "m11-omp-integration.bundle") $restore
 git -C $restore fsck
@@ -193,6 +198,8 @@ providerdock secrets list --json
 | 000272 | `residual-check-000272.json` |
 | 000273 | `log-audit-rollback-000273.json` |
 | 000274 | `summary-rollback-000274.json` |
+| 000275 | `integrity-hashes-rollback-000275.txt` |
+| 000276 | `m11-final-status-000276.json` |
 
 ## 8. Критерии приёмки
 
@@ -202,9 +209,11 @@ providerdock secrets list --json
 ## 9. Публикация
 
 ```powershell
-git add evidence/m11-pilot
-git commit -m "evidence(m11): record A4 provider route and rollback"
-git push origin omp-integration
+$evidence = Join-Path $repo "evidence\m11-pilot"
+git -C $repo add -- $evidence
+git -C $repo commit -m "evidence(m11): record A4 provider route and rollback"
+git -C $repo push origin omp-integration
+```
 
 Координатору передать: hash коммита, SHA-256 последнего манифеста (`000275`), таблицу фаз из `m11-final-status-000276`.
 
