@@ -2,12 +2,17 @@
 
 Документ для владельца (gateway-owner MEGAJava505). Исполняется на его Windows-машине в elevated PowerShell. Координатор команд не выполняет: он проверяет опубликованный evidence и выносит вердикт.
 
+> **Статус документа на 26 октября 2026 (важно перед запуском).**
+> Разделы §2 (A1-D), §3 (A1-F), §4 (A2) и §5 (A3) **уже выполнены и приняты** — их команды повторно не запускать: бюджет «один actual launch на фазу» исчерпан, а evidence-IDs этих фаз заняты.
+> Обязательные к исполнению сейчас: **§6 (A4)** и **§7 (Phase 6)** — но только в редакции отдельных заданий `M11_A4_TASK.md` (IDs 000256–000268) и `M11_PHASE6_TASK.md` (IDs от текущего максимума).
+> Историческая нумерация в §6.4 и §7 ниже сохранена как запись о прошлых планах и **к исполнению не годится**: перечисленные там ID 000194–000210 уже заняты опубликованным evidence A1-fix.
+
 ## 0. Исходное состояние
 
 | Фаза | Статус | Чем подтверждено |
 |---|---|---|
 | Phase 0 — подготовка | PASS | 228/228, build/typecheck, snapshot read-only, hashes |
-| A1 — actual binary | **NOT PROVEN** | единственный launch: exit 1 через 6.924 с до ответа ACP; причина не установлена (диагностика аварийного пути не сохранена) |
+| A1 — actual binary | **PASS** | A1-F: `initialize` + `session/new`, 17/17 checks, manifest 168/168, пакет 000242–000255 (`b3ebf80`) |
 | A2 — native resume | PASS ограниченного наблюдения | idle resume, linkage, before/after hash; inference не проверялся |
 | A3 — egress/isolation | PASS ограниченного наблюдения | AppContainer, deny-by-default, control probe; direct OMP TCP не доказан |
 | A4 — provider route | **BLOCKED** | нет scoped credential, pinned модели, caps |
@@ -22,9 +27,20 @@
 3. Каждая фаза заканчивается манифестом `integrity-hashes-*.txt` с SHA-256 всех файлов фазы (манифест исключает себя; его SHA-256 передаётся отдельно).
 4. Запрещено в evidence: секреты, токены, raw headers, cookies, транскрипты, абсолютные пользовательские пути, email, account/route IDs в сыром виде.
 5. Любой stop → `BLOCKED`/`NOT PROVEN` в summary, без повторов без нового разрешения владельца.
-6. Новые evidence ID начинаются с **000159** и выделяются последовательно; перед записью проверить отсутствие коллизии.
+6. Новый evidence ID = **текущий максимум + 1**, а не фиксированное число: диапазоны ниже (000159, 000172, 000194, 000203) уже израсходованы. Перед записью вычислить следующий свободный ID и проверить отсутствие коллизии:
+
+```powershell
+$next = (Get-ChildItem evidence\m11-pilot -Recurse -File |
+  ForEach-Object { if ($_.Name -match '-(\d{6})\.') { [int]$Matches[1] } } |
+  Measure-Object -Maximum).Maximum + 1
+'{0:D6}' -f $next      # на 26 октября 2026 ожидается 000256
+```
+
+Запись поверх существующего файла запрещена: при совпадении ID — остановиться и поднять номер.
 
 ## 2. Фаза A1-D — диагностический launch
+
+> **ВЫПОЛНЕНО И ПРИНЯТО — не исполнять.** A1-D прошёл 20–21 октября, evidence 000159–000171 опубликован и проверен; повторный launch нарушил бы бюджет «один launch на фазу». Раздел оставлен как историческая запись.
 
 Цель: установить причину exit 1 и собрать полную диагностику. A1 PASS этой фазой не выдаётся.
 
@@ -38,6 +54,7 @@
 ### 2.2 Команды
 
 ```powershell
+# ИСТОРИЧЕСКАЯ ЗАПИСЬ — НЕ ИСПОЛНЯТЬ: A1-D выполнен, evidence 000159–000171 занят.
 # elevation proof
 whoami /groups | Select-String 'S-1-5-32-544','Mandatory Label'
 whoami /priv   | Select-String 'SeSystemProfilePrivilege','SeDebugPrivilege'
@@ -96,7 +113,7 @@ if ($exited) { "exitCode=$($p.ExitCode)" } else { "exitCode=UNKNOWN (watchdog ti
 
 Дополнительно зафиксировать `Get-Item $omp | Select-Object -ExpandProperty VersionInfo` (FileVersion/ProductVersion) — без запуска процесса.
 
-### 2.3 Evidence A1-D (000159–000171)
+### 2.3 Evidence A1-D (000159–000171) — исторический контракт, IDs заняты
 
 | ID | Файл | Содержимое |
 |---|---|---|
@@ -114,18 +131,22 @@ if ($exited) { "exitCode=$($p.ExitCode)" } else { "exitCode=UNKNOWN (watchdog ti
 | 000170 | `summary-diagnostic-000170.json` | причина (или честно «не установлена»), ссылки |
 | 000171 | `integrity-hashes-diagnostic-000171.txt` | SHA-256 всех файлов фазы |
 
-**Приёмка A1-D:** все 13 файлов; stdout/stderr захвачены на аварийном пути; WER metadata; handshake-границы; exit-code mapping; `conhost.exe` declared; `EventsLost=0`; orphan=0; integrity/redaction чисты. A1 claim остаётся `NOT PROVEN`, если `initialize` не ответил.
+**Приёмка A1-D:** все 13 файлов; stdout/stderr захвачены на аварийном пути; WER metadata; handshake-границы; exit-code mapping; `conhost.exe` declared; `EventsLost=0`; orphan=0; integrity/redaction чисты. A1 claim остаётся `NOT PROVEN`, если `initialize` не ответил — историческое правило той фазы; итоговый статус A1 определён приёмкой A1-F (PASS).
 
 ## 3. Фаза A1-F — финальный A1 launch (только после приёмки A1-D и отдельного разрешения)
+
+> **ВЫПОЛНЕНО И ПРИНЯТО — не исполнять.** A1-F завершён 25 октября: `initialize` + `session/new`, 17/17 checks, manifest 168/168, пакет 000242–000255 (`b3ebf80`). Историческая нумерация 000172–000180 **занята** опубликованными файлами A1-fix. Ниже — только запись о том, как это делалось.
 
 Цель: доказать A1. Требуется, если диагностика показала устранимую причину.
 
 - Один bounded launch с теми же ограничениями, исправленной конфигурацией и полной телеметрией.
 - PASS только при получении ответа `initialize` и завершении минимального протокола (`session/new`, без inference).
-- Evidence: `authorization-a1-final-000172.json`, `preflight-a1-final-000173.json`, `process-tree-a1-final-000174.json`, `network-counters-a1-final-000175.json`, `acp-session-000176.json`, `run-log-a1-final-000177.txt`, `side-effects-a1-final-000178.json`, `summary-a1-final-000179.json`, `integrity-hashes-a1-final-000180.txt`.
-- Если причина неустранима в текущей среде — A1 остаётся `NOT PROVEN`, A4 не открывается; зафиксировать это в summary.
+- Evidence (историческая нумерация, все ID заняты — новые пакеты только от вычисленного максимума): `authorization-a1-final-000172.json`, `preflight-a1-final-000173.json`, `process-tree-a1-final-000174.json`, `network-counters-a1-final-000175.json`, `acp-session-000176.json`, `run-log-a1-final-000177.txt`, `side-effects-a1-final-000178.json`, `summary-a1-final-000179.json`, `integrity-hashes-a1-final-000180.txt`.
+- Если причина неустранима в текущей среде — A1 оставался бы `NOT PROVEN`, A4 не открывался бы; зафиксировать это в summary. (Фактически причина устранена, A1 = PASS.)
 
 ## 4. Фаза A2 — native resume
+
+> **ВЫПОЛНЕНО — PASS как наблюдение (evidence 000181–000186 занят).** Раздел исторический, повторный `--resume` не нужен.
 
 Цель: подтвердить продолжение реального run с доказуемой связью.
 
@@ -137,6 +158,8 @@ if ($exited) { "exitCode=$($p.ExitCode)" } else { "exitCode=UNKNOWN (watchdog ti
 **Приёмка:** linkage подтверждён, before/after совпали, дублей 0, side effects 0. PASS — как наблюдение; inference не входит.
 
 ## 5. Фаза A3 — egress и изоляция
+
+> **ВЫПОЛНЕНО — PASS как наблюдение (evidence 000187–000193 занят).** Раздел исторический, повторные probe не нужны.
 
 Цель: доказать, что среда изолирована и egress ограничен allowlist.
 
@@ -191,9 +214,11 @@ try {
 - После: остановить процессы, выключить pilot, **отозвать credential у issuer**, зафиксировать подтверждение с UTC; удалить local vault entry только после проверки bindings.
 - Проверить логи приложения/контроллера, shell history, temp/crash artifacts, staged diff; у issuer — usage/revocation audit.
 
-### 6.4 Evidence A4 (000194–000202)
+### 6.4 Evidence A4 (ID от текущего максимума, не 000194–000202)
 
-`authorization-provider-route-000194.json`, `credential-binding-000195.json` (redacted), `preflight-provider-route-000196.json`, `provider-request-observation-000197.json`, `counters-cost-000198.json`, `side-effects-provider-route-000199.json`, `summary-provider-route-000200.json`, `revocation-confirmation-000201.json`, `integrity-hashes-provider-route-000202.txt`.
+> Историческая нумерация A4 (000194–000202) **занята** опубликованным evidence A1-fix. Актуальный контракт — `M11_A4_TASK.md` §9: **000256–000268**, продолжение — от вычисленного максимума (см. §1 п.6).
+
+Состав файлов A4 (имена те же, ID — свои): `authorization-a4`, `credential-binding` (redacted), `model-route-binding`, `dpapi-test-result`, `preflight-a4`, `provider-request`, `counters-cost`, `side-effects`, `teardown-a4`, `revocation-confirmation`, `log-audit`, `summary-a4`, `integrity-hashes-a4.txt`.
 
 **Приёмка:** ответ получен в пределах caps; counters в лимитах; side effects только ожидаемые; credential отозван; утечек нет. Иначе `NOT PROVEN`.
 
@@ -203,7 +228,7 @@ try {
 2. Восстановление в отдельный owned каталог, сверка дерева и hashes, `git fsck`.
 3. Проверка: 0 собственных процессов, 0 orphan, 0 residual egress, user homes/archives не удалены.
 4. Аудит логов и redaction-скан новых файлов.
-5. Evidence: `authorization-rollback-000203.json`, `snapshot-manifest-000204.json`, `restore-verification-000205.json`, `residual-check-000206.json`, `log-audit-000207.json`, `summary-rollback-000208.json`, `integrity-hashes-rollback-000209.txt`, `m11-final-status-000210.json`.
+5. Evidence: ID от текущего максимума (см. §1 п.6) для `authorization-rollback`, `snapshot-manifest`, `restore-verification`, `residual-check`, `log-audit`, `summary-rollback`, `integrity-hashes-rollback.txt`, `m11-final-status` — исторические 000203–000210 заняты, актуальный контракт в `M11_PHASE6_TASK.md` §6.
 
 **Приёмка:** восстановление подтверждено, residual 0, логи проверены, финальный статус честно отражает PASS/BLOCKED по каждой фазе.
 
@@ -226,7 +251,7 @@ M11 считается завершённым, когда:
 - A3 PASS с измеренным egress;
 - A4 PASS в пределах caps с подтверждённым отзывом credential;
 - Phase 6 PASS с восстановлением и residual=0;
-- итоговый `m11-final-status-000210.json` не содержит необъяснённых `BLOCKED`.
+- итоговый `m11-final-status-*.json` (ID от текущего максимума) не содержит необъяснённых `BLOCKED`.
 
 Cutover, удаление legacy и production default остаются вне M11 и требуют отдельного решения (глава 6 REMAINING_PLAN).
 
