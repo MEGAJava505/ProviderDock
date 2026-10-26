@@ -323,3 +323,13 @@ P2 дефектом для cutover, а A4 по-прежнему BLOCKED.
 - `codex exec -p vsllm -m gpt-6-astra` — рабочий путь для ревью: два прохода по девятому дефекту вернули вердикты без дампа файлов.
 - `claude-vsllm` — недоступен: `claude-opus-5-5` → «Claude Opus 4.6 is no longer available…», `claude-opus-5.5` и `claude-sonnet-5-5` → пустой ответ, exit 124 по таймауту.
 - MCP-транспорт VSLLM — `HTTP 402 deactivated_workspace`, на текстовые ревью не влияет.
+
+## Верификатор owner-документов проверен — 26 октября 2026
+
+`scripts/m11/verify-owner-docs.mjs` (`b081a78`) проверен тремя способами:
+
+- **HEAD:** `npm run verify:owner-docs` → `OK (3 документа, 10 PowerShell-блоков, evidence max 000255)`, exit 0.
+- **Selftest:** `--selftest` → 18 кейсов, все `ok` (баланс скобок, escaped quote, here-strings, subexpressions), exit 0.
+- **History:** `--history` → реальные до-фиксовые ревизии детектируются: `f79908a` — 29 находок (`C:\<OWNED>` в путях), `27d1459` — 23 находки (занятые evidence-ID), HEAD — 0 находок, exit 0.
+
+Попытка модельного ревью через `codex exec -m gpt-6-astra` вернула `NEEDS_CHANGES` с пояснением, что сессия не имеет доступа к репозиторию и не может проверить diff. Это ограничение сессии, а не дефект: детектирующая способность доказана selftest и history на реальных дефектных коммитах.
