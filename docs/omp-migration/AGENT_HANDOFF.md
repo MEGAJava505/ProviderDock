@@ -1,5 +1,33 @@
 # Текущий статус M11
 
+## Ревью owner-документов и статус оркестратора — 26 октября 2026
+
+**Вердикт: A4-задание и Phase 6 были неисполнимы на Windows PowerShell; дефекты исправлены.**
+Приёмка A1-F перепроверена заново и подтверждена без изменений.
+
+Проверено координатором на HEAD `c8c7333`:
+
+- manifest `integrity-hashes-a1-final-000255.txt`: **168/168 OK**, SHA-256 `b6cd1e2a73a3094738cd26a38ba83ecd5d05e0e62aa7b01137d7115ba4607969` совпадает;
+- `summary-a1-final-000254.json`: внутренний `integrityHash` пересчитан по `canonical()` из `scripts/m11/build-evidence.mjs` — **совпал** (`66a7baee…`); 17/17 checks true, `actualLaunches=1`, `retries=0`, exits 0, runtime 18.0.4, deadlines 7295.238/6132.457/860.682/14288.376 ms;
+- redaction-скан пакета по шаблонам секретов (`sk-`, `ghp_`, `Bearer`, `api_key`) и Windows-путям `C:\Users\<name>` — совпадений нет.
+
+Независимое ревью документов (оркестратор, `claude-vsllm --model claude-opus-5-5`) выявило дефекты, каждый подтверждён координатором по коду CLI (`src/cli/provider-dock-cli.ts:1200–1246`):
+
+| Файл | Дефект | Исправление |
+|---|---|---|
+| `M11_A4_TASK.md:48` | `$env:PD_PILOT_SECRET = ***` — остаток redaction, parse error | `PtrToStringBSTR($ptr)` |
+| `M11_A4_TASK.md:49` | `<LOCAL_SECRET_REFERENCE>` как аргумент: `<` в PowerShell — оператор перенаправления | `$ref = '<LOCAL_SECRET_REFERENCE>'`, далее `secrets set $ref` |
+| `M11_A4_TASK.md:59` | шаг «проверить наличие записи» без команды | добавлен `providerdock secrets list` (выводит только ссылки) |
+| `M11_A4_TASK.md:90` | удаление vault-записи без команды | добавлен `providerdock secrets remove $ref` |
+| `M11_PHASE6_TASK.md:12–17` | `C:\<OWNED>\…` и `<PINNED_OMP_PATH>` в исполняемом блоке | `$owned`/`$pinned` в одинарных кавычках + `New-Item -Force` для каталога |
+| `M11_FULL_EXECUTION_TASK.md:152` | ссылка в аргументе + `ZeroFreeBSTR([IntPtr]::Zero)` не освобождал BSTR | `$ref` + `$ptr` с освобождением в `finally` |
+
+Нумерация evidence A4 000256–000268 и её продолжение в Phase 6 проверены — расхождений нет.
+
+**Статус оркестратора (для следующего запуска):** `printf 'OK\n' | codex exec -p vsllm -m gpt-6-astra` — exit 0, отвечает на тривиальные промпты. При этом MCP-транспорт VSLLM отдаёт `402 deactivated_workspace`, а на ревью-промпт по двум документам модель вернула дамп содержимого файлов без вердикта (дважды). Рабочий путь для содержательных ревью — `/home/agent/.local/bin/claude-vsllm --model claude-opus-5-5`.
+
+**Статус M11 не изменился:** A1 PASS, A4 BLOCKED-owner, Phase 6 pending-A4. Серверных этапов, кроме обслуживания документов, не осталось.
+
 ## Текущий статус A1 — 24 октября 2026, пакет 000242–000255
 
 **A1 PASS по A1-F; A4 BLOCKED; весь M11 ещё не завершён.** Единственный запуск

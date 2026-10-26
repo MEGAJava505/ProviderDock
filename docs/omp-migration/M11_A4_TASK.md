@@ -42,11 +42,12 @@ npx vitest run tests/dpapi-secret-vault.test.ts
 2. Ввести скрыто и передать только через process-scoped env:
 
 ```powershell
+$ref = '<LOCAL_SECRET_REFERENCE>'   # подставить redacted-ссылку, например secret:m11-pilot/route
 $sec = Read-Host -AsSecureString "Pilot credential"
 $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
 try {
-  $env:PD_PILOT_SECRET = ***
-  providerdock secrets set <LOCAL_SECRET_REFERENCE> --from-env PD_PILOT_SECRET
+  $env:PD_PILOT_SECRET = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+  providerdock secrets set $ref --from-env PD_PILOT_SECRET
 } finally {
   Remove-Item Env:PD_PILOT_SECRET -ErrorAction SilentlyContinue
   [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
@@ -54,10 +55,17 @@ try {
 }
 ```
 
+Плейсхолдер в одинарных кавычках заменяется реальным значением до запуска. Символы `<` и `>` в PowerShell зарезервированы (перенаправление ввода/вывода), поэтому пути и ссылки не подставляются как `<...>` прямо в команду.
+
 Запрещено: `setx`, user/machine env, plaintext-файл, ключ в аргументах команды, transcript/debug dump, вывод значения на экран.
 
-3. Проверить наличие записи без печати значения (список/маска).
-4. Привязать `<LOCAL_SECRET_REFERENCE>` только к профилю `m11-pilot`.
+3. Проверить наличие записи без печати значения — `secrets list` выводит только ссылки:
+
+```powershell
+providerdock secrets list
+```
+
+4. Привязать `$ref` (та же `<LOCAL_SECRET_REFERENCE>`) только к профилю `m11-pilot`.
 
 ## 4. Fresh environment и policy
 
@@ -87,7 +95,12 @@ try {
 
 1. Остановить свои процессы, выключить pilot/autohealth.
 2. **Отозвать credential у issuer** и сохранить подтверждение с UTC и redacted reference.
-3. Удалить локальную запись vault **после** проверки bindings; локальное удаление ≠ отзыв.
+3. Удалить локальную запись vault **после** проверки bindings; локальное удаление ≠ отзыв:
+
+```powershell
+providerdock secrets remove $ref
+```
+
 4. Проверить orphan=0, residual egress=0, профиль удалён.
 
 ## 8. Аудит логов и redaction

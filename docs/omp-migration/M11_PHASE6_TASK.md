@@ -9,13 +9,18 @@
 Снять и сохранить вне рабочего дерева:
 
 ```powershell
-git bundle create C:\<OWNED>\snapshots\m11-omp-integration.bundle omp-integration
-Get-FileHash -Algorithm SHA256 C:\<OWNED>\snapshots\m11-omp-integration.bundle
+$owned  = '<OWNED_SNAPSHOT_DIR>'   # абсолютный путь вне рабочего дерева, подставить свой
+$pinned = '<PINNED_OMP_PATH>'      # утверждённый omp.exe 18.0.4
+New-Item -ItemType Directory -Force "$owned\snapshots" | Out-Null
+git bundle create "$owned\snapshots\m11-omp-integration.bundle" omp-integration
+Get-FileHash -Algorithm SHA256 "$owned\snapshots\m11-omp-integration.bundle"
 # состояние приложения (если есть)
-if (Test-Path .provider-dock) { Copy-Item .provider-dock C:\<OWNED>\snapshots\provider-dock -Recurse -Force }
+if (Test-Path .provider-dock) { Copy-Item .provider-dock "$owned\snapshots\provider-dock" -Recurse -Force }
 # pinned binary
-Get-FileHash -Algorithm SHA256 <PINNED_OMP_PATH>
+Get-FileHash -Algorithm SHA256 $pinned
 ```
+
+Плейсхолдеры в одинарных кавычках заменить реальными путями: `<`/`>` в PowerShell зарезервированы под перенаправление, поэтому пути не подставляются как `<...>` прямо в команду.
 
 Зафиксировать в `snapshot-manifest`: bundle hash, state hash, binary hash, время UTC, пути в redacted-форме.
 

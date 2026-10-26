@@ -149,16 +149,20 @@ $p.ExitCode
 ### 6.2 Credential
 
 ```powershell
+$ref = '<LOCAL_SECRET_REFERENCE>'   # подставить redacted-ссылку до запуска
 $sec = Read-Host -AsSecureString "Pilot credential"
-$env:PD_PILOT_SECRET = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-  [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
 try {
-  providerdock secrets set <LOCAL_SECRET_REFERENCE> --from-env PD_PILOT_SECRET
+  $env:PD_PILOT_SECRET = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+  providerdock secrets set $ref --from-env PD_PILOT_SECRET
 } finally {
   Remove-Item Env:PD_PILOT_SECRET -ErrorAction SilentlyContinue
-  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR([IntPtr]::Zero) | Out-Null
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+  Remove-Variable sec, ptr -ErrorAction SilentlyContinue
 }
 ```
+
+Символы `<`/`>` в PowerShell зарезервированы, поэтому ссылка подставляется через переменную, а не как `<...>` в аргументе.
 
 Хранение — штатный DPAPI vault вне репозитория. Запрещено: `setx`, user/machine env, plaintext-файлы, ключ в аргументах команды, transcript/debug dump.
 
