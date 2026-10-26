@@ -6,6 +6,7 @@
 
 | # | Шаг | Статус | Причина | Что нужно от владельца |
 |---|---|---|---|---|
+| 0 | Финализация `M11_OWNER_FINAL.md` оркестратором | `blocked-provider` | Astra: codex 401 (токен не обновляется) и OOM; прямой API — таймаут. Claude: Claude Code отдаёт canned «Sonnet 4.6 unavailable», chat completions — таймаут, codex — 429 | Восстановить вход Codex (`codex login`) либо дождаться VSLLM; после этого оркестратор финализирует документ |
 | 1 | A4 — живая provider route | `blocked-owner` | Требуется Windows-запуск, scoped credential и решения по route/model/caps | Заполнить §1 `M11_A4_TASK.md`, выпустить ключ, выполнить один запрос, отозвать ключ, запушить evidence 000256–000268 |
 | 2 | DPAPI-предусловие A4 | `blocked-owner` | На Windows падает `tests/dpapi-secret-vault.test.ts` (1200/1201) | Починить тест либо явно признать дефект и подтвердить round-trip vault |
 | 3 | Phase 6 — rollback и закрытие | `pending-A4` | Начинать только после приёмки A4 | Выполнить `M11_PHASE6_TASK.md`, запушить evidence и финальный статус |
