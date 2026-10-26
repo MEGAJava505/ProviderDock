@@ -72,17 +72,27 @@ $h.ExitCode   # 7
 # negative: direct TCP вне allowlist -> AccessDenied/10013
 
 # launch (единственный)
+# Бюджеты (P2-1): setup/precreate <=15 s, protocol >=60 s, общий watchdog >=90 s.
+# Один watchdog на 90 s оставляет протоколу окно >=60 s и не маскирует причину таймаута.
 $omp='<PINNED_OMP_PATH>'
 $ompArgs = @('<ALLOWLISTED_ARGS>')   # заменить на утверждённый allowlist; каждый аргумент — отдельный элемент массива
 (Get-FileHash -Algorithm SHA256 $omp).Hash
 $p=Start-Process $omp -ArgumentList $ompArgs -WorkingDirectory "$owned\fixture" `
    -RedirectStandardOutput "$owned\logs\omp-stdout.log" `
    -RedirectStandardError  "$owned\logs\omp-stderr.log" -PassThru
-$null=$p.WaitForExit(45000)
-$p.ExitCode
+$sw=[Diagnostics.Stopwatch]::StartNew()
+$finished=$p.WaitForExit(90000)      # общий watchdog
+$sw.Stop()
+"watchdogElapsedMs=$($sw.ElapsedMilliseconds) finished=$finished"
+if (-not $finished) { try { $p.Kill() } catch {}; $null=$p.WaitForExit(5000) }
+$exited=$p.HasExited
+"hasExited=$exited"
+if ($exited) { "exitCode=$($p.ExitCode)" } else { "exitCode=UNKNOWN (watchdog timeout, kill не завершил процесс)" }
 ```
 
 Плейсхолдеры `$owned` и `$omp` в одинарных кавычках заменяются реальными путями до запуска: символы `<`/`>` в PowerShell зарезервированы под перенаправление, поэтому пути не подставляются как `<...>` прямо в команду. Интерполяция `$owned`/`$run` работает только в двойных кавычках — одиночные кавычки оставлены лишь там, где значение подставляется владельцем целиком.
+
+Таймаут фиксируется как отдельный факт: если `WaitForExit(90000)` вернул `$false`, процесс добивается `Kill()`, а в summary пишется `exitCode=UNKNOWN (watchdog timeout)` без трактовки этого как режима отказа OMP. Обращение к `$p.ExitCode` до проверки `$p.HasExited` в PowerShell бросает исключение и обрывает сбор evidence, поэтому проверка обязательна.
 
 Дополнительно зафиксировать `Get-Item $omp | Select-Object -ExpandProperty VersionInfo` (FileVersion/ProductVersion) — без запуска процесса.
 
