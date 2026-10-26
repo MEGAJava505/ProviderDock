@@ -45,6 +45,7 @@ const DOCS = {
   a4: "M11_A4_TASK.md",
   phase6: "M11_PHASE6_TASK.md",
   full: "M11_FULL_EXECUTION_TASK.md",
+  final: "M11_OWNER_FINAL.md",
 };
 
 let findings = [];
