@@ -1,10 +1,5 @@
 # M11 — финальное задание владельцу (26 октября 2026)
 
-> **ЧЕРНОВИК КООРДИНАТОРА.** Документ собран координатором, потому что Astra и Claude были недоступны. По требованию владельца финальную версию должен выдать оркестратор (Astra или Claude); до этого документ не считается согласованным. Статус финализации — в `OWNER_QUEUE.md`.
-
-Единый документ: всё, что осталось сделать на Windows. Серверная часть закрыта.
-Исполнитель — владелец в elevated PowerShell. Координатор команд не выполняет.
-
 ## 1. Статус и границы
 
 | Фаза | Статус | Доказательство |
@@ -16,8 +11,6 @@
 | A4 | **BLOCKED — этот документ** | нужен один живой запрос и отзыв ключа |
 | Phase 6 | pending-A4 | этот документ, часть 3 |
 | Cutover | вне scope | отдельное решение, глава 6 REMAINING_PLAN |
-
-Правило бюджета: **один живой запрос** на A4, `retries=0`. Evidence только append-only: следующие свободные ID — `000256` (A4) и `000269` (Phase 6); существующие файлы не перезаписывать.
 
 ## 2. Предусловие: DPAPI
 
@@ -37,24 +30,23 @@ providerdock secrets remove m11-dpapi-selftest
 
 Без подтверждённого vault A4 остаётся `BLOCKED`.
 
-## 3. Решения владельца (заполнить до запуска)
+## 3. Решения владельца
 
 | Поле | Значение |
 |---|---|
-| route alias (redacted) | вписать alias, не сырой ID |
-| provider id для `doctor` | вписать id, который видит CLI |
-| selectedModel | точный model ID без `auto` |
-| credential class / TTL | scoped, ephemeral, TTL ≤ окна |
-| costLimit | число и валюта |
-| requestLimit | конечное число, не больше 3 |
-| maxInputTokens / maxOutputTokens | числа |
-| timeoutSeconds | не больше окна |
-| UTC-окно start / end | будущее короткое окно |
-| responsible / approver | кто выполняет / кто утверждает |
-| revocationOwner | кто отзывает ключ у провайдера |
-| stopCriterion | см. §6 |
-
-Пустое поле → A4 `BLOCKED`.
+| route alias (redacted) | |
+| provider id для `doctor` | |
+| selectedModel | |
+| credential class / TTL | |
+| costLimit | |
+| requestLimit | |
+| maxInputTokens / maxOutputTokens | |
+| timeoutSeconds | |
+| UTC-окно start / end | |
+| responsible / approver | |
+| revocationOwner | |
+| stopCriterion | |
+```
 
 ## 4. Переменные сессии
 
@@ -72,8 +64,6 @@ $runId = "M11-A4-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 
 New-Item -ItemType Directory -Force -Path $owned, $logs, $dumps, $etw | Out-Null
 ```
-
-Заменить значения на фактические. Пути и ID не должны попадать в публикуемый evidence в сыром виде — только alias.
 
 ## 5. A4 — живой запрос
 
@@ -103,7 +93,6 @@ try {
   Remove-Variable sec, ptr -ErrorAction SilentlyContinue
 }
 providerdock secrets list --json
-```
 
 Запрещено: `setx`, user/machine env, plaintext-файл, ключ в аргументах, transcript или debug dump.
 
@@ -153,6 +142,7 @@ providerdock secrets list --json
 | 000266 | `log-audit-000266.json` | источники, границы, совпадения, недоступное |
 | 000267 | `summary-a4-000267.json` | PASS или BLOCKED, причина, ссылки |
 | 000268 | `integrity-hashes-a4-000268.txt` | SHA-256 всех файлов A4 |
+```
 
 ## 6. Stop-правила A4
 
@@ -203,15 +193,11 @@ providerdock secrets list --json
 | 000272 | `residual-check-000272.json` |
 | 000273 | `log-audit-rollback-000273.json` |
 | 000274 | `summary-rollback-000274.json` |
-| 000275 | `integrity-hashes-rollback-000275.txt` |
-| 000276 | `m11-final-status-000276.json` |
-
-`m11-final-status` содержит таблицу фаз с PASS или BLOCKED и ссылками; необъяснённых `BLOCKED` быть не должно.
 
 ## 8. Критерии приёмки
 
-- A4: DPAPI подтверждён; ключ scoped и отозван; один запрос в пределах caps; нет unexpected egress и side effects; логи и redaction проверены; манифест покрывает все файлы.
-- Phase 6: snapshot снят до действий; restore совпадает; `fsck` чист; residual 0; пользовательские данные целы; финальный статус честный.
+- **A4:** DPAPI подтверждён; ключ scoped, short-lived и отозван у провайдера; ровно один запрос в пределах caps (`retries=0`); нет unexpected egress, дочерних процессов и side effects вне ожидаемых; логи и redaction проверены; манифест `000256–000268` покрывает все файлы A4.
+- **Phase 6:** snapshot снят до действий; restore побайтно совпадает; `fsck` чист; residual 0 (процессы, orphan, egress, секрет, профиль); пользовательские данные целы; `m11-final-status` содержит только PASS или обоснованные BLOCKED.
 
 ## 9. Публикация
 
@@ -219,25 +205,24 @@ providerdock secrets list --json
 git add evidence/m11-pilot
 git commit -m "evidence(m11): record A4 provider route and rollback"
 git push origin omp-integration
-```
 
-Прислать координатору: hash коммита, SHA-256 последнего манифеста, таблицу фаз.
+Координатору передать: hash коммита, SHA-256 последнего манифеста (`000275`), таблицу фаз из `m11-final-status-000276`.
 
 ## 10. Чек-лист
 
-1. DPAPI-тест PASS или решение плюс round-trip
-2. Заполнены все решения из §3
-3. Переменные §4 заданы, каталоги созданы
-4. Preflight: hash и версия совпали
-5. Ключ выпущен, введён скрыто, лёг в vault
-6. Один запрос выполнен, `retries=0`
-7. Counters и side effects сняты
-8. Ключ отозван у провайдера, подтверждение с UTC
-9. Локальная запись удалена
-10. Логи и redaction проверены
-11. Evidence A4 000256–000268 и манифест
-12. Snapshot и restore Phase 6
-13. Residual 0, fsck чист
-14. Evidence Phase 6 000269–000276
-15. `m11-final-status` без необъяснённых BLOCKED
-16. Push и хеши отправлены
+1. DPAPI-тест PASS либо зафиксированное решение плюс round-trip vault.
+2. Все поля §3 заполнены; пустых нет.
+3. Переменные §4 заданы, каталоги созданы.
+4. Preflight: hash `1944c6e2…d4ba` и версия 18.0.4 совпали, `health` зелёный.
+5. Ключ выпущен scoped/ephemeral, введён скрыто, лёг в vault; в env/файлах/аргументах следов нет.
+6. Выполнен один запрос, `retries=0`, без fallback на модель или маршрут.
+7. Counters и side effects сняты до/после, дельты в пределах лимитов.
+8. Ключ отозван у провайдера; подтверждение с UTC и redacted ref сохранено.
+9. Локальная запись удалена, `secrets list` её не содержит.
+10. Аудит логов, shell-истории, temp/crash artifacts и staged diff выполнен; redaction-скан чист.
+11. Evidence A4 `000256–000268` записан append-only, без перезаписи существующих ID.
+12. Snapshot Phase 6 снят до действий; bundle и binary хеши зафиксированы.
+13. Restore проверен: `fsck` чист, HEAD совпадает, хеши равны snapshot.
+14. Residual 0: процессов `*omp*` нет, orphan и egress отсутствуют, профиль выключен.
+15. Evidence Phase 6 `000269–000276` записан; `m11-final-status` без необъяснённых BLOCKED.
+16. Push выполнен; hash коммита, SHA-256 манифеста и таблица фаз отправлены координатору.
