@@ -48,17 +48,21 @@ logman query providers "Microsoft-Windows-TCPIP"
 logman query providers "Microsoft-Windows-WFP"
 wevtutil gp "Microsoft-Windows-Kernel-Process" /ge:true /gm:true
 
-# owned ETW sessions (до создания процессов)
+# owned paths (подставить свой абсолютный путь вне рабочего дерева)
+$owned = '<OWNED_DIR>'
 $run='M11-A1D-20261020'
-logman create trace "PD-$run-Process"   -p "Microsoft-Windows-Kernel-Process" 0xffffffffffffffff 0x5 -o "C:\<OWNED>\etw\$run-process.etl" -ets
-logman create trace "PD-$run-Transport" -p "Microsoft-Windows-TCPIP"           0xffffffffffffffff 0x5 -o "C:\<OWNED>\etw\$run-transport.etl" -ets
-logman create trace "PD-$run-WFP"       -p "Microsoft-Windows-WFP"             0xffffffffffffffff 0x5 -o "C:\<OWNED>\etw\$run-wfp.etl" -ets
+New-Item -ItemType Directory -Force "$owned\etw","$owned\logs","$owned\dumps","$owned\fixture" | Out-Null
+
+# owned ETW sessions (до создания процессов)
+logman create trace "PD-$run-Process"   -p "Microsoft-Windows-Kernel-Process" 0xffffffffffffffff 0x5 -o "$owned\etw\$run-process.etl" -ets
+logman create trace "PD-$run-Transport" -p "Microsoft-Windows-TCPIP"           0xffffffffffffffff 0x5 -o "$owned\etw\$run-transport.etl" -ets
+logman create trace "PD-$run-WFP"       -p "Microsoft-Windows-WFP"             0xffffffffffffffff 0x5 -o "$owned\etw\$run-wfp.etl" -ets
 logman query -ets
 
 # WER LocalDumps (восстановить после прогона)
 $k='HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\omp.exe'
 New-Item $k -Force | Out-Null
-New-ItemProperty $k -Name DumpFolder -Value 'C:\<OWNED>\dumps' -PropertyType ExpandString -Force
+New-ItemProperty $k -Name DumpFolder -Value "$owned\dumps" -PropertyType ExpandString -Force
 New-ItemProperty $k -Name DumpType -Value 1 -PropertyType DWord -Force
 
 # self-test (обязателен, без него launch запрещён)
@@ -69,13 +73,16 @@ $h.ExitCode   # 7
 
 # launch (единственный)
 $omp='<PINNED_OMP_PATH>'
+$ompArgs = @('<ALLOWLISTED_ARGS>')   # заменить на утверждённый allowlist; каждый аргумент — отдельный элемент массива
 (Get-FileHash -Algorithm SHA256 $omp).Hash
-$p=Start-Process $omp -ArgumentList @('<ALLOWLISTED_ARGS>') -WorkingDirectory 'C:\<OWNED>\fixture' `
-   -RedirectStandardOutput 'C:\<OWNED>\logs\omp-stdout.log' `
-   -RedirectStandardError  'C:\<OWNED>\logs\omp-stderr.log' -PassThru
+$p=Start-Process $omp -ArgumentList $ompArgs -WorkingDirectory "$owned\fixture" `
+   -RedirectStandardOutput "$owned\logs\omp-stdout.log" `
+   -RedirectStandardError  "$owned\logs\omp-stderr.log" -PassThru
 $null=$p.WaitForExit(45000)
 $p.ExitCode
 ```
+
+Плейсхолдеры `$owned` и `$omp` в одинарных кавычках заменяются реальными путями до запуска: символы `<`/`>` в PowerShell зарезервированы под перенаправление, поэтому пути не подставляются как `<...>` прямо в команду. Интерполяция `$owned`/`$run` работает только в двойных кавычках — одиночные кавычки оставлены лишь там, где значение подставляется владельцем целиком.
 
 Дополнительно зафиксировать `Get-Item $omp | Select-Object -ExpandProperty VersionInfo` (FileVersion/ProductVersion) — без запуска процесса.
 
