@@ -317,3 +317,9 @@ P2 дефектом для cutover, а A4 по-прежнему BLOCKED.
 - Код, тесты и `evidence/` не затронуты; изменения — 3 markdown-файла документации.
 
 **Статус M11 не изменился:** A1 PASS, A2/A3 PASS как наблюдения, A4 `blocked-owner`, Phase 6 `pending-A4`.
+
+### Состояние провайдера на 07:05 UTC
+
+- `codex exec -p vsllm -m gpt-6-astra` — рабочий путь для ревью: два прохода по девятому дефекту вернули вердикты без дампа файлов.
+- `claude-vsllm` — недоступен: `claude-opus-5-5` → «Claude Opus 4.6 is no longer available…», `claude-opus-5.5` и `claude-sonnet-5-5` → пустой ответ, exit 124 по таймауту.
+- MCP-транспорт VSLLM — `HTTP 402 deactivated_workspace`, на текстовые ревью не влияет.
