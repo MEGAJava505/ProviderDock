@@ -30,13 +30,15 @@
 // `--selftest` нужен потому, что «0 находок» у неработающего детектора выглядит
 // так же, как у исправных документов.
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..", "..");
-const docsDir = join(repoRoot, "docs", "omp-migration");
+const defaultDocsDir = join(repoRoot, "docs", "omp-migration");
 const evidenceDir = join(repoRoot, "evidence", "m11-pilot");
 
 const DOCS = {
@@ -45,7 +47,7 @@ const DOCS = {
   full: "M11_FULL_EXECUTION_TASK.md",
 };
 
-const findings = [];
+let findings = [];
 const addFinding = (rule, file, detail) => findings.push({ rule, file, detail });
 
 // --- самопроверка детектора (--selftest) --------------------------------------
@@ -369,63 +371,64 @@ function maxEvidenceId(ids) {
 }
 
 // --- прогон ------------------------------------------------------------------
+// analyze(dir) прогоняет все проверки по набору документов из каталога dir.
+// findings модульный, поэтому сбрасывается на каждом входе; это позволяет
+// использовать одну и ту же проверку и для текущего HEAD, и для исторических
+// ревизий в режиме --history.
 
-const results = [];
-const occupied = listEvidenceIds();
-
-if (process.argv.includes("--selftest")) process.exit(selfTest());
-
-for (const [key, name] of Object.entries(DOCS)) {
-  const path = join(docsDir, name);
-  let text;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch (err) {
-    addFinding("missing-doc", name, `не читается: ${err.message}`);
-    continue;
-  }
-  const blocks = extractPowerShellBlocks(text);
-  const blockProblems = [];
-  const redirectProblems = [];
-  for (const block of blocks) {
-    for (const p of scanPowerShell(block.body)) {
-      blockProblems.push({ blockStart: block.startLine, ...p });
-    }
-    for (const h of findRedirectChars(block.body)) {
-      redirectProblems.push({ blockStart: block.startLine, ...h });
-    }
-  }
-  for (const p of blockProblems) {
-    addFinding(
-      "powershell-balance",
-      name,
-      `блок с строки ${p.blockStart}, строка ${p.line}: ${p.detail}`,
-    );
-  }
-  for (const h of redirectProblems) {
-    addFinding(
-      "powershell-redirect-char",
-      name,
-      `блок с строки ${h.blockStart}, строка ${h.line}: '${h.ch}' (${h.where}) — в PowerShell это перенаправление`,
-    );
-  }
-  results.push({ doc: name, blocks: blocks.length });
-}
+function analyze(docsDir) {
+  findings = [];
+  const results = [];
+  const occupied = listEvidenceIds();
 
 // Каждый документ обязан содержать свои исполняемые блоки: иначе «0 находок»
 // означало бы «нечего проверять», а не «всё исполняется».
 const EXPECTED_MIN_BLOCKS = { a4: 4, phase6: 2, full: 4 };
-for (const r of results) {
-  const key = Object.keys(DOCS).find((k) => DOCS[k] === r.doc);
-  const min = EXPECTED_MIN_BLOCKS[key];
-  if (typeof min === "number" && r.blocks < min) {
-    addFinding(
-      "doc-blocks-missing",
-      r.doc,
-      `найдено ${r.blocks} PowerShell-блоков, ожидалось не меньше ${min}: документ изменился или разбор сломан`,
-    );
+
+  for (const [key, name] of Object.entries(DOCS)) {
+    const path = join(docsDir, name);
+    let text;
+    try {
+      text = readFileSync(path, "utf8");
+    } catch (err) {
+      addFinding("missing-doc", name, `не читается: ${err.message}`);
+      continue;
+    }
+    const blocks = extractPowerShellBlocks(text);
+    const blockProblems = [];
+    const redirectProblems = [];
+    for (const block of blocks) {
+      for (const p of scanPowerShell(block.body)) {
+        blockProblems.push({ blockStart: block.startLine, ...p });
+      }
+      for (const h of findRedirectChars(block.body)) {
+        redirectProblems.push({ blockStart: block.startLine, ...h });
+      }
+    }
+    for (const p of blockProblems) {
+      addFinding(
+        "powershell-balance",
+        name,
+        `блок с строки ${p.blockStart}, строка ${p.line}: ${p.detail}`,
+      );
+    }
+    for (const h of redirectProblems) {
+      addFinding(
+        "powershell-redirect-char",
+        name,
+        `блок с строки ${h.blockStart}, строка ${h.line}: '${h.ch}' (${h.where}) — в PowerShell это перенаправление`,
+      );
+    }
+    results.push({ doc: name, blocks: blocks.length });
+    const min = EXPECTED_MIN_BLOCKS[key];
+    if (typeof min === "number" && blocks.length < min) {
+      addFinding(
+        "doc-blocks-missing",
+        name,
+        `найдено ${blocks.length} PowerShell-блоков, ожидалось не меньше ${min}: документ изменился или разбор сломан`,
+      );
+    }
   }
-}
 
 // Занятый evidence-ID может упоминаться только как история. Строка, где занятый ID
 // (или диапазон с занятым началом) подан без пометки, — это кандидат на перезапись.
@@ -472,108 +475,286 @@ for (const name of Object.values(DOCS)) {
 }
 
 // A4: таблица evidence-ID
-const a4Text = readFileSync(join(docsDir, DOCS.a4), "utf8");
-const a4Ids = tableIds(a4Text, "## 9. Evidence-контракт");
-const a4Declared = a4Text.match(/старт с (\d{6})/);
-if (!a4Ids) {
-  addFinding("a4-evidence-table", DOCS.a4, "не найдена таблица §9 Evidence-контракт");
-} else if (a4Ids.length === 0) {
-  addFinding("a4-evidence-table-empty", DOCS.a4, "таблица §9 не содержит строк с ID");
-} else {
-  if (!a4Declared) {
-    addFinding(
-      "a4-evidence-start-missing",
-      DOCS.a4,
-      "нет объявления «старт с NNNNNN»: граница append-only не зафиксирована",
-    );
-  }
-  if (new Set(a4Ids).size !== a4Ids.length) {
-    addFinding("a4-evidence-duplicate", DOCS.a4, "в §9 повторяются ID");
-  }
-  const sorted = [...a4Ids].map(Number).sort((a, b) => a - b);
-  for (let i = 1; i < sorted.length; i += 1) {
-    if (sorted[i] !== sorted[i - 1] + 1) {
+let a4Text = null;
+try {
+  a4Text = readFileSync(join(docsDir, DOCS.a4), "utf8");
+} catch {
+  a4Text = null;
+}
+if (a4Text !== null) {
+  const a4Ids = tableIds(a4Text, "## 9. Evidence-контракт");
+  const a4Declared = a4Text.match(/старт с (\d{6})/);
+  if (!a4Ids) {
+    addFinding("a4-evidence-table", DOCS.a4, "не найдена таблица §9 Evidence-контракт");
+  } else if (a4Ids.length === 0) {
+    addFinding("a4-evidence-table-empty", DOCS.a4, "таблица §9 не содержит строк с ID");
+  } else {
+    if (!a4Declared) {
       addFinding(
-        "a4-evidence-gap",
+        "a4-evidence-start-missing",
         DOCS.a4,
-        `разрыв в нумерации: ${String(sorted[i - 1]).padStart(6, "0")} → ${String(sorted[i]).padStart(6, "0")}`,
+        "нет объявления «старт с NNNNNN»: граница append-only не зафиксирована",
       );
     }
-  }
-  for (const id of a4Ids) {
-    if (occupied.has(id)) {
+    if (new Set(a4Ids).size !== a4Ids.length) {
+      addFinding("a4-evidence-duplicate", DOCS.a4, "в §9 повторяются ID");
+    }
+    const sorted = [...a4Ids].map(Number).sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i += 1) {
+      if (sorted[i] !== sorted[i - 1] + 1) {
+        addFinding(
+          "a4-evidence-gap",
+          DOCS.a4,
+          `разрыв в нумерации: ${String(sorted[i - 1]).padStart(6, "0")} → ${String(sorted[i]).padStart(6, "0")}`,
+        );
+      }
+    }
+    for (const id of a4Ids) {
+      if (occupied.has(id)) {
+        addFinding(
+          "a4-evidence-collision",
+          DOCS.a4,
+          `ID ${id} предписан к записи, но уже занят в evidence/m11-pilot`,
+        );
+      }
+    }
+    const declared = a4Declared;
+    const max = maxEvidenceId(occupied);
+    const expected = max === null ? null : String(Number(max) + 1).padStart(6, "0");
+    if (declared && expected && declared[1] !== expected) {
       addFinding(
-        "a4-evidence-collision",
+        "a4-evidence-start-stale",
         DOCS.a4,
-        `ID ${id} предписан к записи, но уже занят в evidence/m11-pilot`,
+        `документ объявляет старт с ${declared[1]}, фактический максимум+1 = ${expected}`,
       );
     }
-  }
-  const declared = a4Declared;
-  const max = maxEvidenceId(occupied);
-  const expected = max === null ? null : String(Number(max) + 1).padStart(6, "0");
-  if (declared && expected && declared[1] !== expected) {
-    addFinding(
-      "a4-evidence-start-stale",
-      DOCS.a4,
-      `документ объявляет старт с ${declared[1]}, фактический максимум+1 = ${expected}`,
-    );
-  }
-  if (declared && sorted[0] !== Number(declared[1])) {
-    addFinding(
-      "a4-evidence-start-mismatch",
-      DOCS.a4,
-      `таблица начинается с ${String(sorted[0]).padStart(6, "0")}, а текст объявляет ${declared[1]}`,
-    );
+    if (declared && sorted[0] !== Number(declared[1])) {
+      addFinding(
+        "a4-evidence-start-mismatch",
+        DOCS.a4,
+        `таблица начинается с ${String(sorted[0]).padStart(6, "0")}, а текст объявляет ${declared[1]}`,
+      );
+    }
   }
 }
 
 // Phase 6: не должно быть жёстких «продолжаем с 0002NN», если такой диапазон занят
-const ph6Text = readFileSync(join(docsDir, DOCS.phase6), "utf8");
-const ph6Hard = [...ph6Text.matchAll(/\b(\d{6})\s*[–-]\s*(\d{6})\b/g)].map((m) => m[1]);
-for (const id of ph6Hard) {
-  if (occupied.has(id)) {
-    addFinding(
-      "phase6-evidence-collision",
-      DOCS.phase6,
-      `жёсткий диапазон начинается с занятого ID ${id}`,
-    );
-  }
+let ph6Text = null;
+try {
+  ph6Text = readFileSync(join(docsDir, DOCS.phase6), "utf8");
+} catch {
+  ph6Text = null;
 }
-
-// Phase 6: диапазон-заглушка next+1 … next+K должен быть непрерывным и без дублей
-const ph6Section = ph6Text.slice(ph6Text.indexOf("## 6. Evidence-контракт"));
-const ph6Next = [...ph6Section.matchAll(/next\+(\d+)/g)].map((m) => Number(m[1]));
-if (ph6Next.length === 0) {
-  addFinding(
-    "phase6-next-missing",
-    DOCS.phase6,
-    "в §6 нет плейсхолдеров next+N: граница нумерации не зафиксирована",
-  );
-} else {
-  const unique = [...new Set(ph6Next)].sort((a, b) => a - b);
-  if (unique.length !== ph6Next.length) {
-    addFinding("phase6-next-duplicate", DOCS.phase6, "в §6 повторяются плейсхолдеры next+N");
-  }
-  for (let i = 0; i < unique.length; i += 1) {
-    if (unique[i] !== i + 1) {
+if (ph6Text !== null) {
+  const ph6Hard = [...ph6Text.matchAll(/\b(\d{6})\s*[–-]\s*(\d{6})\b/g)].map((m) => m[1]);
+  for (const id of ph6Hard) {
+    if (occupied.has(id)) {
       addFinding(
-        "phase6-next-gap",
+        "phase6-evidence-collision",
         DOCS.phase6,
-        `плейсхолдеры next+N не непрерывны: ожидался next+${i + 1}, найден next+${unique[i]}`,
+        `жёсткий диапазон начинается с занятого ID ${id}`,
       );
-      break;
+    }
+  }
+
+  // Phase 6: диапазон-заглушка next+1 … next+K должен быть непрерывным и без дублей
+  const ph6Section = ph6Text.slice(ph6Text.indexOf("## 6. Evidence-контракт"));
+  const ph6Next = [...ph6Section.matchAll(/next\+(\d+)/g)].map((m) => Number(m[1]));
+  if (ph6Next.length === 0) {
+    addFinding(
+      "phase6-next-missing",
+      DOCS.phase6,
+      "в §6 нет плейсхолдеров next+N: граница нумерации не зафиксирована",
+    );
+  } else {
+    const unique = [...new Set(ph6Next)].sort((a, b) => a - b);
+    if (unique.length !== ph6Next.length) {
+      addFinding("phase6-next-duplicate", DOCS.phase6, "в §6 повторяются плейсхолдеры next+N");
+    }
+    for (let i = 0; i < unique.length; i += 1) {
+      if (unique[i] !== i + 1) {
+        addFinding(
+          "phase6-next-gap",
+          DOCS.phase6,
+          `плейсхолдеры next+N не непрерывны: ожидался next+${i + 1}, найден next+${unique[i]}`,
+        );
+        break;
+      }
     }
   }
 }
 
-// --- вывод -------------------------------------------------------------------
+  return { results, findings, occupied };
+}
+
+// --- проверка на реальной истории ---------------------------------------------
+// «0 находок» на HEAD ничего не доказывает, если детектор не способен поймать уже
+// известные дефекты. Каждая ревизия здесь — реальный коммит до исправления;
+// ожидается, что проверка на нём падает и содержит указанные правила.
+
+const HISTORY_CASES = [
+  {
+    rev: "f79908a",
+    note: "буквальные C:\\<OWNED> в путях: PowerShell читает '<'/'>' как перенаправление",
+    expect: ["powershell-redirect-char"],
+    docs: ["M11_A4_TASK.md", "M11_PHASE6_TASK.md", "M11_FULL_EXECUTION_TASK.md"],
+  },
+  {
+    rev: "27d1459",
+    note: "Full-Execution предписывает evidence 000159+ при фактическом максимуме 000255",
+    expect: ["occupied-id-unmarked"],
+    docs: ["M11_A4_TASK.md", "M11_PHASE6_TASK.md", "M11_FULL_EXECUTION_TASK.md"],
+  },
+];
+
+function revExists(rev) {
+  try {
+    execFileSync("git", ["-C", repoRoot, "cat-file", "-e", `${rev}^{commit}`], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isShallow() {
+  try {
+    const out = execFileSync("git", ["-C", repoRoot, "rev-parse", "--is-shallow-repository"], {
+      encoding: "utf8",
+    });
+    return out.trim() === "true";
+  } catch {
+    return false;
+  }
+}
+
+function materialize(rev, dir) {
+  const used = [];
+  const failed = [];
+  for (const name of Object.values(DOCS)) {
+    const spec = `${rev}:docs/omp-migration/${name}`;
+    // Документа может не быть в старой ревизии — это не дефект. Ошибка чтения
+    // существующего файла — дефект окружения, и её нельзя глушить: иначе кейс
+    // «поймал дефект» может пройти на одном файле из трёх.
+    let exists = false;
+    try {
+      execFileSync("git", ["-C", repoRoot, "cat-file", "-e", spec], { stdio: "ignore" });
+      exists = true;
+    } catch {
+      exists = false;
+    }
+    if (!exists) continue;
+    try {
+      const text = execFileSync("git", ["-C", repoRoot, "show", spec], {
+        encoding: "utf8",
+        maxBuffer: 32 * 1024 * 1024,
+      });
+      writeFileSync(join(dir, name), text);
+      used.push(name);
+    } catch (err) {
+      failed.push(`${name}: ${err.message.split("\n")[0]}`);
+    }
+  }
+  return { used, failed };
+}
+
+function history() {
+  let failures = 0;
+  let skipped = 0;
+  const shallow = isShallow();
+  // Пропуск допустим только явным флагом. Иначе shallow-клон давал бы зелёный
+  // результат без единой проверки детектора на известных дефектах.
+  const allowSkip = process.argv.includes("--allow-shallow-skip");
+  for (const c of HISTORY_CASES) {
+    if (!revExists(c.rev)) {
+      if (shallow && allowSkip) {
+        skipped += 1;
+        console.log(`SKIP ${c.rev}: нет в shallow-клоне (--allow-shallow-skip)`);
+        continue;
+      }
+      failures += 1;
+      console.log(
+        `FAIL ${c.rev}: ревизия отсутствует${shallow ? " (shallow-клон; нужен полный клон или --allow-shallow-skip)" : ""} — ${c.note}`,
+      );
+      continue;
+    }
+    const dir = mkdtempSync(join(tmpdir(), "m11-owner-docs-"));
+    try {
+      const { used, failed } = materialize(c.rev, dir);
+      if (failed.length > 0) {
+        failures += 1;
+        console.log(`FAIL ${c.rev}: git show упал на ${failed.join("; ")} — ${c.note}`);
+        continue;
+      }
+      const missingDocs = c.docs.filter((d) => !used.includes(d));
+      if (missingDocs.length > 0) {
+        failures += 1;
+        console.log(
+          `FAIL ${c.rev}: в ревизии нет ожидаемых документов ${missingDocs.join(", ")} — ${c.note}`,
+        );
+        continue;
+      }
+      const { findings: f } = analyze(dir);
+      const rules = new Set(f.map((x) => x.rule));
+      const missing = c.expect.filter((r) => !rules.has(r));
+      const caught = c.expect.every((r) => rules.has(r));
+      if (!caught) failures += 1;
+      console.log(
+        `${caught ? "ok  " : "FAIL"} ${c.rev}: ${f.length} находок${caught ? "" : `, не поймано: ${missing.join(", ")}`} — ${c.note}`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  const head = analyze(defaultDocsDir);
+  const headClean = head.findings.length === 0;
+  if (!headClean) failures += 1;
+  console.log(
+    `${headClean ? "ok  " : "FAIL"} HEAD: ${head.findings.length} находок (ожидалось 0)`,
+  );
+  const total = HISTORY_CASES.length + 1 - skipped;
+  console.log(
+    failures === 0
+      ? `history: OK (${total} проверок${skipped ? `, ${skipped} пропущено из-за shallow-клона` : ""})`
+      : `history: FAIL (${failures} из ${total})`,
+  );
+  return failures === 0 ? 0 : 1;
+}
+
+// --- точка входа ---------------------------------------------------------------
+
+if (process.argv.includes("--selftest")) process.exit(selfTest());
+
+const docsArgIndex = process.argv.indexOf("--docs");
+let docsOverride = null;
+if (docsArgIndex >= 0) {
+  const value = process.argv[docsArgIndex + 1];
+  if (!value || value.startsWith("--")) {
+    console.error("verify-owner-docs: --docs требует путь к каталогу с документами");
+    process.exit(2);
+  }
+  docsOverride = resolve(value);
+}
+
+if (process.argv.includes("--history")) {
+  if (docsOverride) {
+    // --history проверяет исторические ревизии и HEAD репозитория; подмена каталога
+    // сделала бы проверку HEAD бессмысленной, поэтому комбинация запрещена явно.
+    console.error("verify-owner-docs: --history несовместим с --docs");
+    process.exit(2);
+  }
+  process.exit(history());
+}
+
+const docsDir = docsOverride ?? defaultDocsDir;
+
+const { results, findings: found, occupied } = analyze(docsDir);
 
 const report = {
-  ok: findings.length === 0,
+  ok: found.length === 0,
+  docsDir,
   evidence: { occupiedCount: occupied.size, max: maxEvidenceId(occupied) },
   docs: results,
-  findings,
+  findings: found,
 };
 
 if (process.argv.includes("--json")) {
@@ -583,8 +764,8 @@ if (process.argv.includes("--json")) {
     `verify-owner-docs: OK (${results.length} документа, ${results.reduce((n, r) => n + r.blocks, 0)} PowerShell-блоков, evidence max ${report.evidence.max})`,
   );
 } else {
-  console.log(`verify-owner-docs: FAIL (${findings.length} находок)`);
-  for (const f of findings) console.log(`- [${f.rule}] ${f.file ?? ""}: ${f.detail}`);
+  console.log(`verify-owner-docs: FAIL (${found.length} находок)`);
+  for (const f of found) console.log(`- [${f.rule}] ${f.file ?? ""}: ${f.detail}`);
 }
 
 process.exit(report.ok ? 0 : 1);
