@@ -398,6 +398,35 @@ Diff `b081a78..HEAD` по `scripts/m11/verify-owner-docs.mjs`, `tests/m11-owner-
 
 Изменения в код не вносились: гейт остаётся на `483e92c`, поведение подтверждено тестами и `--history`.
 
+## Независимая перепроверка evidence — 27 октября 2026, 15:40 UTC
+
+Проверено напрямую (не по предыдущему вердикту), репозиторий `provider__switcher`,
+ветка `origin/omp-integration` = `4c438d8`, рабочее дерево чистое.
+
+- **Манифест** `evidence/m11-pilot/A1-actual-binary/integrity-hashes-a1-final-000255.txt`:
+  **168/168 OK**, missing/mismatch — 0. SHA-256 самого манифеста
+  `b6cd1e2a73a3094738cd26a38ba83ecd5d05e0e62aa7b01137d7115ba4607969` совпадает.
+- **Внутренние `integrityHash`**: пересчитаны по node-канонизации
+  (`localeCompare('en')`, массивы сохранены, pretty 2, UTF-8, LF, верхний
+  `integrityHash` исключён) — **98/98 verified, 0 mismatch**; 27 файлов внутреннего
+  хеша не имеют (логи/бинарные артефакты), они покрыты манифестом.
+  Один файл (`authorization-rerun-elevated-000132.json`) объявляет собственное
+  правило `sorted-keys-pretty-json-ensure-ascii-utf8-lf` и содержит не-ASCII
+  строки (2 значения в `authorizationRef`) — пересчёт с `ensure_ascii=true`
+  совпадает с его объявленным `value`. Это задокументированный вариант, не дефект.
+- **Append-only**: `git log --all --diff-filter=M -- evidence/` — **0 изменённых
+  файлов**, ни один evidence-ID не перезаписан.
+- **Backfill `000145`**: покрывает ровно **19 JSON** (`entries` = 19),
+  `historicalFilesModified` = 0, `missingOriginalInternalHashes` = 18.
+  Файл включён в манифест `000255` (1 совпадение) — **P2-1 закрыт**.
+- **Redaction-скан** по всем 168 файлам манифеста (`sk-`, `ghp_`, `Bearer`,
+  `C:\Users\<name>`) — **0 совпадений**.
+
+**Вердикт:** существующая приёмка A1-F подтверждена; новых evidence-пакетов нет.
+Статус M11 без изменений: A1 PASS, A2/A3 PASS как наблюдения, A4 blocked-owner,
+Phase 6 pending-A4, cutover вне scope. Ничего не повышено до PASS по косвенным
+признакам; live-приёмка A4 не выполнялась.
+
 ## Плановая проверка evidence — 27 октября 2026, 11:41 UTC
 
 - `git fetch origin omp-integration` (timeout 30) — OK. Локальный HEAD = `origin/omp-integration` = `4d10f6c`. Относительно baseline `3bf6f29` изменений в `evidence/` нет (нет A/M/D) — нового evidence-пакета для приёмки нет, append-only не нарушен.
