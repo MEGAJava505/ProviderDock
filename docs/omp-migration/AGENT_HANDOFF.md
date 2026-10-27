@@ -405,3 +405,11 @@ Diff `b081a78..HEAD` по `scripts/m11/verify-owner-docs.mjs`, `tests/m11-owner-
 - Redaction: 168 файлов manifest проверены на sk-токены, ghp-токены и Bearer-токены; совпадений 0. Это проверка указанных шаблонов, не гарантия отсутствия любых персональных данных.
 - Первоначальная попытка применить современный canonical() ко всем историческим JSON остановилась на `authorization-rerun-elevated-000132.json`: у него явно другая canonicalization (`sorted-keys-pretty-json-ensure-ascii-utf8-lf`). Это не основание объявлять исторический файл повреждённым; его байтовый SHA-256 подтверждён manifest. Проверка внутренних хешей ограничена финальным пакетом с соответствующей canonicalization.
 - Вердикт: существующая приёмка A1-F подтверждена, новых evidence нет. A4 остаётся blocked-owner, Phase 6 pending-A4. OWNER_QUEUE.md не менялся. OMP/Windows/credentials/cutover не затрагивались; внешние модельные вызовы не выполнялись.
+
+## Плановая проверка evidence — 27 октября 2026, 09:31 UTC
+
+- `git fetch origin omp-integration` (timeout 30) — OK. Локальный HEAD = `origin/omp-integration` = `8bd0e62`. Относительно baseline `3bf6f29` изменений в `evidence/` нет (нет A/M/D) — нового evidence-пакета для приёмки нет, append-only не нарушен.
+- Существующий A1-F: `sha256sum -c integrity-hashes-a1-final-000255.txt` — **168/168 OK**.
+- Внутренние integrityHash финального набора `000242–000254` (10 JSON) пересчитаны через `canonical()` из `scripts/m11/build-evidence.mjs` — **10/10 OK**.
+- Redaction-скан 168 файлов manifest на `sk-`, `ghp_`, `Bearer` — **0 совпадений**. Это проверка указанных шаблонов, не гарантия отсутствия любых персональных данных.
+- Вердикт: существующая приёмка A1-F подтверждена, новых evidence нет. Статус M11 без изменений: A1 PASS, A4 `blocked-owner`, Phase 6 `pending-A4`. `OWNER_QUEUE.md` не менялся. OMP/Windows/credentials/cutover не затрагивались; внешние модельные вызовы не выполнялись (шаг 1: после приёмки evidence прогон завершён).
